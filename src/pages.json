@@ -1,0 +1,72 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+    }
+  },
+
+	"pages": [
+		{
+			"path": "pages/tabBar/schedule",
+			"style": {
+				"navigationBarTitleText": "日程"
+			}
+		},
+		{
+			"path": "pages/tabBar/task",
+			"style": {
+				"navigationBarTitleText": "打卡"
+			}
+		},
+		{
+			"path": "pages/tabBar/more",
+			"style": {
+				"navigationBarTitleText": "更多"
+			}
+		},
+		{
+			"path": "pages/tabBar/profile",
+			"style": {
+				"navigationBarTitleText": "我的"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "funfun日程",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#409EFF",
+		"backgroundColor": "#ffffff",
+		"list": [
+			{
+				"pagePath": "pages/tabBar/schedule",
+				"text": "日程",
+				"iconPath": "static/icons/schedule.png",
+				"selectedIconPath": "static/icons/scheduleHL.png"
+			},
+			{
+				"pagePath": "pages/tabBar/task",
+				"text": "打卡",
+				"iconPath": "static/icons/task.png",
+				"selectedIconPath": "static/icons/taskHL.png"
+			},
+			{
+				"pagePath": "pages/tabBar/more",
+				"text": "更多",
+				"iconPath": "static/icons/more.png",
+				"selectedIconPath": "static/icons/moreHL.png"
+			},
+			{
+				"pagePath": "pages/tabBar/profile",
+				"text": "我的",
+				"iconPath": "static/icons/my.png",
+				"selectedIconPath": "static/icons/myHL.png"
+			}
+		]
+	}
+}

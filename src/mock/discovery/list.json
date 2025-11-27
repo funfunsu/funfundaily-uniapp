@@ -1,0 +1,15 @@
+[{
+		"id": "1",
+		"itemTitle": "积分兑换",
+		"itemType": "path",
+		"uri": "/pages/point/pointExchange",
+		"status":"active"
+	}, {
+		"id": "2",
+		"itemTitle": "积分管理",
+		"itemType": "path",
+		"uri": "/pages/point/management",
+		"status":"inactive"
+	}
+
+]

@@ -1,0 +1,15 @@
+{
+	"id": "1",
+	"itemTitle": "数学11",
+	"itemDesc": "",
+	"location": "教室",
+	"repeatType": "weekly",
+	"repeatKeys": ["2", "3"],
+	"repeatStartDay": "2025-08-31 16:00:00",
+	"repeatEndDay": "2026-01-13 16:00:00",
+	"itemType": "school",
+	"startTime": "2025-09-01 08:30:00",
+	"endTime": "2025-09-01 09:10:00",
+	"userId": "1",
+	"groupId": "1"
+}
