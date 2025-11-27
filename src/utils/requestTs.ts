@@ -73,7 +73,7 @@ export default function request<T = any>(options : RequestOptions) : Promise<Res
 	if (config.mock) {
 		console.log('Mock 请求')
 		const mockResult = mock.mockRequest(url, processedOptions) as ResponseData<T>
-		return Promise.resolve(mockResult)
+		return Promise.resolve(mockResult.data)
 	}
 
 	// 生产环境下发起真实请求

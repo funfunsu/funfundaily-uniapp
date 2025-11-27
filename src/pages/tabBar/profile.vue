@@ -82,7 +82,7 @@
 </template>
 
 <script>
-	import api from '../../utils/api.js'
+	import api from '../../utils/apiTs'
 	
 	export default {
 		data() {

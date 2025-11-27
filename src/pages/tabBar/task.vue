@@ -1,589 +1,485 @@
 <template>
-	<!-- 页面根容器：三段式布局 -->
 	<view class="page-container">
-
-		<!-- 中间内容区域 -->
+		<!-- 内容区域 -->
 		<view class="content-container">
-			<!-- 今日任务统计 -->
-			<view class="task-stats">
-				<scroll-view direction="horizontal" class="stats-scroll" show-scrollbar="false">
-					<view class="uni-flex uni-row">
-						<view class="stat-item" style="width:30%">
-							<text class="stat-number">{{ completedTasks?.length || 0 }}/{{ todayTasks?.length || 0 }}</text>
-							<text class="stat-label">今日任务</text>
-						</view>
-						<view class="stat-divider"></view>
-						<view class="stat-item" @click="handleHistoryClick()" style="width:30%">
-							<text class="stat-number">{{ point?.count || 0 }}</text>
-							<text class="stat-label">总积分</text>
-						</view>
-						<view class="stat-divider"></view>
-						<view class="stat-item" style="width:30%">
-							<text class="stat-number">{{ totalPoints || 0 }}</text>
-							<text class="stat-label">今日积分</text>
-						</view>
+			<!-- 任务统计卡片 -->
+			<view class="task-stats-card">
+				<view class="stats-row">
+					<view class="stat-block">
+						<text class="stat-number">{{ completedCount }}/{{ totalCount }}</text>
+						<text class="stat-label">今日任务</text>
 					</view>
-					<view class="date-row">
-						<view class="uni-flex uni-row">
-							<view class="stat-item" style="width:30%">
-								<text class="date-icon" @click="handleLastDayClick()">←</text>
-							</view>
-							<view class="stat-divider"></view>
-							<view class="stat-item" style="width:30%">
-								<text class="stat-label">{{getDateToShow(currentDate)}}</text>
-							</view>
-							<view class="stat-divider"></view>
-							<view class="stat-item" style="width:30%">
-								<text class="date-icon" @click="handleNextDayClick()">→</text>
-							</view>
-						</view>
+					<view class="stat-divider"></view>
+					<view class="stat-block" @click="handleHistoryClick">
+						<text class="stat-number">{{ point.count || 0 }}</text>
+						<text class="stat-label">总积分</text>
 					</view>
-				</scroll-view>
+					<view class="stat-divider"></view>
+					<view class="stat-block">
+						<text class="stat-number">{{ todayPoints }}</text>
+						<text class="stat-label">今日积分</text>
+					</view>
+				</view>
+
+				<view class="date-control-row">
+					<view class="date-nav" @click="handleLastDayClick">
+						<text class="nav-icon">←</text>
+					</view>
+					<view class="current-date">
+						<text class="date-text">{{ formattedCurrentDate }}</text>
+					</view>
+					<view class="date-nav" @click="handleNextDayClick">
+						<text class="nav-icon">→</text>
+					</view>
+				</view>
 			</view>
 
 			<!-- 任务列表 -->
-		<scroll-view v-show="list_show" id="listview" class="task-list" show-scrollbar="false"
-			@scrolltolower="onScrollTolower">
-			<!-- 空状态提示 -->
-			<view v-if="taskList.length === 0" class="empty-tip">
-				<text class="empty-icon">📋</text>
-				<text class="empty-text">今天没有任务，休息一下吧！</text>
-			</view>
+			<scroll-view
+				v-show="listShow"
+				class="task-list"
+				scroll-y
+				:scroll-with-animation="true"
+				@scrolltolower="onScrollTolower"
+				show-scrollbar="false"
+			>
+				<view v-if="taskList.length === 0" class="empty-state">
+					<text class="empty-icon">📋</text>
+					<text class="empty-text">今天没有任务，休息一下吧！</text>
+				</view>
 
-			<!-- 任务项 -->
-			<view v-for="(task, index) in taskList" :key="index" :id="'item_'+index" class="task-item"
-				@click="itemClick(index)">
-					<!-- 任务内容和状态在一行显示 -->
-					<view class="task-content-row uni-flex uni-row">
-						<!-- 任务信息：标题和描述在一行 -->
-						<view class="task-info-section">
-							<view class="uni-flex uni-row">
-								<text class="task-title">{{ task.itemTitle || '任务标题' }}</text>
-								<text class="task-point">+{{task.extra.pointCnt}}</text>
-								<text class="edit-icon" @click="handleEditTaskclick(index)">⚙️</text>
-							</view>
-							<text class="task-desc"> {{ task.itemDesc || '暂无任务描述' }}</text>
+				<view
+					v-for="task in taskList"
+					:key="task.id"
+					class="task-item"
+					:class="{ 'task-item--completed': task.isCompleted }"
+					@click="itemClick(task.id)"
+				>
+					<view class="task-header">
+						<view class="task-title-section">
+							<text class="task-title">{{ task.itemTitle || '任务标题' }}</text>
+							<text class="task-point">+{{ task.extra?.pointCnt || 0 }}</text>
 						</view>
-						<!-- 任务状态 -->
-						<view class="task-status">
-							<switch style="transform:scale(0.7)" :checked="task.isCompleted || false"
-								@change="handleTaskCheck($event, task)" class="task-checkbox"
-								:disabled="task.isCompleted || false" />
+						<view class="task-actions">
+							<text class="edit-icon" @click.stop="handleEditTaskClick(task.id)">⚙️</text>
+							<switch
+								:checked="!!task.isCompleted"
+								:disabled="!!task.isCompleted"
+								@change="handleTaskCheck($event, task)"
+								class="task-switch"
+							/>
 						</view>
-						<view v-if="task.isCompleted" class="task-complete-info">
-							<text class="completed-text">✓ <text
-									class="task-point-completed">+{{task.extra.pointCnt}}</text></text>
-							<text class="completed-time">{{ formatTime(task.completedTime) }}</text>
-						</view>
-
 					</view>
 
-					<!-- 任务完成信息 -->
+					<text class="task-desc">{{ task.itemDesc || '暂无任务描述' }}</text>
 
+					<view v-if="task.isCompleted" class="task-completion-info">
+						<text class="completed-text">
+							✓ <text class="point-earned">+{{ task.extra?.pointCnt }}</text>
+						</text>
+						<text class="completed-time">{{ formatTime(task.completedTime) }}</text>
+					</view>
 				</view>
-		</scroll-view>
+			</scroll-view>
 		</view>
-		<!-- 底部固定栏 -->
+
+		<!-- 底部栏 -->
 		<view class="bottom-bar">
 			<schedule-bottom-bar add-button-text="任务" @add-click="handleAddClick" />
 		</view>
 	</view>
 </template>
 
-<script>
-	import apiTs from '../../utils/apiTs'
-	import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
-export default {
-	components: {
-		scheduleBottomBar
-	},
-		data() {
-			return {
-			todayTasks: [],
-			completedTasks: [],
-			point: {},
-			totalPoints: 0,
-			taskList: [],
-				taskRecords: [],
-				currentDate: new Date(),
-				item_count: 20,
-				list_show: true,
-				listViewElement: null
-			}
-		},
-		mounted() {
-			// 获取任务列表
-			this.fetchTaskList();
-			this.fetchPoint()
-		},
-		onReady() {
-			this.listViewElement = uni.getElementById('listview');
-		},
-		methods: {
-			async fetchPoint() {
-				const resp = await apiTs.point.get({});
-				console.log('AAAAAAAAA', resp)
-				this.point = resp.data || {}
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import apiTs from '@/utils/apiTs'
+import scheduleBottomBar from '@/components/schedule-bottom-bar.vue'
 
-			},
-			getDateToShow(date) {
-				const year = date.getFullYear();
-				const month = String(date.getMonth() + 1).padStart(2, '0');
-				const day = String(date.getDate()).padStart(2, '0');
-				return `${year}-${month}-${day}`;
-			},
-			handleNextDayClick() {
-				const dateObj = new Date();
-				dateObj.setDate(this.currentDate.getDate() + 1);
-				this.currentDate = dateObj
-				this.fetchTaskList();
-			},
-			handleLastDayClick() {
-				const dateObj = new Date();
-				dateObj.setDate(this.currentDate.getDate() - 1);
-				this.currentDate = dateObj;
-				this.fetchTaskList();
-			},
-
-			// 获取任务列表
-			async fetchTaskList() {
-				try {
-					const req = { 'date': this.currentDate }
-					console.log('taskList')
-
-					// 使用Promise.all并行请求，提高性能
-					const [taskListResp, recordResp] = await Promise.all([
-						apiTs.task.list(req),
-						apiTs.task.records(req)
-					]);
-
-					const taskList = taskListResp.data || [];
-					const taskRecords = recordResp.data || [];
-					// 创建任务记录的映射表，方便快速查找
-					const taskRecordMap = new Map();
-					taskRecords.forEach(record => {
-						// 假设任务记录中包含任务ID字段，这里需要根据实际API返回调整
-						if (record.relatedItemId) {
-							taskRecordMap.set(record.relatedItemId, record);
-						}
-					});
-					console.log('taskMap', taskRecordMap);
-					// 为每个任务添加完成状态和完成时间
-					const tasksWithStatus = taskList.map(task => {
-						// 假设任务对象中包含ID字段，这里需要根据实际API返回调整
-						const taskRecord = taskRecordMap.get(task.id);
-						const isCompleted = !!taskRecord;
-
-						return {
-							...task,
-							isCompleted: isCompleted,
-							// 如果任务已完成，记录完成时间
-							completedTime: taskRecord ? taskRecord.createTime : null
-						};
-					});
-
-					// 更新页面数据
-					this.taskList = tasksWithStatus;
-					this.taskRecords = taskRecords;
-
-
-				} catch (error) {
-					// 如果API调用失败，使用模拟数据
-					console.log('使用模拟数据');
-				}
-
-				// 更新任务统计信息
-				this.updateTaskStats();
-			},
-
-			// 更新任务统计信息
-			updateTaskStats() {
-				// 今日任务总数
-				this.todayTasks = this.taskList;
-				// 已完成任务
-				this.completedTasks = this.taskList.filter(task => task.isCompleted);
-				// 计算今日积分
-				this.totalPoints = this.taskList
-					.filter(task => task.isCompleted && task.extra?.pointCnt)
-					.reduce((sum, task) => sum + parseInt(task.extra.pointCnt), 0);
-			},
-			handleHistoryClick() {
-				// 跳转到日程编辑页面
-				uni.navigateTo({
-					url: '/pages/point/history'
-				});
-			},
-			handleEditTaskclick(index) {
-				const task = this.taskList[index]
-				// 跳转到日程编辑页面
-				uni.navigateTo({
-					url: '/pages/task/edit?id=' + task.id
-				});
-			},
-
-			// 处理任务勾选
-			handleTaskCheck(event, task) {
-				const isChecked = event.detail.value;
-				// 更新任务状态
-				task.isCompleted = isChecked;
-				// 如果完成任务，记录完成时间
-				if (isChecked) {
-					task.completedTime = Date.now();
-				}
-				// 更新统计信息
-				this.updateTaskStats();
-				// 这里可以添加保存任务状态的逻辑
-			},
-
-			// 处理添加按钮点击
-			handleAddClick() {
-				// 跳转到日程编辑页面
-				uni.navigateTo({
-					url: '/pages/task/edit'
-				});
-			},
-
-			// 任务项点击事件
-			itemClick(index) {
-				console.log("任务点击: " + index);
-				// 可以添加任务详情查看逻辑
-			},
-
-			// 添加新任务
-			addTask() {
-				// 这里可以跳转到添加任务页面或显示添加任务弹窗
-				uni.showToast({
-					title: '添加任务',
-					icon: 'none'
-				});
-			},
-
-			// 滚动到底部加载更多
-			onScrollTolower() {
-				setTimeout(() => {
-					this.item_count += 20;
-				}, 300);
-			},
-
-			// 格式化时间显示
-			formatTime(timestamp) {
-				if (!timestamp) return '';
-				const date = new Date(timestamp);
-				const hours = String(date.getHours()).padStart(2, '0');
-				const minutes = String(date.getMinutes()).padStart(2, '0');
-				return `${hours}:${minutes}`;
-			}
-		}
+// =============== 类型定义 ===============
+interface Task {
+	id: string | number
+	itemTitle?: string
+	itemDesc?: string
+	extra?: {
+		pointCnt?: number | string
 	}
+	isCompleted?: boolean
+	completedTime?: number | string | null
+}
+
+interface PointData {
+	count: number
+}
+
+// =============== 响应式状态 ===============
+const point = ref<PointData>({ count: 0 })
+const taskList = ref<Task[]>([])
+const currentDate = ref(new Date())
+const listShow = ref(true)
+const isLoadingMore = ref(false)
+
+// =============== 计算属性 ===============
+const formattedCurrentDate = computed(() => {
+	const d = currentDate.value
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
+
+const totalCount = computed(() => taskList.value.length)
+
+const completedCount = computed(() =>
+	taskList.value.filter(t => t.isCompleted).length
+)
+
+const todayPoints = computed(() =>
+	taskList.value
+		.filter(t => t.isCompleted && t.extra?.pointCnt)
+		.reduce((sum, t) => sum + (Number(t.extra.pointCnt) || 0), 0)
+)
+
+// =============== 方法 ===============
+async function fetchAllData() {
+	await Promise.all([fetchPoint(), fetchTaskList()])
+}
+
+async function fetchPoint() {
+	try {
+		const resp = await apiTs.point.get({})
+		point.value = resp.data || { count: 0 }
+	} catch (err) {
+		console.error('获取积分失败', err)
+	}
+}
+
+async function fetchTaskList() {
+	try {
+		const req = { date: currentDate.value }
+		const [taskListResp, recordResp] = await Promise.all([
+			apiTs.task.list(req),
+			apiTs.task.records(req)
+		])
+
+		const tasks = taskListResp || []
+		const records = recordResp || []
+
+		const recordMap = new Map()
+		records.forEach((r: any) => {
+			if (r.relatedItemId) recordMap.set(r.relatedItemId, r)
+		})
+
+		taskList.value = tasks.map(task => {
+			const record = recordMap.get(task.id)
+			return {
+				...task,
+				isCompleted: !!record,
+				completedTime: record ? record.createTime : null
+			}
+		})
+	} catch (error) {
+		console.error('获取任务失败', error)
+		taskList.value = []
+	}
+}
+
+function handleNextDayClick() {
+	updateDate(1)
+}
+
+function handleLastDayClick() {
+	updateDate(-1)
+}
+
+function updateDate(days: number) {
+	const newDate = new Date(currentDate.value)
+	newDate.setDate(newDate.getDate() + days)
+	currentDate.value = newDate
+	fetchTaskList()
+}
+
+function handleTaskCheck(e: any, task: Task) {
+	const isChecked = e.detail.value
+	if (!isChecked) return // 实际不可取消（因 disabled）
+
+	const updatedTask: Task = {
+		...task,
+		isCompleted: true,
+		completedTime: Date.now()
+	}
+
+	// 替换数组项（响应式安全）
+	const index = taskList.value.findIndex(t => t.id === task.id)
+	if (index !== -1) {
+		taskList.value.splice(index, 1, updatedTask)
+	}
+
+	// TODO: 调用 API 提交完成状态
+	// await apiTs.task.complete({ id: task.id })
+}
+
+// =============== 导航方法 ===============
+function handleHistoryClick() {
+	uni.navigateTo({ url: '/pages/point/history' })
+}
+
+function handleEditTaskClick(id: string | number) {
+	uni.navigateTo({ url: `/pages/task/edit?id=${id}` })
+}
+
+function handleAddClick() {
+	uni.navigateTo({ url: '/pages/task/edit' })
+}
+
+function itemClick(id: string | number) {
+	console.log('任务点击:', id)
+}
+
+function onScrollTolower() {
+	if (isLoadingMore.value) return
+	isLoadingMore.value = true
+	setTimeout(() => {
+		// 模拟加载更多（实际应分页请求）
+		isLoadingMore.value = false
+	}, 500)
+}
+
+function formatTime(timestamp: number | string | null): string {
+	if (!timestamp) return ''
+	const d = new Date(timestamp as number)
+	return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// =============== 生命周期 ===============
+onMounted(() => {
+	fetchAllData()
+})
 </script>
 
 <style scoped>
-	/* 根容器：使用flex布局，占据整个屏幕 */
-	.page-container {
-		width: 100%;
-		height: 100vh;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		/* 禁止整体滚动 */
-		box-sizing: border-box;
-		background-color: #f5f5f5;
-	}
+/* 全局容器 */
+.page-container {
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background-color: #f5f5f5;
+	overflow: hidden;
+}
 
-	/* 顶部固定栏：高度56px，蓝色背景 */
-	.top-bar {
-		height: 56px;
-		background-color: #2196f3;
-		color: white;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		padding: 0 16px;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-		flex-shrink: 0;
-		z-index: 100;
-	}
+.content-container {
+	flex: 1;
+	overflow-y: auto;
+	padding: 0 16rpx 20rpx;
+}
 
-	.top-bar-title {
-		font-size: 18px;
-		font-weight: bold;
-		margin-bottom: 2px;
-	}
+/* 任务统计卡片 */
+.task-stats-card {
+	background: white;
+	border-radius: 16rpx;
+	padding: 24rpx 20rpx;
+	margin-bottom: 20rpx;
+	box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+}
 
-	.top-bar-date {
-		font-size: 12px;
-		opacity: 0.9;
-	}
+.stats-row,
+.date-control-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
 
-	/* 中间内容区域：自适应高度，可滚动 */
-	.content-container {
-		flex: 1;
-		overflow-y: auto;
-		-webkit-overflow-scrolling: touch;
-		/* iOS滚动优化 */
-		position: relative;
-	}
+.stat-block {
+	text-align: center;
+	flex: 1;
+}
 
-	/* 任务统计区域 */
-	.task-stats {
-		background-color: white;
-		padding: 12px 0;
-		margin-bottom: 10px;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-	}
+.stat-number {
+	font-size: 36rpx;
+	font-weight: bold;
+	color: #2196f3;
+	display: block;
+}
 
-	.stats-scroll {
-		white-space: nowrap;
-	}
+.stat-label {
+	font-size: 24rpx;
+	color: #888;
+	margin-top: 8rpx;
+}
 
-	.stat-item {
-		display: inline-flex;
-		align-items: center;
-		/* height: 40px; */
-	}
+.stat-divider {
+	width: 2rpx;
+	height: 40rpx;
+	background: #eee;
+}
 
+/* 日期控制 */
+.date-control-row {
+	margin-top: 24rpx;
+}
+
+.date-nav {
+	flex: 1;
+	text-align: center;
+}
+
+.nav-icon {
+	font-size: 32rpx;
+	color: #666;
+}
+
+.current-date {
+	flex: 2;
+	text-align: center;
+}
+
+.date-text {
+	font-size: 28rpx;
+	font-weight: 500;
+	color: #333;
+}
+
+/* 任务列表 */
+.task-list {
+	padding-top: 10rpx;
+}
+
+.empty-state {
+	text-align: center;
+	padding: 120rpx 40rpx 80rpx;
+}
+
+.empty-icon {
+	font-size: 72rpx;
+	margin-bottom: 20rpx;
+}
+
+.empty-text {
+	font-size: 28rpx;
+	color: #999;
+}
+
+/* 任务项 */
+.task-item {
+	background: white;
+	border-radius: 16rpx;
+	padding: 28rpx;
+	margin-bottom: 20rpx;
+	box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+	transition: transform 0.2s;
+}
+
+.task-item:active {
+	transform: translateY(-4rpx);
+}
+
+.task-item--completed {
+	opacity: 0.85;
+}
+
+/* 任务头部 */
+.task-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 16rpx;
+}
+
+.task-title-section {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+}
+
+.task-title {
+	font-size: 32rpx;
+	font-weight: 600;
+	color: #333;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	flex: 1;
+}
+
+.task-point {
+	margin-left: 16rpx;
+	padding: 6rpx 16rpx;
+	background: #f0f5ff;
+	color: #2196f3;
+	border-radius: 20rpx;
+	font-size: 24rpx;
+	font-weight: bold;
+	flex-shrink: 0;
+}
+
+.task-actions {
+	display: flex;
+	align-items: center;
+	margin-left: 20rpx;
+}
+
+.edit-icon {
+	font-size: 32rpx;
+	color: #999;
+	margin-right: 16rpx;
+}
+
+.task-switch {
+	transform: scale(0.85);
+}
+
+/* 任务描述 */
+.task-desc {
+	font-size: 26rpx;
+	color: #666;
+	line-height: 1.5;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+/* 完成信息 */
+.task-completion-info {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 16rpx;
+	padding-top: 16rpx;
+	border-top: 1rpx solid #f0f0f0;
+}
+
+.completed-text {
+	font-size: 26rpx;
+	color: #4caf50;
+	font-weight: 500;
+}
+
+.point-earned {
+	color: #007aff;
+}
+
+.completed-time {
+	font-size: 24rpx;
+	color: #999;
+}
+
+/* 底部栏 */
+.bottom-bar {
+	height: 100rpx;
+	background: white;
+	box-shadow: 0 -2rpx 20rpx rgba(0, 0, 0, 0.1);
+	z-index: 10;
+}
+
+/* 小屏适配 */
+@media (max-width: 375px) {
 	.stat-number {
-		font-size: 20px;
-		font-weight: bold;
-		color: #2196f3;
-		margin-right: 8px;
-		margin-bottom: 10px;
+		font-size: 32rpx;
 	}
-
-	.stat-label {
-		font-size: 14px;
-		color: #666;
-	}
-
-	.stat-divider {
-		display: inline-block;
-		width: 1px;
-		height: 24px;
-		background-color: #eee;
-		margin: 0 10px;
-		vertical-align: middle;
-	}
-
-	/* 任务列表 */
-	.task-list {
-		padding: 0 16px 16px;
-		flex: 1;
-	}
-
-	/* 空状态提示 */
-	.empty-tip {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 60px 20px;
-		text-align: center;
-	}
-
-	.empty-icon {
-		font-size: 48px;
-		margin-bottom: 16px;
-	}
-
-	.empty-text {
-		font-size: 14px;
-		color: #999;
-	}
-
-	/* 任务项 */
-	.task-item {
-		background-color: white;
-		border-radius: 12px;
-		padding: 16px;
-		margin-bottom: 12px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-		transition: transform 0.2s, box-shadow 0.2s;
-		overflow: hidden;
-		position: relative;
-	}
-
-	.task-item:active {
-		transform: scale(0.98);
-	}
-
-	/*<!-- 任务内容行 -->
-	.task-content-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 8px;
-	}
-
-	/* 任务信息区域 */
-	.task-info-section {
-		display: flex;
-		flex-direction: column;
-		flex: 1;
-		overflow: hidden;
-	}
-
-	/* 任务标题 */
 	.task-title {
-		font-size: 16px;
-		font-weight: 600;
-		color: #333;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		flex-shrink: 0;
+		font-size: 30rpx;
 	}
-
-	.task-point {
-		color: #c4ccd5;
-		padding: 2px 8px;
-		border-radius: 10px;
-		font-size: 12px;
-		font-weight: bold;
-		min-width: 30px;
-		text-align: center;
-		flex-shrink: 0;
-	}
-
-	.task-point-completed {
-		color: #007aff;
-		padding: 2px 8px;
-		border-radius: 10px;
-		font-size: 12px;
-		font-weight: bold;
-		min-width: 30px;
-		text-align: center;
-		flex-shrink: 0;
-	}
-
-	/* 任务描述 */
 	.task-desc {
-		font-size: 12px;
-		color: #666;
-		margin-top: 4px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 1;
-		-webkit-box-orient: vertical;
+		font-size: 24rpx;
 	}
-
-
-	/* 任务状态 */
-	.task-status {
-		margin-left: 12px;
-		flex-shrink: 0;
-	}
-
-	.task-checkbox {
-		transform: scale(1.2);
-	}
-
-	.task-checkbox[checked] {
-		color: #4caf50;
-	}
-
-	/* 任务完成信息 */
-	.task-complete-info {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		border-left: 1px solid #f0f0f0;
-		padding-left: 10px;
-	}
-
-	.completed-text {
-		font-size: 13px;
-		color: #4caf50;
-		font-weight: 500;
-	}
-
-	.completed-time {
-		font-size: 12px;
-		color: #999;
-	}
-
-	/* 底部固定栏 */
-	.bottom-bar {
-		height: 60px;
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 16px;
-		font-weight: bold;
-		flex-shrink: 0;
-		z-index: 100;
-		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-	}
-
-	/* 添加任务按钮 */
-	.add-task-btn {
-		position: fixed;
-		bottom: 80px;
-		right: 20px;
-		width: 56px;
-		height: 56px;
-		border-radius: 28px;
-		background-color: #2196f3;
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 28px;
-		box-shadow: 0 4px 16px rgba(33, 150, 243, 0.4);
-		z-index: 101;
-		transition: transform 0.2s, background-color 0.2s;
-	}
-
-	.add-task-btn:active {
-		transform: scale(0.95);
-		background-color: #1976d2;
-	}
-
-	.add-btn-text {
-		line-height: 1;
-	}
-
-	.date-row {
-		margin-top: 20px;
-	}
-	
-	.date-icon {
-		font-size: 18px;
-		color: #666;
-		padding: 5px;
-	}
-	
-	.edit-icon {
-		font-size: 16px;
-		margin-left: 5px;
-	}
-
-	/* 适配小屏幕 */
-	@media (max-width: 375px) {
-		.stat-item {
-			padding: 0 16px;
-		}
-
-		.stat-number {
-			font-size: 20px;
-		}
-
-		.task-list {
-			padding: 0 12px 0px;
-		}
-
-		.task-item {
-			padding: 14px;
-		}
-
-		.task-title {
-			font-size: 15px;
-		}
-
-		.task-desc {
-			font-size: 13px;
-		}
-	}
+}
 </style>

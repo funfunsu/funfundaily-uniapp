@@ -30,6 +30,30 @@
 			"style": {
 				"navigationBarTitleText": "我的"
 			}
+		},
+		{
+			"path": "pages/profile/group-manage",
+			"style": {
+				"navigationBarTitleText": "群组管理",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/profile/group-member",
+			"style": {
+				"navigationBarTitleText": "群组成员",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/schedule/edit",
+			"style": {
+				"navigationBarTitleText": "编辑日程",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
+			}
 		}
 	],
 	"globalStyle": {

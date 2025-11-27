@@ -1,5 +1,5 @@
 <template>
-	<view class="discovery-container"> {{ discoverList }}
+	<view class="discovery-container"> 
 		<view class="grid">
 			<view
 				v-for="(item, index) in discoverList" 
@@ -8,7 +8,7 @@
 				:class="{ 'grid-item--active': item.status === 'active' }"
 				@click="handleCardClick(item)"
 			>
-				<view class="card">{{ item }}
+				<view class="card">
 					<text class="card-title">{{ item.itemTitle }}</text>
 					<text v-if="item.status !== 'active'" class="card-note">即将开放</text>
 				</view>
@@ -19,7 +19,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import apiTs from '../../utils/apiTs'
-import type { ApiResponse } from '../../types/type'
 import type { DiscoveryItem } from '../../types/discovery'
 
 const discoverList = ref<DiscoveryItem[]>([])

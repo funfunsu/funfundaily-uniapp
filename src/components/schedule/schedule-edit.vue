@@ -14,18 +14,14 @@
 				</text>
 				<view v-if="showDescription">
 					<view class="form-item">
-						<text class="label">
-							描述
-						</text>
+						<text class="label">描述</text>
 						<view class="expand-container">
 							<textarea class="textarea" v-model="schedule.itemDesc" placeholder="请输入日程描述" />
 						</view>
 					</view>
 
 					<view class="form-item">
-						<text class="label">
-							地点
-						</text>
+						<text class="label">地点</text>
 						<view class="expand-container">
 							<input class="input" v-model="schedule.location" placeholder="请输入地点" />
 						</view>
@@ -36,51 +32,50 @@
 			<!-- 重复设置 -->
 			<view class="form-section">
 				<text class="section-title">重复设置</text>
-				<view class="uni-flex uni-row">
-					<view class="form-item" style="width: 20%;">
-						<text class="label">重复类型</text>
-						<picker class="picker" mode="selector" :range="repeatTypeOptions"
-							:value="getRepeatTypeIndex(schedule.repeatType)" @change="handleRepeatTypeChange">
-							<view class="picker-display">{{ getRepeatTypeText(schedule.repeatType) }}</view>
+				
+				<!-- 重复类型选择 -->
+				<view class="form-item">
+					<text class="label">重复类型</text>
+					<picker class="picker" mode="selector" :range="repeatTypeOptions"
+						:value="getRepeatTypeIndex(schedule.repeatType)" @change="handleRepeatTypeChange">
+						<view class="picker-display">{{ getRepeatTypeText(schedule.repeatType) }}</view>
+					</picker>
+				</view>
+
+				<!-- 重复时间范围 - 仅在设置重复时显示 -->
+				<view v-if="schedule.repeatType !== 'none'" class="form-row">
+					<view class="form-item form-item-inline">
+						<text class="label">重复开始日期</text>
+						<picker class="picker" mode="date" :value="formatDate(schedule.repeatStartDay)"
+							start="2023-01-01" end="2030-12-31"
+							@change="(e) => handleDateChange(e, 'repeatStartDay')">
+							<view class="picker-display">{{ formatDate(schedule.repeatStartDay) }}</view>
 						</picker>
 					</view>
 
-					<!-- 重复时间范围 - 仅在设置重复时显示 -->
-					<view class="uni-row" v-if="schedule.repeatType !== 'none'" style="width: 80%;">
-						<view class="form-item form-item-row" style="width:50%">
-							<text class="label">重复开始日期</text>
-							<picker class="picker" mode="date" :value="formatDate(schedule.repeatStartDay)"
-								start="2023-01-01" end="2030-12-31"
-								@change="(e) => handleDateChange(e, 'repeatStartDay')">
-								<view class="picker-display">{{ formatDate(schedule.repeatStartDay) }}</view>
-							</picker>
-						</view>
-
-						<view class="form-item form-item-row" style="width:50%">
-							<text class="label">重复结束日期</text>
-							<picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
-								start="2023-01-01" end="2030-12-31"
-								@change="(e) => handleDateChange(e, 'repeatEndDay')">
-								<view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
-							</picker>
-						</view>
+					<view class="form-item form-item-inline">
+						<text class="label">重复结束日期</text>
+						<picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
+							start="2023-01-01" end="2030-12-31"
+							@change="(e) => handleDateChange(e, 'repeatEndDay')">
+							<view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
+						</picker>
 					</view>
 				</view>
 
-
-
 				<!-- 不重复：日期+时间 -->
 				<view class="form-item" v-if="schedule.repeatType === 'none'">
-					<text class="label">日期 *</text>
+					<text class="label">事件日期 *</text>
 					<picker class="picker" mode="date" :value="formatDate(schedule.startTime)" start="2023-01-01"
 						end="2030-12-31" @change="(e) => handleEventDateChange(e)">
 						<view class="picker-display">{{ formatDate(schedule.startTime) }}</view>
 					</picker>
 				</view>
+				
 				<!-- 每周重复：周几+时间 -->
 				<view v-else-if="schedule.repeatType === 'weekly'">
 					<text class="label">重复星期</text>
-					<view class="week-days-container uni-row">
+					<view class="week-days-container">
 						<view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
 							:class="{ selected: schedule.repeatKeys.includes(index.toString()) }"
 							@click="toggleWeekDay(index)">
@@ -107,17 +102,18 @@
 					</picker>
 				</view>
 
-				<view class="uni-flex uni-row" v-if="schedule.itemType != 'task'">
-					<view class="form-item form-item-row" style="width:50%">
-						<text class="label">开始时间 *</text>
+				<!-- 时间设置 - 开始时间和结束时间放在一行 -->
+				<view class="form-row" v-if="schedule.itemType != 'task'">
+					<view class="form-item form-item-inline">
+						<text class="label">事件开始时间 *</text>
 						<picker class="picker" mode="time" :value="getTimeOnly(schedule.startTime)" start="00:00"
 							end="23:59" @change="(e) => handleTimeChange(e, 'startTime')">
 							<view class="picker-display">{{ getTimeOnly(schedule.startTime) }}</view>
 						</picker>
 					</view>
 
-					<view class="form-item form-item-row" style="width:50%">
-						<text class="label">结束时间 *</text>
+					<view class="form-item form-item-inline">
+						<text class="label">事件结束时间 *</text>
 						<picker class="picker" mode="time" :value="getTimeOnly(schedule.endTime)" start="00:00"
 							end="23:59" @change="(e) => handleTimeChange(e, 'endTime')">
 							<view class="picker-display">{{ getTimeOnly(schedule.endTime) }}</view>
@@ -125,10 +121,6 @@
 					</view>
 				</view>
 			</view>
-
-
-			<!-- 时间设置 -->
-
 
 			<!-- 类型设置 -->
 			<view class="form-section" v-if="schedule.itemType != 'task'">
@@ -142,17 +134,20 @@
 					</picker>
 				</view>
 			</view>
-			<!-- 积分设置 -->
+			
+			<!-- 积分设置 - 放在一行显示 -->
 			<view class="form-section" v-if="schedule.itemType == 'task'">
 				<text class="section-title">积分设置</text>
 
-				<view class="form-item">
-					<text class="label">积分数量</text>
-					<input class="input" v-model="schedule.score" placeholder="积分" />
-				</view>
-				<view class="form-item">
-					<text class="label">奖励机制</text>
-					<input class="input" v-model="schedule.scoreType" placeholder="积分" />
+				<view class="form-row">
+					<view class="form-item form-item-inline">
+						<text class="label">积分数量</text>
+						<input class="input" v-model="schedule.score" placeholder="积分" />
+					</view>
+					<view class="form-item form-item-inline">
+						<text class="label">奖励机制</text>
+						<input class="input" v-model="schedule.scoreType" placeholder="奖励方式" />
+					</view>
 				</view>
 			</view>
 		</view>
@@ -418,21 +413,41 @@
 		display: block;
 	}
 
+	/* 基础表单项样式 */
 	.form-item {
 		margin-bottom: 15px;
 	}
 
+	/* 行内表单项容器 */
+	.form-row {
+		display: flex;
+		flex-wrap: wrap;
+		margin-bottom: 15px;
+		gap: 10px;
+	}
+
+	/* 行内表单项样式 */
+	.form-item-inline {
+		flex: 1;
+		min-width: 200px;
+		margin-bottom: 0;
+	}
+
+	/* 标签样式 */
 	.label {
 		display: block;
 		font-size: 14px;
 		color: #666;
 		margin-bottom: 8px;
+		font-weight: 500;
 	}
 
 	.expand-trigger {
 		cursor: pointer;
 		color: #2196f3;
 		transition: color 0.3s;
+		margin-bottom: 10px;
+		display: inline-block;
 	}
 
 	.expand-trigger:active {
@@ -449,14 +464,22 @@
 		animation: slideDown 0.2s ease-out;
 	}
 
+	/* 输入框通用样式 */
 	.input,
 	.textarea {
 		width: 100%;
-		padding: 10px;
+		padding: 12px;
 		border: 1px solid #ddd;
 		border-radius: 4px;
 		font-size: 14px;
 		box-sizing: border-box;
+		transition: border-color 0.3s;
+	}
+
+	.input:focus,
+	.textarea:focus {
+		outline: none;
+		border-color: #2196f3;
 	}
 
 	.textarea {
@@ -464,22 +487,31 @@
 		resize: none;
 	}
 
+	/* 选择器样式 */
 	.picker {
 		width: 100%;
 	}
 
 	.picker-display {
-		padding: 10px;
+		padding: 12px;
 		border: 1px solid #ddd;
 		border-radius: 4px;
 		font-size: 14px;
 		background-color: white;
+		position: relative;
+		transition: border-color 0.3s;
 	}
 
+	.picker-display:active {
+		border-color: #2196f3;
+	}
+
+	/* 星期选择器样式 */
 	.week-days-container {
 		display: flex;
 		gap: 10px;
 		flex-wrap: wrap;
+		margin-top: 8px;
 	}
 
 	.week-day-item {
@@ -500,6 +532,10 @@
 		color: white;
 	}
 
+	.week-day-item:active {
+		transform: scale(0.95);
+	}
+
 	/* 展开动画 */
 	@keyframes slideDown {
 		from {
@@ -514,7 +550,7 @@
 	}
 
 	/* 适配小屏幕 */
-	@media (max-width: 375px) {
+	@media (max-width: 414px) {
 		.edit-content {
 			padding: 10px;
 		}
@@ -522,10 +558,52 @@
 		.form-section {
 			padding: 12px;
 		}
+
+		.form-row {
+			flex-direction: column;
+			gap: 15px;
+		}
+
+		.form-item-inline {
+			min-width: 100%;
+		}
+
+		.week-days-container {
+			gap: 8px;
+		}
+
+		.week-day-item {
+			width: 32px;
+			height: 32px;
+			font-size: 12px;
+		}
 	}
 
+	/* 适配平板等大屏幕 */
+	@media (min-width: 768px) {
+		.form-row {
+			gap: 20px;
+		}
+
+		.form-item-inline {
+			flex: 0 0 calc(50% - 10px);
+			min-width: calc(50% - 10px);
+		}
+
+		.form-section {
+			padding: 20px;
+		}
+
+		.input,
+		.textarea,
+		.picker-display {
+			padding: 14px;
+			font-size: 16px;
+		}
+	}
+
+	/* 移除原有的form-item-row样式，使用新的内联样式替代 */
 	.form-item-row {
-		padding-left: 10px;
-		padding-right: 10px;
+		/* 已废弃，使用form-item-inline替代 */
 	}
 </style>
