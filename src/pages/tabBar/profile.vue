@@ -1,452 +1,445 @@
+<!-- pages/profile/index.vue -->
 <template>
-	<view class="profile-container">
-		<!-- 用户信息区域 -->
-		<view class="user-info-section">
-			<view class="avatar">
-				<text class="avatar-text">用户</text>
-			</view>
-			<view class="user-details">
-				<text class="user-id">{{userInfo.username}}</text>
-			</view>
-			<!-- 积分设置 -->
-			<view class="my-menu-item uni-row">
-				<view class="uni-list-cell">
-					<view class="uni-list-cell-left">当前群组</view>
-					<view class="uni-list-cell-db">
-						<picker class="picker-selector" @change="bindGroupChange" :value="selectedGroupIdx" :range="groupList" range-key="groupName">
-							<view class="picker-selector--value uni-row">{{groupList[selectedGroupIdx]?.groupName}}<uni-icons type="right" style="margin-left: 10px;"></uni-icons></view>
-						</picker>
-					</view>
-				</view>
-				<view @click="showCreateGroupForm">
-					<uni-icons type="plusempty" size="20" color="#007aff"></uni-icons>
-				</view>
-			</view>
-			
-		</view>
-		<!-- 功能菜单区域 -->
-		
+  <view class="profile-container">
+    <!-- 用户信息区域 -->
+    <view class="user-info-section">
+      <view class="avatar">
+        <text class="avatar-text">U</text>
+      </view>
+      <view class="user-details">
+        <text class="user-name">{{ userInfo.username || '未知用户' }}</text>
+      </view>
+      <view class="group-selector-container">
+        <view class="group-label">当前群组：</view>
+        <view class="group-picker-wrapper">
+          <picker
+              class="group-picker"
+              @change="bindGroupChange"
+              :value="selectedGroupIdx"
+              :range="groupList"
+              range-key="groupName"
+          >
+            <view class="picker-value">
+              {{ groupList[selectedGroupIdx]?.groupName || '请选择群组' }}
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+        <view class="add-group-btn" @click="showCreateGroupForm">
+          <text class="add-icon">+</text>
+        </view>
+      </view>
+    </view>
 
-		<!-- 功能菜单区域 -->
-		<view class="menu-section">
-			<!-- 群组管理 -->
-			<view class="menu-item uni-row" @click="handleGroupManageClick">
-				<view class="menu-left uni-row">
-					<uni-icons type="vip" size="20"></uni-icons>
-					<view class="stat-divider" ></view>
-					<text class="menu-title">群组管理</text>
-				</view>
-				<view class="menu-right">
-					<text class="menu-arrow">›</text>
-				</view>
-			</view>
-			<!-- 群组成员 -->
-			<view class="menu-item uni-row" @click="handleGroupMembersClick">
-				<view class="menu-left uni-row">
-					<uni-icons type="staff" size="20"></uni-icons>
-					<view class="stat-divider" ></view>
-					<text class="menu-title">成员管理</text>
-				</view>
-				<view class="menu-right">
-					<text class="menu-arrow">›</text>
-				</view>
-			</view>
-		</view>
-		
-		<!-- 创建群组表单弹窗 -->
-		<view v-if="showGroupForm" class="group-form-modal">
-			<view class="group-form-container">
-				<view class="group-form-header">
-					<text class="group-form-title">创建新群组</text>
-				</view>
-				<view class="group-form-body">
-					<view class="form-item">
-						<text class="form-label">群组名称</text>
-						<input 
-							class="form-input" 
-							v-model="newGroupName" 
-							placeholder="请输入群组名称" 
-							placeholder-class="placeholder-text"
-							@focus="inputFocus = true"
-							@blur="inputFocus = false"
-						/>
-					</view>
-				</view>
-				<view class="group-form-footer">
-					<button class="cancel-btn" @click="cancelCreateGroup">取消</button>
-					<button class="submit-btn" @click="submitCreateGroup" :disabled="!newGroupName.trim()">创建</button>
-				</view>
-			</view>
-		</view>
-	</view>
+    <!-- 功能菜单区域 -->
+    <view class="menu-section">
+      <view class="menu-item" @click="handleGroupManageClick">
+        <view class="menu-left">
+          <text class="menu-title">群组管理</text>
+        </view>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" @click="handleGroupMembersClick">
+        <view class="menu-left">
+          <text class="menu-title">成员管理</text>
+        </view>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 创建群组表单弹窗 -->
+    <view v-if="showGroupForm" class="group-form-modal" @click="cancelCreateGroup">
+      <view class="group-form-container" @click.stop>
+        <view class="group-form-header">
+          <text class="group-form-title">创建新群组</text>
+        </view>
+        <view class="group-form-body">
+          <view class="form-item">
+            <text class="form-label">群组名称 *</text>
+            <input
+                ref="groupNameInput"
+                class="form-input"
+                v-model="newGroupName"
+                placeholder="请输入群组名称"
+                placeholder-class="placeholder-text"
+                @focus="inputFocus = true"
+                @blur="inputFocus = false"
+            />
+          </view>
+        </view>
+        <view class="group-form-footer">
+          <button class="cancel-btn" @click="cancelCreateGroup">取消</button>
+          <button
+              class="submit-btn"
+              :class="{ disabled: !newGroupName.trim() }"
+              @click="submitCreateGroup"
+              :disabled="!newGroupName.trim()"
+          >
+            创建
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script>
-	import api from '../../utils/apiTs'
-	
-	export default {
-		data() {
-			return {
-				// 模拟积分数据
-				points: 1280,
-				selectedGroupIdx:0,
-				groupList: [],
-				// 创建群组相关数据
-				showGroupForm: false,
-				newGroupName: '',
-				inputFocus: false,
-				userInfo:{}
-			}
-		},
-		mounted() {
-			this.fetchGroupList();
-			this.fetchUserInfo();
-		},
-		methods: {
-			// 获取群组成员
-			async fetchUserInfo() {
-				const userRes = await api.user.getInfo();
-				this.userInfo = userRes.data || []
-				console.log(this.groupList)
-			},
-			// 获取群组成员
-			async fetchGroupList() {
-				const groupRes = await api.group.list();
-				this.groupList = groupRes.data || []
-				console.log(this.groupList)
-			},
-			bindGroupChange(e){
-				this.selectedGroupIdx = e.detail.value;
-				
-			},
-			// 处理积分点击，跳转到积分兑换页面
-			handleGroupManageClick() {
-				// 根据项目结构，跳转到群组成员页面
-				uni.navigateTo({
-					url: '/pages/profile/group-manage'
-				});
-			},
+import api from '../../utils/apiTs'
 
-			// 处理群组成员点击，跳转到成员管理页面
-			handleGroupMembersClick() {
-				console.log(1)
-				// 根据项目结构，跳转到群组成员页面
-				uni.navigateTo({
-					url: '/pages/profile/group-member'
-				});
-			},
+export default {
+  data() {
+    return {
+      userInfo: {},
+      groupList: [],
+      selectedGroupIdx: 0,
+      showGroupForm: false,
+      newGroupName: '',
+      inputFocus: false
+    }
+  },
+  mounted() {
+    this.fetchUserInfo()
+    this.fetchGroupList()
+  },
+  methods: {
+    async fetchUserInfo() {
+      try {
+        const res = await api.user.getInfo()
+        this.userInfo = res.data || {}
+      } catch (err) {
+        console.error('获取用户信息失败', err)
+        uni.showToast({ title: '获取用户信息失败', icon: 'none' })
+      }
+    },
 
-			// 处理设置点击
-			handleSettingsClick() {
-				uni.showToast({
-					title: '设置功能待实现',
-					icon: 'none'
-				});
-			},
-			
-			// 显示创建群组表单
-			showCreateGroupForm() {
-				this.showGroupForm = true;
-				this.newGroupName = '';
-				// 延迟聚焦输入框
-				setTimeout(() => {
-					uni.createSelectorQuery().select('.form-input').boundingClientRect((rect) => {
-						uni.pageScrollTo({
-							top: Math.max(0, rect.top - 100),
-							duration: 300
-						});
-					}).exec();
-				}, 300);
-			},
-			
-			// 取消创建群组
-			cancelCreateGroup() {
-				this.showGroupForm = false;
-				this.newGroupName = '';
-				this.inputFocus = false;
-			},
-			
-			// 提交创建群组
-			async submitCreateGroup() {
-				if (!this.newGroupName.trim()) {
-					uni.showToast({
-						title: '请输入群组名称',
-						icon: 'none'
-					});
-					return;
-				}
-				
-				try {
-					const requestData = {'groupName':this.newGroupName.trim()}
-					const groupRes = await api.group.add(requestData)
-					// 调用创建群组API（实际项目中替换为真实接口）
-					// 这里模拟创建成功
-					const newGroup = {
-						id: Date.now(),
-						groupName: this.newGroupName.trim()
-					};
-					
-					// 添加到群组列表
-					this.groupList.push(newGroup);
-					// 切换到新创建的群组
-					this.selectedGroupIdx = this.groupList.length - 1;
-					
-					// 显示成功提示
-					uni.showToast({
-						title: '群组创建成功',
-						icon: 'success'
-					});
-					
-					// 关闭表单
-					this.cancelCreateGroup();
-				} catch (error) {
-					uni.showToast({
-						title: '创建失败，请重试',
-						icon: 'none'
-					});
-				}
-			}
-		}
-	}
+    async fetchGroupList() {
+      try {
+        const res = await api.group.list()
+        this.groupList = Array.isArray(res) ? res : []
+        // 如果有群组，默认选中第一个
+        if (this.groupList.length > 0) {
+          this.selectedGroupIdx = 0
+        }
+      } catch (err) {
+        console.error('获取群组列表失败', err)
+        uni.showToast({ title: '获取群组失败', icon: 'none' })
+      }
+    },
+
+    bindGroupChange(e) {
+      this.selectedGroupIdx = e.detail.value
+    },
+
+    handleGroupManageClick() {
+      uni.navigateTo({
+        url: '/pages/profile/group-manage'
+      })
+    },
+
+    handleGroupMembersClick() {
+      const currentGroup = this.groupList[this.selectedGroupIdx]
+      if (!currentGroup) {
+        uni.showToast({ title: '请先选择或创建群组', icon: 'none' })
+        return
+      }
+      uni.navigateTo({
+        url: `/pages/profile/group-member?groupId=${currentGroup.id}&groupName=${encodeURIComponent(currentGroup.groupName)}`
+      })
+    },
+
+    showCreateGroupForm() {
+      this.showGroupForm = true
+      this.newGroupName = ''
+      this.$nextTick(() => {
+        // 自动聚焦输入框（App/小程序支持有限，但尽量尝试）
+        const input = this.$refs.groupNameInput
+        if (input && typeof input.focus === 'function') {
+          input.focus()
+        }
+        // 滚动到可视区域（可选）
+        uni.createSelectorQuery()
+            .select('.group-form-container')
+            .boundingClientRect((rect) => {
+              if (rect && rect.top < 0) {
+                uni.pageScrollTo({ scrollTop: 0, duration: 200 })
+              }
+            })
+            .exec()
+      })
+    },
+
+    cancelCreateGroup() {
+      this.showGroupForm = false
+      this.newGroupName = ''
+      this.inputFocus = false
+    },
+
+    async submitCreateGroup() {
+      const name = this.newGroupName.trim()
+      if (!name) {
+        uni.showToast({ title: '请输入群组名称', icon: 'none' })
+        return
+      }
+
+      try {
+        uni.showLoading({ title: '创建中...' })
+        const res = await api.group.add({ groupName: name })
+        // 假设返回 { id, groupName }
+        const newGroup = { id: res.id, groupName: name }
+        this.groupList.push(newGroup)
+        this.selectedGroupIdx = this.groupList.length - 1
+
+        uni.showToast({ title: '群组创建成功', icon: 'success' })
+        this.cancelCreateGroup()
+      } catch (error) {
+        console.error('创建群组失败:', error)
+        uni.showToast({ title: '创建失败，请重试', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+      }
+    }
+  }
+}
 </script>
 
 <style scoped>
-	.profile-container {
-		background-color: #f5f5f5;
-		padding-bottom: 20rpx;
-		min-height: calc(100% - 60px);
-		display: flex;
-		flex-direction: column;
-	}
+.profile-container {
+  background-color: #f8f9fa;
+  min-height: 100vh;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
 
-	/* 用户信息区域 */
-	.user-info-section {
-		display: flex;
-		align-items: center;
-		padding-top: 20px;
-		padding-left: 20px;
-		padding-right: 20px;
-		padding-bottom: 10px;
-		background-color: #fff;
-		margin-bottom: 20px;
-	}
+/* 用户信息区域 */
+.user-info-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 40rpx 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+}
 
-	.avatar {
-		width: 60px;
-		height: 60px;
-		border-radius: 50%;
-		background-color: #007aff;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.avatar-text {
-		color: #fff;
-		font-weight: bold;
-	}
-
-	.user-details {
-		flex: 1;
-		margin-bottom:20px;
-		margin-top:20px;
-	}
-
-	.user-name {
-		font-weight: bold;
-		color: #333;
-		margin-bottom: 10rpx;
-		display: block;
-		margin-top:10px;
-		text-align:center;
-	}
-
-	.user-id {
-		color: #999;
-	}
-
-	/* 菜单区域 */
-	.menu-section {
-		background-color: #fff;
-	}
-
-	.my-menu-item{
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding-top:10rpx;
-		padding-bottom:10rpx;
-		border-top: 1rpx solid #f0f0f0;
-		width: 80%;
-	}
-
-	.menu-item {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 30rpx 40rpx;
-		border-bottom: 1rpx solid #f0f0f0;
-	}
-
-	.menu-item:last-child {
-		border-bottom: none;
-	}
-
-	.menu-left {
-		display: flex;
-		align-items: center;
-	}
-
-	.menu-icon {
-		margin-right: 30rpx;
-		width: 50rpx;
-		text-align: center;
-	}
-
-	.menu-title {
-		color: #333;
-	}
-
-	.menu-right {
-		display: flex;
-		align-items: center;
-	}
-
-	.points-value {
-		color: #007aff;
-		margin-right: 10rpx;
-	}
-
-	.menu-arrow {
-		color: #007aff;
-		font-size:20px;
-	}
-	
-/* 底部固定栏 */
-.bottom-bar {
-  height: 60px;
-  color: white;
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007aff, #00bfff);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
-  flex-shrink: 0;
-  z-index: 100;
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-}
-.picker-selector--value{
-	width: 100px;
+  margin-bottom: 24rpx;
 }
 
-/* 创建群组表单样式 */
+.avatar-text {
+  color: white;
+  font-size: 48rpx;
+  font-weight: bold;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 30rpx;
+}
+
+.group-selector-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 500rpx;
+  background: #f0f7ff;
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+}
+
+.group-label {
+  font-size: 26rpx;
+  color: #666;
+  white-space: nowrap;
+  margin-right: 12rpx;
+}
+
+.group-picker-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+.group-picker {
+  width: 100%;
+}
+
+.picker-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 28rpx;
+  color: #333;
+  padding: 12rpx 0;
+}
+
+.picker-arrow {
+  font-size: 20rpx;
+  color: #999;
+  transform: scaleY(0.7);
+}
+
+.add-group-btn {
+  margin-left: 16rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background-color: #e6f0ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #007aff;
+  font-size: 40rpx;
+  font-weight: bold;
+}
+
+/* 菜单区域 */
+.menu-section {
+  background: #ffffff;
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx 40rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-title {
+  font-size: 32rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.menu-arrow {
+  font-size: 36rpx;
+  color: #007aff;
+}
+
+/* 创建群组弹窗 */
 .group-form-modal {
-	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	background-color: rgba(0, 0, 0, 0.5);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
 }
 
 .group-form-container {
-	width: 80%;
-	max-width: 500rpx;
-	background-color: #fff;
-	border-radius: 20rpx;
-	overflow: hidden;
+  width: 85%;
+  max-width: 520rpx;
+  background: #ffffff;
+  border-radius: 24rpx;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .group-form-header {
-	padding: 30rpx 40rpx;
-	border-bottom: 1rpx solid #f0f0f0;
-	text-align: center;
+  text-align: center;
+  padding: 36rpx 0;
+  background: #f8f9fa;
 }
 
 .group-form-title {
-	font-weight: bold;
-	color: #333;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
 }
 
 .group-form-body {
-	padding: 40rpx;
-}
-
-.form-item {
-	margin-bottom: 30rpx;
+  padding: 0 40rpx 30rpx;
 }
 
 .form-label {
-	display: block;
-	font-size: 28rpx;
-	color: #333;
-	margin-bottom: 15rpx;
+  display: block;
+  font-size: 28rpx;
+  color: #333;
+  margin-bottom: 16rpx;
+  font-weight: 500;
 }
 
 .form-input {
-	width: 100%;
-	height: 80rpx;
-	border: 2rpx solid #ddd;
-	border-radius: 10rpx;
-	padding: 0 20rpx;
-	box-sizing: border-box;
-	font-size: 28rpx;
+  width: 100%;
+  height: 80rpx;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
 }
 
 .form-input:focus {
-	border-color: #007aff;
+  border-color: #007aff;
+  outline: none;
 }
 
 .placeholder-text {
-	color: #999;
+  color: #aaa;
 }
 
 .group-form-footer {
-	display: flex;
-	border-top: 1rpx solid #f0f0f0;
+  display: flex;
+  height: 96rpx;
+  border-top: 1rpx solid #f0f0f0;
 }
 
 .cancel-btn,
 .submit-btn {
-	flex: 1;
-	height: 90rpx;
-	line-height: 90rpx;
-	text-align: center;
-	font-size: 28rpx;
-	background: none;
-	border: none;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
 
 .cancel-btn {
-	color: #666;
-	border-right: 1rpx solid #f0f0f0;
+  color: #666;
+  border-right: 1rpx solid #f0f0f0;
 }
 
 .submit-btn {
-	color: #007aff;
+  color: #007aff;
+  font-weight: 600;
 }
 
-.submit-btn:disabled {
-	color: #999;
-	opacity: 0.6;
-}
-
-/* 确保输入框聚焦时有良好的视觉反馈 */
-.form-input:focus {
-	border-color: #007aff;
-	box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
-}
-
-.stat-divider {
-  display: inline-block;
-  width: 1px;
-  height: 24px;
-  background-color: #eee;
-  margin: 0 10px;
-  vertical-align: middle;
+.submit-btn.disabled {
+  color: #ccc;
+  opacity: 1;
 }
 </style>

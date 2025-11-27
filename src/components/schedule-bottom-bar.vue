@@ -5,16 +5,23 @@
       <view class="group-info">
         <view class="group-name">{{ _currentGroup?.groupName || 'VV家庭' }}</view>
       </view>
-      
+
       <!-- 成员选择器 -->
       <view class="member-switcher">
-        <picker @change="handleMemberChange" :value="displayMemberIndex" :range="displayUserList.map(u => u.nickname || '未知用户')">
+        <picker
+            @change="handleMemberChange"
+            :value="displayMemberIndex"
+            :range="displayUserList.map(u => u.nickname || '未知用户')"
+        >
           <view class="member-selector">
-            <text class="member-name">{{ displayMember ? (displayMember.nickname || '未知用户') : '选择成员' }}<text class="arrow-icon">›</text></text>
+            <text class="member-name">
+              {{ displayMember ? (displayMember.nickname || '未知用户') : '选择成员' }}
+              <text class="arrow-icon">›</text>
+            </text>
           </view>
         </picker>
       </view>
-      
+
       <!-- 添加事件按钮 -->
       <button class="bottom-add-btn uni-flex uni-row" @click="handleAddClick">
         <text class="add-icon">+</text>
@@ -24,186 +31,158 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
 import api from '../utils/apiTs'
-export default {
-  name: 'schedule-bottom-bar',
-  props: {
-    // 群组名称
-    groupName: {
-      type: String,
-      default: 'VV家庭'
-    },
-    // 可选：传入用户列表（保持向后兼容）
-    userList: {
-      type: Array,
-      default: () => []
-    },
-    // 可选：传入当前选中的成员索引（保持向后兼容）
-    currentMemberIndex: {
-      type: Number,
-      default: 0
-    },
-    // 可选：传入当前选中的成员对象（保持向后兼容）
-    currentMember: {
-      type: Object,
-      default: null
-    },
-    // 添加按钮文本
-    addButtonText: {
-      type: String,
-      default: '添加日程'
-    },
-    // 是否自动获取群组成员
-    autoLoadMembers: {
-      type: Boolean,
-      default: true
-    }
-  },
-  data() {
-    return {
-      // 群组列表
-      _groupList: [],
-      // 内部成员列表（优先使用props传入的数据）
-      _userList: [],
-      // 内部当前成员索引
-      _currentMemberIndex: 0,
-      // 内部当前成员对象
-      _currentMember: null,
-	  _currentGroup:null
-    }
-  },
-  emits: ['member-change', 'add-click', 'members-loaded'],
-  computed: {
-    // 合并props和内部数据的用户列表
-    displayUserList() {
-      return this.userList.length > 0 ? this.userList : this._userList
-    },
-    // 合并props和内部数据的当前成员索引
-    displayMemberIndex() {
-      if (this.currentMemberIndex >= 0 && this.userList.length > 0) {
-        return this.currentMemberIndex
-      }
-      return this._currentMemberIndex
-    },
-    // 合并props和内部数据的当前成员对象
-    displayMember() {
-      return this.currentMember || this._currentMember
-    }
-  },
-  mounted() {
-    // 如果启用了自动获取成员且没有通过props传入成员列表，则自动获取
-    if (this.autoLoadMembers && this.userList.length === 0) {
-      this.fetchGroupMembers()
-    } else if (this.userList.length > 0) {
-      // 如果传入了成员列表，更新内部状态
-      this._userList = [...this.userList]
-      this._currentMemberIndex = this.currentMemberIndex || 0
-      this._currentMember = this.currentMember || this.userList[this._currentMemberIndex] || null
-    }
-  },
-  watch: {
-    // 监听外部传入的成员列表变化
-    userList: {
-      handler(newList) {
-        if (newList && newList.length > 0) {
-          this._userList = [...newList]
-          // 更新当前成员
-          if (this.currentMember) {
-            this._currentMember = this.currentMember
-          } else if (this.currentMemberIndex >= 0 && newList[this.currentMemberIndex]) {
-            this._currentMember = newList[this.currentMemberIndex]
-            this._currentMemberIndex = this.currentMemberIndex
-          } else if (newList[0]) {
-            this._currentMember = newList[0]
-            this._currentMemberIndex = 0
-          }
-        }
-      },
-      deep: true
-    },
-    // 监听外部传入的当前成员索引变化
-    currentMemberIndex(newIndex) {
-      if (newIndex >= 0 && this.displayUserList[newIndex]) {
-        this._currentMemberIndex = newIndex
-        this._currentMember = this.displayUserList[newIndex]
-      }
-    },
-    // 监听外部传入的当前成员对象变化
-    currentMember(newMember) {
-      if (newMember) {
-        this._currentMember = newMember
-        // 查找对应的索引
-        const index = this.displayUserList.findIndex(u => u.userId === newMember.userId || u.id === newMember.id)
-        if (index >= 0) {
-          this._currentMemberIndex = index
-        }
-      }
-    }
-  },
-  methods: {
-    // 获取群组成员
-    async fetchGroupMembers() {
-      try {
-		const groupRes = await api.group.list();
-		const groups = groupRes.data || []
-		this._groupList = groups
-		this._currentGroup = groups[0]
-        // 调用API获取成员列表
-		const requestData = {'groupId':this._currentGroup.grouId}
-        const res = await api.group.user.list(requestData);
-        const members = res.data || []
-        
-        // 更新内部状态
-        this._userList = members
-        
-        // 设置默认选中第一个成员
-        if (members.length > 0) {
-          this._currentMemberIndex = 0
-          this._currentMember = members[0]
-        } else {
-          this._currentMemberIndex = -1
-          this._currentMember = null
-        }
-        
-        // 触发成员加载完成事件
-        this.$emit('members-loaded', {
-          userList: this._userList,
-          currentMemberIndex: this._currentMemberIndex,
-          currentMember: this._currentMember
-        })
-      } catch (e) {
-        console.error('获取群组成员失败:', e)
-      }
-    },
-    
-    // 处理成员切换
-    handleMemberChange(e) {
-      const index = e.detail.value
-      
-      // 更新内部状态
-      this._currentMemberIndex = index
-      this._currentMember = this.displayUserList[index] || null
-      
-      // 触发事件，传递更新后的数据
-      this.$emit('member-change', {
-        ...e,
-		currentGroup:this._currentGroup,
-        currentMemberIndex: index,
-        currentMember: this._currentMember
-      })
-    },
-    
-    // 处理添加按钮点击
-    handleAddClick() {
-      this.$emit('add-click');
-    }
+
+// ===== Props 定义 =====
+const props = defineProps({
+  groupName: { type: String, default: 'VV家庭' },
+  userList: { type: Array, default: () => [] },
+  currentMemberIndex: { type: Number, default: 0 },
+  currentMember: { type: Object, default: null },
+  addButtonText: { type: String, default: '添加日程' },
+  autoLoadMembers: { type: Boolean, default: true }
+})
+
+// ===== Emits 定义 =====
+const emit = defineEmits(['member-change', 'add-click', 'members-loaded'])
+
+// ===== 响应式数据 =====
+const _groupList = ref([])
+const _userList = ref([])
+const _currentMemberIndex = ref(0)
+const _currentMember = ref(null)
+const _currentGroup = ref(null)
+
+// ===== 计算属性 =====
+const displayUserList = computed(() => {
+  return props.userList.length > 0 ? props.userList : _userList.value
+})
+
+const displayMemberIndex = computed(() => {
+  if (props.currentMemberIndex >= 0 && props.userList.length > 0) {
+    return props.currentMemberIndex
   }
-};
+  return _currentMemberIndex.value
+})
+
+const displayMember = computed(() => {
+  return props.currentMember || _currentMember.value
+})
+
+// ===== 方法 =====
+const fetchGroupMembers = async () => {
+  try {
+    const groupRes = await api.group.list()
+    _groupList.value = groupRes || []
+
+    // 修复：使用 _groupList.value 而非未定义的 groups
+    if (_groupList.value.length > 0) {
+      _currentGroup.value = _groupList.value[0]
+      const requestData = { groupId: _currentGroup.value.id } // 修正拼写：grouId → groupId
+      const res = await api.group.user.list(requestData)
+      const members = res || []
+
+      _userList.value = members
+
+      if (members.length > 0) {
+        _currentMemberIndex.value = 0
+        _currentMember.value = members[0]
+      } else {
+        _currentMemberIndex.value = -1
+        _currentMember.value = null
+      }
+
+      emit('members-loaded', {
+        userList: _userList.value,
+        currentMemberIndex: _currentMemberIndex.value,
+        currentMember: _currentMember.value
+      })
+    }
+  } catch (e) {
+    console.error('获取群组成员失败:', e)
+  }
+}
+
+const handleMemberChange = (e) => {
+  const index = e.detail.value
+  _currentMemberIndex.value = index
+  _currentMember.value = displayUserList.value[index] || null
+
+  emit('member-change', {
+    ...e,
+    currentGroup: _currentGroup.value,
+    currentMemberIndex: index,
+    currentMember: _currentMember.value
+  })
+}
+
+const handleAddClick = () => {
+  emit('add-click')
+}
+
+// ===== 生命周期 & Watchers =====
+onMounted(() => {
+  if (props.autoLoadMembers && props.userList.length === 0) {
+    fetchGroupMembers()
+  } else if (props.userList.length > 0) {
+    _userList.value = [...props.userList]
+    _currentMemberIndex.value = props.currentMemberIndex || 0
+    _currentMember.value = props.currentMember || props.userList[_currentMemberIndex.value] || null
+  }
+})
+
+// 监听 userList 变化
+watch(
+    () => props.userList,
+    (newList) => {
+      if (newList && newList.length > 0) {
+        _userList.value = [...newList]
+        if (props.currentMember) {
+          _currentMember.value = props.currentMember
+        } else if (props.currentMemberIndex >= 0 && newList[props.currentMemberIndex]) {
+          _currentMember.value = newList[props.currentMemberIndex]
+          _currentMemberIndex.value = props.currentMemberIndex
+        } else if (newList[0]) {
+          _currentMember.value = newList[0]
+          _currentMemberIndex.value = 0
+        }
+      }
+    },
+    { deep: true }
+)
+
+// 监听 currentMemberIndex 变化
+watch(
+    () => props.currentMemberIndex,
+    (newIndex) => {
+      if (newIndex >= 0 && displayUserList.value[newIndex]) {
+        _currentMemberIndex.value = newIndex
+        _currentMember.value = displayUserList.value[newIndex]
+      }
+    }
+)
+
+// 监听 currentMember 变化
+watch(
+    () => props.currentMember,
+    (newMember) => {
+      if (newMember) {
+        _currentMember.value = newMember
+        const index = displayUserList.value.findIndex(
+            u => u.userId === newMember.userId || u.id === newMember.id
+        )
+        if (index >= 0) {
+          _currentMemberIndex.value = index
+        }
+      }
+    }
+)
 </script>
 
 <style scoped>
-/* 固定底栏 */
+/* 样式保持不变 */
 .bottom-bar {
   position: absolute;
   bottom: 0;
@@ -217,10 +196,9 @@ export default {
   box-sizing: border-box;
 }
 
-/* 底栏内容容器 */
 .bottom-bar-content {
   height: 100%;
-  width:100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -230,7 +208,6 @@ export default {
   gap: 12px;
 }
 
-/* 群组信息区域 */
 .group-info {
   display: flex;
   align-items: center;
@@ -247,7 +224,6 @@ export default {
   text-overflow: ellipsis;
 }
 
-/* 成员选择器 */
 .member-switcher {
   flex: 1;
   min-width: 0;
@@ -283,9 +259,8 @@ export default {
   text-overflow: ellipsis;
 }
 
-/* 添加事件按钮 */
 .bottom-add-btn {
-background-color: #007aff;
+  background-color: #007aff;
   color: #fff;
   border-radius: 20px;
   font-size: 13px;

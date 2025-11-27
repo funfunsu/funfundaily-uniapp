@@ -1,8 +1,8 @@
 // utils/auth.uts
 
-import apiTs from '@/utils/apiTs'
+import apiTs from './apiTs'
 import config from '../config/env'
-import { setToken, getToken } from '@/utils/token'
+import { setToken, getToken } from './token'
 
 export async function autoLogin() : Promise<String> {
 	const existingToken = getToken()
@@ -15,7 +15,7 @@ export async function autoLogin() : Promise<String> {
 	if (!loginRes.code) {
 		throw new Error('获取 code 失败')
 	}
-
+	console.log('Auto login success', loginRes.code)
 	const token = await apiTs.user.login(loginRes.code);
 	console.log('Auto login success', token)
 	setToken(token)

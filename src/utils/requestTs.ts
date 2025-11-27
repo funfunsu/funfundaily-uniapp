@@ -44,7 +44,20 @@ const requestConfig : RequestConfig = {
 			// 例如：Token过期，需要重新登录
 			if (response.code === "4010001") {
 				uni.clearStorageSync()
-				uni.navigateTo({ url: '/pages/login/login' })
+				uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+				// 方式1：重新加载当前页面（推荐）
+				const pages = getCurrentPages()
+				const currentPage = pages[pages.length - 1]
+				const route = currentPage.route
+				const options = currentPage.options || {}
+
+				// 拼接 query 参数
+				const queryStr = Object.keys(options).map(k => `${k}=${encodeURIComponent(options[k])}`).join('&')
+				const reloadUrl = `/${route}` + (queryStr ? '?' + queryStr : '')
+
+				uni.reLaunch({
+					url: reloadUrl
+				})
 			}
 
 			// 2. 统一抛出错误信息
@@ -60,7 +73,7 @@ const requestConfig : RequestConfig = {
 
 
 // 定义请求函数
-export default function request<T = any>(options : RequestOptions) : Promise<ResponseData<T>> {
+export default function request<T = any>(options : RequestOptions) : Promise<T> {
 	// 1. 执行请求拦截器
 	const processedOptions = requestConfig.requestInterceptor(options)
 
@@ -86,10 +99,10 @@ export default function request<T = any>(options : RequestOptions) : Promise<Res
 				'content-type': 'application/json'
 			},
 			success: (res) => {
-				if (res.statusCode === 200) {
+				if (res.statusCode === 200 || res.statusCode === 201 ) {
 					try {
 						// 执行响应拦截器
-						const processedResponse : ResponseData = requestConfig.responseInterceptor<T>(res.data)
+						const processedResponse : ApiResponse<T> = requestConfig.responseInterceptor<T>(res.data)
 						resolve(processedResponse.data)
 					} catch (error) {
 						reject(error)
@@ -108,23 +121,23 @@ export default function request<T = any>(options : RequestOptions) : Promise<Res
 
 // 定义便捷的请求方法
 export const api = {
-	get: <T = any>(url : string, data ?: any, header ?: any) : Promise<ResponseData<T>> => {
+	get: <T = any>(url : string, data ?: any, header ?: any) : Promise<T> => {
 		return request<T>({ url, method: 'GET', data, header })
 	},
 
-	post: <T = any>(url : string, data ?: any, header ?: any) : Promise<ResponseData<T>> => {
+	post: <T = any>(url : string, data ?: any, header ?: any) : Promise<T> => {
 		return request<T>({ url, method: 'POST', data, header })
 	},
 
-	put: <T = any>(url : string, data ?: any, header ?: any) : Promise<ResponseData<T>> => {
+	put: <T = any>(url : string, data ?: any, header ?: any) : Promise<T> => {
 		return request<T>({ url, method: 'PUT', data, header })
 	},
 
-	delete: <T = any>(url : string, data ?: any, header ?: any) : Promise<ResponseData<T>> => {
+	delete: <T = any>(url : string, data ?: any, header ?: any) : Promise<T> => {
 		return request<T>({ url, method: 'DELETE', data, header })
 	},
 
-	patch: <T = any>(url : string, data ?: any, header ?: any) : Promise<ResponseData<T>> => {
+	patch: <T = any>(url : string, data ?: any, header ?: any) : Promise<T> => {
 		return request<T>({ url, method: 'PATCH', data, header })
 	}
 }
