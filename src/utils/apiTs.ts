@@ -21,6 +21,10 @@ const apiTs = {
         login: (code: string): Promise<any> => api.post<any>(
             '/login',
             {'code': code}
+        ),
+        getInfo:():Promise<any> => api.get<any>(
+            '/api/user/info',
+            {}
         )
     },
     discovery: {

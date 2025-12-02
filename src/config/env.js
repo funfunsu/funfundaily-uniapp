@@ -8,5 +8,6 @@ export default {
     // 不同环境的 API 基础地址
     baseUrl: {
         prod: 'http://localhost:8080' // 替换成你的后端地址
+        // prod: 'https://api.funfundaily.com' // 替换成你的后端地址
     }
 }

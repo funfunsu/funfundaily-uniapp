@@ -24,6 +24,7 @@ export async function autoLogin() : Promise<String> {
 
 	// #ifndef MP-WEIXIN
 	if (config.env === 'dev') {
+		debugger
 		const token = await apiTs.user.login("Test");
 		console.log('Auto login success', token)
 		setToken(token)

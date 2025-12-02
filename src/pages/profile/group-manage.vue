@@ -10,11 +10,10 @@
     
     <view class="content">
       <view class="section">
-        <text class="section-title">我的群组</text>
         <view class="group-list">
           <view class="group-item" v-for="(group, index) in groups" :key="index">
             <view class="group-info">
-              <text class="group-name">{{ group.name }}</text>
+              <text class="group-name">{{ group.groupName }}</text>
               <text class="group-desc">{{ group.memberCount }} 成员</text>
             </view>
             <view class="group-actions">
@@ -41,13 +40,6 @@
     setup() {
       const groups = ref([])
       
-      // 模拟数据
-      const mockGroups = [
-        { id: '1', name: '工作小组', memberCount: 5 },
-        { id: '2', name: '学习伙伴', memberCount: 8 },
-        { id: '3', name: '家庭群组', memberCount: 4 }
-      ]
-      
       onMounted(() => {
         loadGroups()
       })
@@ -55,11 +47,8 @@
       const loadGroups = async () => {
         try {
           // 实际项目中调用API获取群组数据
-          // const res = await api.get('/groups')
-          // groups.value = res.data
-          
-          // 使用模拟数据
-          groups.value = mockGroups
+          const res = await api.group.list()
+          groups.value = res
         } catch (error) {
           console.error('加载群组失败:', error)
         }

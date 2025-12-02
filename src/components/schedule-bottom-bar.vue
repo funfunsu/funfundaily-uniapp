@@ -1,32 +1,41 @@
 <template>
   <view class="bottom-bar">
-    <view class="bottom-bar-content uni-flex uni-row">
-      <!-- 群组信息 -->
-      <view class="group-info">
-        <view class="group-name">{{ _currentGroup?.groupName || 'VV家庭' }}</view>
+    <view class="bottom-bar-content">
+      <!-- 左侧：群组信息 + 成员选择器 -->
+      <view class="left-section">
+        <!-- 群组信息 -->
+        <view class="group-info">
+          <view class="group-name">{{ _currentGroup?.groupName || props.groupName || 'VV家庭' }}</view>
+        </view>
+
+        <!-- 成员选择器 -->
+        <view class="member-switcher">
+          <picker
+              @change="handleMemberChange"
+              :value="displayMemberIndex"
+              :range="displayUserList.map(u => u.nickname || '未知用户')"
+          >
+            <view class="member-selector">
+              <text class="member-name">
+                {{ displayMember?.nickname || '选择成员' }}
+                <text class="arrow-icon">›</text>
+              </text>
+            </view>
+          </picker>
+        </view>
       </view>
 
-      <!-- 成员选择器 -->
-      <view class="member-switcher">
-        <picker
-            @change="handleMemberChange"
-            :value="displayMemberIndex"
-            :range="displayUserList.map(u => u.nickname || '未知用户')"
-        >
-          <view class="member-selector">
-            <text class="member-name">
-              {{ displayMember ? (displayMember.nickname || '未知用户') : '选择成员' }}
-              <text class="arrow-icon">›</text>
-            </text>
-          </view>
-        </picker>
+      <!-- 右侧：两个按钮（靠右） -->
+      <view class="right-section">
+        <button class="bottom-add-btn" @click="handleAddClick">
+          <text class="add-icon">+</text>
+          <text class="add-text">{{ addButtonText || '添加日程' }}</text>
+        </button>
+        <button class="bottom-add-btn" @click="handleShareClick">
+          <text class="add-icon">+</text>
+          <text class="add-text">{{ shareButtonText || '分享' }}</text>
+        </button>
       </view>
-
-      <!-- 添加事件按钮 -->
-      <button class="bottom-add-btn uni-flex uni-row" @click="handleAddClick">
-        <text class="add-icon">+</text>
-        <text class="add-text">{{ addButtonText || '添加日程' }}</text>
-      </button>
     </view>
   </view>
 </template>
@@ -42,11 +51,12 @@ const props = defineProps({
   currentMemberIndex: { type: Number, default: 0 },
   currentMember: { type: Object, default: null },
   addButtonText: { type: String, default: '添加日程' },
+  shareButtonText: { type: String, default: '分享' },
   autoLoadMembers: { type: Boolean, default: true }
 })
 
 // ===== Emits 定义 =====
-const emit = defineEmits(['member-change', 'add-click', 'members-loaded'])
+const emit = defineEmits(['member-change', 'add-click', 'share-click', 'members-loaded'])
 
 // ===== 响应式数据 =====
 const _groupList = ref([])
@@ -61,14 +71,19 @@ const displayUserList = computed(() => {
 })
 
 const displayMemberIndex = computed(() => {
-  if (props.currentMemberIndex >= 0 && props.userList.length > 0) {
-    return props.currentMemberIndex
+  if (props.userList.length > 0) {
+    return Math.max(0, props.currentMemberIndex)
   }
   return _currentMemberIndex.value
 })
 
 const displayMember = computed(() => {
-  return props.currentMember || _currentMember.value
+  if (props.userList.length > 0) {
+    if (props.currentMember) return props.currentMember
+    if (props.userList[props.currentMemberIndex]) return props.userList[props.currentMemberIndex]
+    return props.userList[0]
+  }
+  return _currentMember.value
 })
 
 // ===== 方法 =====
@@ -77,11 +92,9 @@ const fetchGroupMembers = async () => {
     const groupRes = await api.group.list()
     _groupList.value = groupRes || []
 
-    // 修复：使用 _groupList.value 而非未定义的 groups
     if (_groupList.value.length > 0) {
       _currentGroup.value = _groupList.value[0]
-      const requestData = { groupId: _currentGroup.value.id } // 修正拼写：grouId → groupId
-      const res = await api.group.user.list(requestData)
+      const res = await api.group.user.list({ groupId: _currentGroup.value.id })
       const members = res || []
 
       _userList.value = members
@@ -106,72 +119,61 @@ const fetchGroupMembers = async () => {
 }
 
 const handleMemberChange = (e) => {
-  const index = e.detail.value
+  const index = parseInt(e.detail.value, 10)
+  const member = displayUserList.value[index] || null
+
   _currentMemberIndex.value = index
-  _currentMember.value = displayUserList.value[index] || null
+  _currentMember.value = member
 
   emit('member-change', {
-    ...e,
-    currentGroup: _currentGroup.value,
-    currentMemberIndex: index,
-    currentMember: _currentMember.value
+    index,
+    member,
+    currentGroup: _currentGroup.value
   })
 }
 
-const handleAddClick = () => {
-  emit('add-click')
-}
+const handleAddClick = () => emit('add-click')
+const handleShareClick = () => emit('share-click')
 
 // ===== 生命周期 & Watchers =====
 onMounted(() => {
   if (props.autoLoadMembers && props.userList.length === 0) {
     fetchGroupMembers()
-  } else if (props.userList.length > 0) {
+  } else {
     _userList.value = [...props.userList]
-    _currentMemberIndex.value = props.currentMemberIndex || 0
-    _currentMember.value = props.currentMember || props.userList[_currentMemberIndex.value] || null
+    if (props.userList.length > 0) {
+      const idx = Math.max(0, props.currentMemberIndex)
+      _currentMemberIndex.value = idx
+      _currentMember.value = props.currentMember || props.userList[idx] || props.userList[0]
+    }
   }
 })
 
-// 监听 userList 变化
 watch(
     () => props.userList,
     (newList) => {
-      if (newList && newList.length > 0) {
+      if (Array.isArray(newList)) {
         _userList.value = [...newList]
-        if (props.currentMember) {
-          _currentMember.value = props.currentMember
-        } else if (props.currentMemberIndex >= 0 && newList[props.currentMemberIndex]) {
-          _currentMember.value = newList[props.currentMemberIndex]
-          _currentMemberIndex.value = props.currentMemberIndex
-        } else if (newList[0]) {
-          _currentMember.value = newList[0]
-          _currentMemberIndex.value = 0
+        if (newList.length > 0) {
+          const idx = Math.max(0, props.currentMemberIndex)
+          _currentMemberIndex.value = idx
+          _currentMember.value = props.currentMember || newList[idx] || newList[0]
+        } else {
+          _currentMemberIndex.value = -1
+          _currentMember.value = null
         }
       }
     },
-    { deep: true }
+    { deep: true, immediate: true }
 )
 
-// 监听 currentMemberIndex 变化
-watch(
-    () => props.currentMemberIndex,
-    (newIndex) => {
-      if (newIndex >= 0 && displayUserList.value[newIndex]) {
-        _currentMemberIndex.value = newIndex
-        _currentMember.value = displayUserList.value[newIndex]
-      }
-    }
-)
-
-// 监听 currentMember 变化
 watch(
     () => props.currentMember,
     (newMember) => {
       if (newMember) {
         _currentMember.value = newMember
         const index = displayUserList.value.findIndex(
-            u => u.userId === newMember.userId || u.id === newMember.id
+            u => (u.userId && u.userId === newMember.userId) || (u.id && u.id === newMember.id)
         )
         if (index >= 0) {
           _currentMemberIndex.value = index
@@ -182,7 +184,6 @@ watch(
 </script>
 
 <style scoped>
-/* 样式保持不变 */
 .bottom-bar {
   position: absolute;
   bottom: 0;
@@ -192,41 +193,43 @@ watch(
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
   height: 60px;
   z-index: 100;
-  width: auto;
-  box-sizing: border-box;
 }
 
 .bottom-bar-content {
   height: 100%;
-  width: 100%;
+  padding: 0 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 2px 16px;
   box-sizing: border-box;
-  max-width: 100%;
+  width: 100%;
+  /* 不使用 justify-content，靠 margin-left: auto 实现右对齐 */
+}
+
+/* —————— 左侧区域 —————— */
+.left-section {
+  flex-shrink: 0; /* 不收缩 */
+  display: flex;
+  align-items: center;
   gap: 12px;
+  min-width: 0; /* 允许内部文本省略 */
 }
 
 .group-info {
-  display: flex;
-  align-items: center;
-  flex-shrink: 1;
-  min-width: 0;
+  white-space: nowrap;
 }
 
 .group-name {
   font-size: 15px;
   color: #333;
   font-weight: bold;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 60px;   /* 防止过窄 */
+  max-width: 120px;  /* 防止过长撑开布局 */
 }
 
 .member-switcher {
-  flex: 1;
-  min-width: 0;
+  min-width: 80px;   /* 保证可点击区域 */
   max-width: 140px;
 }
 
@@ -236,8 +239,18 @@ watch(
   padding: 6px 8px;
   background-color: #f5f5f5;
   border-radius: 16px;
-  font-size: 13px;
   height: 32px;
+  font-size: 13px;
+  width: 100%;
+}
+
+.member-name {
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 
 .arrow-icon {
@@ -250,13 +263,13 @@ watch(
   background-color: #e9e9e9;
 }
 
-.member-name {
-  color: #333;
-  font-weight: 500;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* —————— 右侧区域 —————— */
+.right-section {
+  margin-left: auto;     /* 👈 关键：推到最右边 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;        /* 按钮不被压缩 */
 }
 
 .bottom-add-btn {
@@ -266,22 +279,22 @@ watch(
   font-size: 13px;
   padding: 0 16px;
   height: 32px;
-  line-height: 36px;
+  line-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   border: none;
   box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.bottom-add-btn::after {
+  border: none;
 }
 
 .bottom-add-btn:active {
   transform: scale(0.97);
   box-shadow: 0 1px 3px rgba(0, 122, 255, 0.3);
-}
-
-.bottom-add-btn::after {
-  border: none;
 }
 
 .add-icon {

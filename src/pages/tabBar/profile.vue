@@ -7,7 +7,7 @@
         <text class="avatar-text">U</text>
       </view>
       <view class="user-details">
-        <text class="user-name">{{ userInfo.username || '未知用户' }}</text>
+        <text class="user-name">{{ userInfo.nickname || '未知用户' }}</text>
       </view>
       <view class="group-selector-container">
         <view class="group-label">当前群组：</view>
@@ -105,7 +105,7 @@ export default {
     async fetchUserInfo() {
       try {
         const res = await api.user.getInfo()
-        this.userInfo = res.data || {}
+        this.userInfo = res || {}
       } catch (err) {
         console.error('获取用户信息失败', err)
         uni.showToast({ title: '获取用户信息失败', icon: 'none' })

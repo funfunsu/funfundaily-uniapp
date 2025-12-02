@@ -76,7 +76,6 @@ const requestConfig : RequestConfig = {
 export default function request<T = any>(options : RequestOptions) : Promise<T> {
 	// 1. 执行请求拦截器
 	const processedOptions = requestConfig.requestInterceptor(options)
-
 	// 处理 URL
 	const url = !config.mock
 		? `${config.baseUrl.prod}${processedOptions.url}`
