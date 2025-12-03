@@ -55,6 +55,7 @@
 										:class="['event-container', `event-${event.color}`]"
 										:style="getEventStyle(event)" @click="handleEventClick(date,index)">
 										<view class="event-title">{{ event.title }}</view>
+                    <checkbox></checkbox>
 									</view>
 								</view>
 							</view>

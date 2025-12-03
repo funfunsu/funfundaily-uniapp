@@ -5,7 +5,9 @@
       <view class="left-section">
         <!-- 群组信息 -->
         <view class="group-info">
-          <view class="group-name">{{ _currentGroup?.groupName || props.groupName || 'VV家庭' }}</view>
+          <text class="member-name">
+            {{ _currentGroup?.groupName}}
+          </text>
         </view>
 
         <!-- 成员选择器 -->
@@ -27,12 +29,10 @@
 
       <!-- 右侧：两个按钮（靠右） -->
       <view class="right-section">
-        <button class="bottom-add-btn" @click="handleAddClick">
-          <text class="add-icon">+</text>
+        <button v-if="addButtonText" class="bottom-add-btn" @click="handleAddClick">
           <text class="add-text">{{ addButtonText || '添加日程' }}</text>
         </button>
-        <button class="bottom-add-btn" @click="handleShareClick">
-          <text class="add-icon">+</text>
+        <button v-if="shareButtonText" class="bottom-add-btn" @click="handleShareClick">
           <text class="add-text">{{ shareButtonText || '分享' }}</text>
         </button>
       </view>
@@ -46,12 +46,11 @@ import api from '../utils/apiTs'
 
 // ===== Props 定义 =====
 const props = defineProps({
-  groupName: { type: String, default: 'VV家庭' },
   userList: { type: Array, default: () => [] },
   currentMemberIndex: { type: Number, default: 0 },
   currentMember: { type: Object, default: null },
-  addButtonText: { type: String, default: '添加日程' },
-  shareButtonText: { type: String, default: '分享' },
+  addButtonText: { type: String},
+  shareButtonText: { type: String},
   autoLoadMembers: { type: Boolean, default: true }
 })
 
@@ -69,12 +68,11 @@ const _currentGroup = ref(null)
 const displayUserList = computed(() => {
   return props.userList.length > 0 ? props.userList : _userList.value
 })
-
 const displayMemberIndex = computed(() => {
   if (props.userList.length > 0) {
     return Math.max(0, props.currentMemberIndex)
   }
-  return _currentMemberIndex.value
+  return _currentMemberIndex.value || 0
 })
 
 const displayMember = computed(() => {
@@ -98,7 +96,6 @@ const fetchGroupMembers = async () => {
       const members = res || []
 
       _userList.value = members
-
       if (members.length > 0) {
         _currentMemberIndex.value = 0
         _currentMember.value = members[0]
@@ -124,6 +121,7 @@ const handleMemberChange = (e) => {
 
   _currentMemberIndex.value = index
   _currentMember.value = member
+  console.log("handleMemberChange",_currentMember)
 
   emit('member-change', {
     index,
@@ -148,39 +146,39 @@ onMounted(() => {
     }
   }
 })
-
-watch(
-    () => props.userList,
-    (newList) => {
-      if (Array.isArray(newList)) {
-        _userList.value = [...newList]
-        if (newList.length > 0) {
-          const idx = Math.max(0, props.currentMemberIndex)
-          _currentMemberIndex.value = idx
-          _currentMember.value = props.currentMember || newList[idx] || newList[0]
-        } else {
-          _currentMemberIndex.value = -1
-          _currentMember.value = null
-        }
-      }
-    },
-    { deep: true, immediate: true }
-)
-
-watch(
-    () => props.currentMember,
-    (newMember) => {
-      if (newMember) {
-        _currentMember.value = newMember
-        const index = displayUserList.value.findIndex(
-            u => (u.userId && u.userId === newMember.userId) || (u.id && u.id === newMember.id)
-        )
-        if (index >= 0) {
-          _currentMemberIndex.value = index
-        }
-      }
-    }
-)
+//
+// watch(
+//     () => props.userList,
+//     (newList) => {
+//       if (Array.isArray(newList)) {
+//         _userList.value = [...newList]
+//         if (newList.length > 0) {
+//           const idx = Math.max(0, props.currentMemberIndex)
+//           _currentMemberIndex.value = idx
+//           _currentMember.value = props.currentMember || newList[idx] || newList[0]
+//         } else {
+//           _currentMemberIndex.value = -1
+//           _currentMember.value = null
+//         }
+//       }
+//     },
+//     { deep: true, immediate: true }
+// )
+//
+// watch(
+//     () => props.currentMember,
+//     (newMember) => {
+//       if (newMember) {
+//         _currentMember.value = newMember
+//         const index = displayUserList.value.findIndex(
+//             u => (u.userId && u.userId === newMember.userId) || (u.id && u.id === newMember.id)
+//         )
+//         if (index >= 0) {
+//           _currentMemberIndex.value = index
+//         }
+//       }
+//     }
+// )
 </script>
 
 <style scoped>

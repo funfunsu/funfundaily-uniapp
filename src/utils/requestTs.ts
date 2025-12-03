@@ -12,6 +12,7 @@ interface RequestConfig {
 	requestInterceptor : (options : RequestOptions) => RequestOptions
 	responseInterceptor : <T = any>(response : ResponseData<T>) => ResponseData<T>
 }
+let isRedirectingToLogin = false; // 防重
 
 // 创建请求实例的配置
 const requestConfig : RequestConfig = {
@@ -43,21 +44,41 @@ const requestConfig : RequestConfig = {
 		if (response.code !== "0") {
 			// 例如：Token过期，需要重新登录
 			if (response.code === "4010001") {
-				uni.clearStorageSync()
-				uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
-				// 方式1：重新加载当前页面（推荐）
-				const pages = getCurrentPages()
-				const currentPage = pages[pages.length - 1]
-				const route = currentPage.route
-				const options = currentPage.options || {}
+				if (!isRedirectingToLogin) {
+					isRedirectingToLogin = true;
+					uni.clearStorageSync();
 
-				// 拼接 query 参数
-				const queryStr = Object.keys(options).map(k => `${k}=${encodeURIComponent(options[k])}`).join('&')
-				const reloadUrl = `/${route}` + (queryStr ? '?' + queryStr : '')
+					const pages = getCurrentPages();
+					if (pages.length > 0) {
+						const currentPage = pages[pages.length - 1];
+						const route = currentPage.route;
+						const options = currentPage.options || {};
 
-				uni.reLaunch({
-					url: reloadUrl
-				})
+						// 构造完整路径用于跳回
+						const queryStr = Object.keys(options)
+							.map(k => `${k}=${encodeURIComponent(options[k])}`)
+							.join('&');
+						const currentFullPath = `/${route}` + (queryStr ? '?' + queryStr : '');
+
+						// 跳转到登录页，并携带 redirect 参数
+						uni.redirectTo({
+							url: `/pages/index/index?redirect=${encodeURIComponent(currentFullPath)}`,
+							fail: () => {
+								// 如果 redirectTo 失败（比如已经在登录页），直接去登录页
+								uni.reLaunch({url: '/pages/index/index'});
+							},
+							complete: () => {
+								// 不要重置 isRedirectingToLogin，避免短时间内多次跳转
+								// 可选：3秒后自动解锁（防极端情况）
+								setTimeout(() => {
+									isRedirectingToLogin = false;
+								}, 3000);
+							}
+						});
+					} else {
+						uni.reLaunch({url: '/pages/index/index'});
+					}
+				}
 			}
 
 			// 2. 统一抛出错误信息

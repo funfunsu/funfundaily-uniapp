@@ -47,6 +47,17 @@ export default class DateUtils {
 		return `${year}-${month}-${day}`;
 	}
 
+	/**
+	 * 通用日期格式化：Date 转 yyyy-MM-dd 字符串
+	 * @param date 需格式化的日期
+	 * @returns 格式化后的日期字符串
+	 */
+	static formatDateToMonth(date : Date) : string {
+		const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份 0-11 → 1-12，补0
+		const day = String(date.getDate()).padStart(2, '0'); // 日期补0
+		return `${month}-${day}`;
+	}
+
 	// 可扩展其他日期工具方法（如获取周日、格式化时间等）
 	/**
 	 * 获取指定日期所属周的周日（yyyy-MM-dd 字符串格式）

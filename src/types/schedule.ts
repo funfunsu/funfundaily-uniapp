@@ -6,7 +6,8 @@ export interface Schedule {
     location: string
     userId?: string
     groupId?: string
-    itemType: 'school' | 'task' 
+    itemType: 'schedule' | 'task'
+    itemLabel: string
     startTime: string // 'YYYY-MM-DD HH:mm:ss'
     endTime: string // 'YYYY-MM-DD HH:mm:ss'
     notes?: string

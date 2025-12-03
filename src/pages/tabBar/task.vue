@@ -85,15 +85,15 @@
 
 		<!-- 底部栏 -->
 		<view class="bottom-bar">
-			<schedule-bottom-bar add-button-text="任务" @add-click="handleAddClick" />
+			<schedule-bottom-bar add-button-text="添加任务" @add-click="handleAddClick" />
 		</view>
 	</view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import apiTs from '@/utils/apiTs'
-import scheduleBottomBar from '@/components/schedule-bottom-bar.vue'
+import apiTs from '../../utils/apiTs'
+import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 
 // =============== 类型定义 ===============
 interface Task {

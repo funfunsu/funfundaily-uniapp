@@ -2,7 +2,7 @@
 	<view class="page-container">
 		<view class="page-content-container">
 			<!-- 引入schedule-content组件 -->
-			<schedule-edit :schedule="editingSchedule" />
+			<schedule-edit :schedule="editingSchedule" :schedule-type="'schedule'" />
 		</view>
 		<!-- 底部固定栏 -->
 		<view class="bottom-bar">
@@ -29,15 +29,7 @@ import scheduleEdit from '../../components/schedule/schedule-edit.vue'
 		},
 		data() {
 			return {
-				editingSchedule: {},
-				// 重复类型选项
-				repeatTypeOptions: ['不重复', '每天', '每周', '每月', '每年'],
-				repeatTypeValues: ['none', 'daily', 'weekly', 'monthly', 'yearly'],
-				// 星期选项
-				weekDays: ['日', '一', '二', '三', '四', '五', '六'],
-				// 日程类型选项
-				itemTypeOptions: ['学校', '工作', '生活', '其他'],
-				itemTypeValues: ['school', 'work', 'life', 'other']
+				editingSchedule: {}
 			};
 		},
 		onLoad(query) {

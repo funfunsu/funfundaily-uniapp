@@ -7,14 +7,14 @@
 
     <!-- 底部固定栏 -->
     <view class="bottom-bar">
-      <schedule-bottom-bar add-button-text="事件" @add-click="handleAddClick" />
+      <schedule-bottom-bar add-button-text="添加"  @add-click="handleAddClick" share-button-text="分享"   @share-click="handleShareClick"/>
     </view>
   </view>
 </template>
 
 <script>
 import apiTs from '../../utils/apiTs'
-import DateUtils from '@/utils/util'; // 导入日期工具类
+import DateUtils from '../../utils/util'; // 导入日期工具类
 
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import scheduleContent from '../../components/schedule/schedule-content.vue'
@@ -69,6 +69,13 @@ export default {
     },
     // 处理添加按钮点击
     handleAddClick() {
+      // 跳转到日程编辑页面
+      uni.navigateTo({
+        url: '/pages/schedule/edit'
+      });
+    },
+    // 处理添加按钮点击
+    handleShareClick() {
       // 跳转到日程编辑页面
       uni.navigateTo({
         url: '/pages/schedule/edit'
