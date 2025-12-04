@@ -11,7 +11,7 @@ export async function autoLogin() : Promise<String> {
 	}
 	// #ifdef MP-WEIXIN
 	// 获取 code
-	const loginRes = await uni.login()
+	const loginRes = await uni.login({ provider: 'weixin' })
 	if (!loginRes.code) {
 		throw new Error('获取 code 失败')
 	}
@@ -25,7 +25,7 @@ export async function autoLogin() : Promise<String> {
 	// #ifndef MP-WEIXIN
 	if (config.env === 'dev') {
 		debugger
-		const token = await apiTs.user.login("Test");
+		const token = await apiTs.user.login("0e3duUFa1hjrMK0KtmFa1jmkmE1duUFg");
 		console.log('Auto login success', token)
 		setToken(token)
 		return token
