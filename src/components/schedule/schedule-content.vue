@@ -2,11 +2,9 @@
   <!-- 顶部固定栏 -->
   <view class="top-bar">
     <view class="flex-row" style="width: 100%;">
-      <!-- 左侧时间轴表头占位 -->
       <view class="day-column-header" style="width: 12%; flex-shrink: 0;">
         <view class="schedule-header"></view>
       </view>
-      <!-- 右侧固定日期表头 -->
       <view class="dates-header" style="width: 88%;">
         <view class="flex-row">
           <view
@@ -31,7 +29,6 @@
   <view class="content-container">
     <view class="content-wrapper">
       <view class="flex-row">
-        <!-- 左侧时间轴 -->
         <view class="time-axis" style="width: 12%; flex-shrink: 0;">
           <view class="flex-column">
             <view
@@ -44,7 +41,6 @@
           </view>
         </view>
 
-        <!-- 右侧日期区域 -->
         <view class="dates-container" style="width: 88%;">
           <view class="flex-row">
             <view
@@ -54,7 +50,6 @@
                 style="width: 14%;"
             >
               <view class="flex-column">
-                <!-- 背景时间格子 -->
                 <view
                     v-for="(hour, hourIndex) in hours"
                     :key="hourIndex"
@@ -63,7 +58,6 @@
                   <view class="time-slot"></view>
                 </view>
 
-                <!-- 绝对定位的事件层 -->
                 <view class="events-layer">
                   <view
                       v-for="(event, index) in getAllEventsForDate(date)"
@@ -72,15 +66,16 @@
                       :style="getEventStyle(event)"
                       @click.stop="toggleEventSelection(event, date)"
                   >
-                    <!-- 选中框 -->
+                    <!-- 仅在 shareMode 为 true 时显示选中框 -->
                     <view
+                        v-if="shareMode"
                         class="event-checkbox"
                         :class="{ 'checked': isSelected(event, date) }"
                     >
                       <text v-if="isSelected(event, date)">✓</text>
                     </view>
 
-                    <view class="event-title" @click.stop="handleEventClick(date,index)">{{ event.title }}</view>
+                    <view class="event-title">{{ event.title }}</view>
                   </view>
                 </view>
               </view>
@@ -95,13 +90,14 @@
 <script>
 export default {
   props: {
-    dates: {
-      type: Array,
-      default: () => []
-    },
+
     events: {
       type: Object,
       default: () => ({})
+    },
+    eventList: {
+      type: Array,
+      default: () => []
     },
     weekDays: {
       type: Array,
@@ -113,23 +109,60 @@ export default {
         '8:00', '9:00', '10:00', '11:00', '12:00', '13:00',
         '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
       ]
+    },
+    // 新增：是否处于分享模式（控制多选框显示）
+    shareMode: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
-      selectedEvents: new Set() // 存储选中的事件唯一标识
+      selectedEvents: new Set(),
+      dates: {
+        type: Array,
+        default: () => []
+      }
     };
   },
+  watch: {
+    // 当 shareMode 关闭时，自动清空选择
+    shareMode(newVal) {
+      if (!newVal) {
+        this.clearSelection();
+      }
+    },
+    // ✅ 监听 eventList 变化，更新 dates
+    eventList: {
+      handler(newList) {
+        console.log("📅 eventList changed, updating dates...");
+        this.updateDatesFromEventList(newList);
+      },
+      immediate: true // 组件挂载时也执行一次
+    },
+  },
   methods: {
+    updateDatesFromEventList(list) {
+      const uniqueSortedDates = [...new Set(list.map(item => item.date))].sort();
+      this.dates = uniqueSortedDates;
+      console.log("🗓️ Updated dates:", this.dates);
+    },
+
     handleEventClick(date, index) {
       const schedules = this.events[date] || [];
       this.$emit('event-click', schedules[index]);
     },
 
     getAllEventsForDate(date) {
-      const eventsForDate = [];
-      const scheduleForDate = this.events[date] || [];
-      scheduleForDate.forEach(schedule => {
+      let schedules = [];
+      // 遍历数组形式的数据
+      this.eventList.forEach(event => {
+        if (event.date === date) {
+          schedules = event.schedules;
+        }
+      })
+      let eventsForDate = []
+      schedules.forEach(schedule => {
         const startTime = schedule.startTime.split(' ')[1].slice(0, 5);
         const endTime = schedule.endTime.split(' ')[1].slice(0, 5);
 
@@ -166,35 +199,66 @@ export default {
       };
     },
 
-    // 生成唯一 key
     getEventKey(event, date) {
       return event.id != null ? String(event.id) : `${date}-${event.startHour}-${event.title}`;
     },
 
-    // 切换选中状态
     toggleEventSelection(event, date) {
+      if (!this.shareMode) return; // 非分享模式不可选
       const key = this.getEventKey(event, date);
       if (this.selectedEvents.has(key)) {
         this.selectedEvents.delete(key);
       } else {
         this.selectedEvents.add(key);
       }
-      // 向父组件同步选中状态
       this.$emit('selection-change', Array.from(this.selectedEvents));
     },
 
-    // 判断是否选中
     isSelected(event, date) {
       return this.selectedEvents.has(this.getEventKey(event, date));
     },
 
-    // 可选：提供清除选中方法（父组件可通过 ref 调用）
+    // 清空选中
     clearSelection() {
       this.selectedEvents.clear();
       this.$emit('selection-change', []);
     },
 
-    // 可选：获取完整选中事件对象（需配合原始 events 数据）
+    // 全选所有事件
+    selectAll() {
+      if (!this.shareMode) return;
+      this.selectedEvents.clear();
+      for (const date of this.dates) {
+        const events = this.getAllEventsForDate(date);
+        for (const event of events) {
+          this.selectedEvents.add(this.getEventKey(event, date));
+        }
+      }
+      this.$emit('selection-change', Array.from(this.selectedEvents));
+    },
+
+    // 反选（已选的取消，未选的选中）
+    toggleSelectAll() {
+      if (!this.shareMode) return;
+      const allKeys = new Set();
+      for (const date of this.dates) {
+        const events = this.getAllEventsForDate(date);
+        for (const event of events) {
+          allKeys.add(this.getEventKey(event, date));
+        }
+      }
+
+      const newSelected = new Set();
+      for (const key of allKeys) {
+        if (!this.selectedEvents.has(key)) {
+          newSelected.add(key);
+        }
+      }
+      this.selectedEvents = newSelected;
+      this.$emit('selection-change', Array.from(this.selectedEvents));
+    },
+
+    // 获取完整选中事件对象（含原始数据）
     getSelectedEventObjects() {
       const selected = [];
       for (const date in this.events) {
@@ -208,11 +272,25 @@ export default {
           };
           const key = this.getEventKey(fakeEvent, date);
           if (this.selectedEvents.has(key)) {
-            selected.push({ ...schedule, date }); // 附加日期信息
+            selected.push({...schedule, date});
           }
         });
       }
       return selected;
+    },
+
+    // 获取当前选中数量
+    getSelectedCount() {
+      return this.selectedEvents.size;
+    },
+
+    // 获取总事件数量
+    getTotalEventCount() {
+      let total = 0;
+      for (const date of this.dates) {
+        total += (this.events[date] || []).length;
+      }
+      return total;
     }
   }
 };
@@ -376,6 +454,7 @@ export default {
 
 .event-title {
   margin-bottom: 2px;
+  margin-right: 20px;
   text-align: center;
   font-size: small;
 }

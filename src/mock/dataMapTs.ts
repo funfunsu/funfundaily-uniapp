@@ -19,6 +19,8 @@ import pointGet from './point/get.json';
 
 import discoveryList from './discovery/list.json';
 
+import createShare from './share/create.json';
+
 
 	import {
 		Schedule, ScheduleList, ScheduleListRequest
@@ -56,6 +58,7 @@ export default {
     '/api/schedule/list': generateRecent7DaysSchedule(),
     '/api/schedule/info': scheduleInfo,
     '/api/schedule/add': add,
+    '/api/schedule/copy': add,
     '/api/schedule/modify': modify,
     '/api/group/user/list': groupUserList,
     '/api/group/user/add': add,
@@ -73,6 +76,8 @@ export default {
     '/api/point/get': pointGet,
 	
     '/api/discovery/list': discoveryList,
+
+    '/api/share/create': createShare,
 };
 
 

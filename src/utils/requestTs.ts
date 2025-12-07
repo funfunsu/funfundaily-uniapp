@@ -1,7 +1,7 @@
 // utils/request.ts
 import config from '../config/env'
 import mock from '../mock/mockTs'
-import {getToken } from '../utils/token'
+import {getToken,getShareToken } from '../utils/token'
 
 import { ResponseData, RequestOptions, ApiResponse } from '../types/type'
 
@@ -25,6 +25,13 @@ const requestConfig : RequestConfig = {
 		if (token) {
 			options.header = options.header || {}
 			options.header.Authorization = `Bearer ${token}`
+		}
+
+		const shareToken = getShareToken();
+		console.log('请求拦截器shareToken:', shareToken)
+		if (shareToken){
+			options.header = options.header || {}
+			options.header['x-fun-sharetoken'] = `${token}`
 		}
 
 		// 2. 可以在这里添加公共参数

@@ -1,6 +1,7 @@
 // utils/token.uts 或 token.ts
 
 const TOKEN_KEY = 'ACCESS_TOKEN'
+const SHARE_TOKEN_KEY = 'SHARE_TOKEN'
 
 /**
  * 保存 Token
@@ -21,12 +22,37 @@ export function getToken(): string | null {
     return null
   }
 }
+/**
+ * 保存 Token
+ */
+export function setShareToken(token: string): void {
+  uni.setStorageSync(SHARE_TOKEN_KEY, token)
+}
+
+/**
+ * 获取 Token
+ */
+export function getShareToken(): string | null {
+  try {
+    const token = uni.getStorageSync(SHARE_TOKEN_KEY)
+    return typeof token === 'string' ? token : null
+  } catch (e) {
+    console.warn('getShareToken failed:', e)
+    return null
+  }
+}
 
 /**
  * 移除 Token
  */
 export function removeToken(): void {
   uni.removeStorageSync(TOKEN_KEY)
+}
+/**
+ * 移除 Token
+ */
+export function removeShareToken(): void {
+  uni.removeStorageSync(SHARE_TOKEN_KEY)
 }
 
 /**

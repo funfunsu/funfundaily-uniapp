@@ -2,25 +2,25 @@
 import request from './requestTs'
 import {api} from './requestTs'
 import {
-    Schedule, ScheduleList, ScheduleListRequest, ScheduleInfoRequest, ScheduleAddRequest
+    Schedule, ScheduleList, ScheduleListRequest, ScheduleInfoRequest, ScheduleAddRequest, ScheduleCopyRequest
 } from '../types/schedule'
 import {
     DiscoveryItem
 } from '../types/discovery'
 import {
-    ApiResponse, ResponseData
-} from '../types/type'
-import {
     Point
 } from '../types/point'
+import {
+    Share
+} from '../types/share'
 
 // 统一管理所有API接口
 const apiTs = {
     // 用户相关接口
     user: {
-        login: (code: string): Promise<any> => api.post<any>(
+        login: (data: object): Promise<any> => api.post<any>(
             '/login',
-            {'code': code}
+            data
         ),
         getInfo:():Promise<any> => api.get<any>(
             '/api/user/info',
@@ -42,6 +42,7 @@ const apiTs = {
         info: (data: ScheduleInfoRequest): Promise<Schedule> => api.get<Schedule>('/api/schedule/' + data.id, data),
         // 添加日程
         add: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/add', data),
+        copy: (data: ScheduleCopyRequest): Promise<boolean> => api.post<boolean>('/api/schedule/copy', data),
         // 修改日程
         modify: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/modify', data)
     },
@@ -146,6 +147,10 @@ const apiTs = {
             method: 'GET',
             data
         })
+    },
+    share:{
+        create:(data:any):Promise<Share> => api.post<Share>('/api/share/create', data),
+        getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
     }
 }
 

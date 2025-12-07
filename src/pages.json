@@ -66,6 +66,13 @@
         "navigationBarTitleText": "编辑任务",
         "enablePullDownRefresh": false
       }
+    },
+    {
+      "path": "pages/schedule/share",
+      "style": {
+        "navigationBarTitleText": "日程分享",
+        "enablePullDownRefresh": false
+      }
     }
   ],
   "globalStyle": {

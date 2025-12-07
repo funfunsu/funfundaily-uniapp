@@ -19,7 +19,7 @@
           >
             <view class="member-selector">
               <text class="member-name">
-                {{ displayMember?.nickname || '选择成员' }}
+                {{ displayMember?.nickname || '' }}
                 <text class="arrow-icon">›</text>
               </text>
             </view>
@@ -29,12 +29,14 @@
 
       <!-- 右侧：两个按钮（靠右） -->
       <view class="right-section">
-        <button v-if="addButtonText" class="bottom-add-btn" @click="handleAddClick">
-          <text class="add-text">{{ addButtonText || '添加日程' }}</text>
-        </button>
-        <button v-if="shareButtonText" class="bottom-add-btn" @click="handleShareClick">
-          <text class="add-text">{{ shareButtonText || '分享' }}</text>
-        </button>
+        <view v-for="item in buttons" >
+          <button v-if="item.type === 'share'" open-type="share" class="bottom-add-btn">
+            <text class="add-text" >{{ item.text || '-' }}</text>
+          </button>
+          <button v-if="item.type !== 'share'" class="bottom-add-btn" @click="handleButtonClick(item.code)">
+            <text class="add-text" >{{ item.text || '-' }}</text>
+          </button>
+        </view>
       </view>
     </view>
   </view>
@@ -49,13 +51,12 @@ const props = defineProps({
   userList: { type: Array, default: () => [] },
   currentMemberIndex: { type: Number, default: 0 },
   currentMember: { type: Object, default: null },
-  addButtonText: { type: String},
-  shareButtonText: { type: String},
-  autoLoadMembers: { type: Boolean, default: true }
+  autoLoadMembers: { type: Boolean, default: true },
+  buttons:{type: Array, default: () => []}
 })
 
 // ===== Emits 定义 =====
-const emit = defineEmits(['member-change', 'add-click', 'share-click', 'members-loaded'])
+const emit = defineEmits(['member-change', 'button-click', 'members-loaded'])
 
 // ===== 响应式数据 =====
 const _groupList = ref([])
@@ -104,11 +105,16 @@ const fetchGroupMembers = async () => {
         _currentMember.value = null
       }
 
-      emit('members-loaded', {
-        userList: _userList.value,
-        currentMemberIndex: _currentMemberIndex.value,
-        currentMember: _currentMember.value
+      emit('member-change', {
+        currentMember:_currentMember.value,
+        currentGroup: _currentGroup.value
       })
+
+      // emit('members-loaded', {
+      //   userList: _userList.value,
+      //   currentMemberIndex: _currentMemberIndex.value,
+      //   currentMember: _currentMember.value
+      // })
     }
   } catch (e) {
     console.error('获取群组成员失败:', e)
@@ -124,14 +130,11 @@ const handleMemberChange = (e) => {
   console.log("handleMemberChange",_currentMember)
 
   emit('member-change', {
-    index,
-    member,
+    currentMember:member,
     currentGroup: _currentGroup.value
   })
 }
-
-const handleAddClick = () => emit('add-click')
-const handleShareClick = () => emit('share-click')
+const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
 
 // ===== 生命周期 & Watchers =====
 onMounted(() => {

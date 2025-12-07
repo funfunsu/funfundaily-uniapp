@@ -4,7 +4,7 @@ import apiTs from './apiTs'
 import config from '../config/env'
 import { setToken, getToken } from './token'
 
-export async function autoLogin() : Promise<String> {
+export async function autoLogin(shareToken) : Promise<String> {
 	const existingToken = getToken()
 	if (existingToken) {
 		return existingToken // 已登录，直接返回
@@ -16,7 +16,8 @@ export async function autoLogin() : Promise<String> {
 		throw new Error('获取 code 失败')
 	}
 	console.log('Auto login success', loginRes.code)
-	const token = await apiTs.user.login(loginRes.code);
+	const  data = {'code': loginRes.code,'shareToken':shareToken}
+	const token = await apiTs.user.login(data);
 	console.log('Auto login success', token)
 	setToken(token)
 	return token
@@ -24,8 +25,8 @@ export async function autoLogin() : Promise<String> {
 
 	// #ifndef MP-WEIXIN
 	if (config.env === 'dev') {
-		debugger
-		const token = await apiTs.user.login("0e3duUFa1hjrMK0KtmFa1jmkmE1duUFg");
+		const  data = {'code': "Test3",'shareToken':shareToken}
+		const token = await apiTs.user.login(data);
 		console.log('Auto login success', token)
 		setToken(token)
 		return token

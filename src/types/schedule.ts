@@ -34,7 +34,12 @@ export interface ScheduleInfoRequest{
 }
 
 export interface ScheduleAddRequest{
-	userId: string
 	groupId: string
+	targetUserId: string
 	items:Schedule[]
+}
+export interface ScheduleCopyRequest{
+	groupId: string
+	targetUserId: string
+	shareToken:string
 }
