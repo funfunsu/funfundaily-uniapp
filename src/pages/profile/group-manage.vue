@@ -1,12 +1,5 @@
 <template>
   <view class="group-manage">
-    <view class="header">
-      <view class="back-btn" @click="goBack">
-        <text>返回</text>
-      </view>
-      <view class="title">群组管理</view>
-      <view class="placeholder"></view>
-    </view>
     
     <view class="content">
       <view class="section">
@@ -17,16 +10,16 @@
               <text class="group-desc">{{ group.memberCount }} 成员</text>
             </view>
             <view class="group-actions">
-              <text class="action-btn" @click="editGroup(group)">编辑</text>
-              <text class="action-btn delete" @click="deleteGroup(group.id)">删除</text>
+              <text class="action-btn" @click="editGroup(group)">编辑群组名称</text>
+<!--              <text class="action-btn delete" @click="deleteGroup(group.id)">删除</text>-->
             </view>
           </view>
         </view>
       </view>
       
-      <view class="create-btn">
-        <button type="primary" @click="createGroup">创建新群组</button>
-      </view>
+<!--      <view class="create-btn">-->
+<!--        <button type="primary" @click="createGroup">创建新群组</button>-->
+<!--      </view>-->
     </view>
   </view>
 </template>
@@ -66,6 +59,19 @@
       const editGroup = (group) => {
         // 编辑群组逻辑
         uni.showToast({ title: `编辑群组: ${group.name}`, icon: 'none' })
+        // 第一步：输入昵称
+        uni.showModal({
+          title: '修改群组',
+          placeholderText: '请输入群组名称',
+          editable: true,
+          success: async(res1) => {
+            if (res1.confirm && res1.content.trim()) {
+              const groupName = res1.content.trim()
+              await api.group.modify({ id: group.id, groupName: groupName })
+            }
+          },
+          fail: () => {}
+        })
       }
       
       const deleteGroup = (groupId) => {

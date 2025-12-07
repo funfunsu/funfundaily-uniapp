@@ -9,35 +9,35 @@
       <view class="user-details">
         <text class="user-name">{{ userInfo.nickname || '未知用户' }}</text>
       </view>
-      <view class="group-selector-container">
-        <view class="group-label">当前群组：</view>
-        <view class="group-picker-wrapper">
-          <picker
-              class="group-picker"
-              @change="bindGroupChange"
-              :value="selectedGroupIdx"
-              :range="groupList"
-              range-key="groupName"
-          >
-            <view class="picker-value">
-              {{ groupList[selectedGroupIdx]?.groupName || '请选择群组' }}
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
-        </view>
-        <view class="add-group-btn" @click="showCreateGroupForm">
-          <text class="add-icon">+</text>
-        </view>
-      </view>
+<!--      <view class="group-selector-container">-->
+<!--        <view class="group-label">当前群组：</view>-->
+<!--        <view class="group-picker-wrapper">-->
+<!--          <picker-->
+<!--              class="group-picker"-->
+<!--              @change="bindGroupChange"-->
+<!--              :value="selectedGroupIdx"-->
+<!--              :range="groupList"-->
+<!--              range-key="groupName"-->
+<!--          >-->
+<!--            <view class="picker-value">-->
+<!--              {{ groupList[selectedGroupIdx]?.groupName || '请选择群组' }}-->
+<!--              <text class="picker-arrow">▼</text>-->
+<!--            </view>-->
+<!--          </picker>-->
+<!--        </view>-->
+<!--        <view class="add-group-btn" @click="showCreateGroupForm">-->
+<!--          <text class="add-icon">+</text>-->
+<!--        </view>-->
+<!--      </view>-->
     </view>
 
     <!-- 功能菜单区域 -->
     <view class="menu-section">
-      <view class="menu-item" @click="handleGroupManageClick">
+      <view class="menu-item">
         <view class="menu-left">
-          <text class="menu-title">群组管理</text>
+          <text class="menu-title">家庭：{{ groupList[selectedGroupIdx]?.groupName}}</text>
         </view>
-        <text class="menu-arrow">›</text>
+        <text class="menu-arrow" @click="editGroup(group)">修改名称</text>
       </view>
       <view class="menu-item" @click="handleGroupMembersClick">
         <view class="menu-left">
@@ -110,6 +110,22 @@ export default {
         console.error('获取用户信息失败', err)
         uni.showToast({ title: '获取用户信息失败', icon: 'none' })
       }
+    },
+    async editGroup(){
+      // 编辑群组逻辑
+      // 第一步：输入昵称
+      uni.showModal({
+        title: '修改群组',
+        placeholderText: '请输入群组名称',
+        editable: true,
+        success: async(res1) => {
+          if (res1.confirm && res1.content.trim()) {
+            const groupName = res1.content.trim()
+            await api.group.modify({ id: this.groupList[this.selectedGroupIdx].id, groupName: groupName })
+          }
+        },
+        fail: () => {}
+      })
     },
 
     async fetchGroupList() {

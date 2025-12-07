@@ -107,10 +107,6 @@ export default {
   onReady() {
   },
   methods: {
-    initDate() {
-      // 生成从周一到周日的日期数组，与dateFrom保持一致
-      this.dates = DateUtils.getScheduleDates(new Date())
-    },
     handleEventClick(event) {
       // 跳转到日程编辑页面
       uni.navigateTo({
@@ -126,6 +122,8 @@ export default {
         this.selectAll()
       } else if (buttonCode === 'toggleSelectAll') {
         this.toggleSelectAll()
+      } else if (buttonCode === 'cancelShare') {
+        this.exitShareMode()
       }
     },
     // 处理成员切换
@@ -148,7 +146,7 @@ export default {
       this.selectedCount = keys.length;
     },
     enterShareMode() {
-      this.buttons = [{code: 'selectAll', text: '全选'}, {code: 'toggleSelectAll', text: '反选'}, {
+      this.buttons = [{code: 'cancelShare', text: '取消'}, {code: 'selectAll', text: '全选'}, {code: 'toggleSelectAll', text: '反选'}, {
         code: 'doShare',
         type: 'share',
         text: '去分享'
@@ -160,6 +158,7 @@ export default {
     },
     exitShareMode() {
       this.shareMode = false;
+      this.buttons =  [{code: 'addEvent', text: '添加事件'}, {code: 'toShare', text: '分享'}]
     },
     selectAll() {
       this.$refs.schedule.selectAll();
