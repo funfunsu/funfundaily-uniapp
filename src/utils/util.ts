@@ -35,6 +35,17 @@ export default class DateUtils {
 		return this.formatDate(mondayDate);
 	}
 
+	static getTodayStr(date : Date = new Date()) : string {
+		return this.formatDate(date);
+	}
+	static getNextDayStr(date : Date = new Date()) : string {
+		// 创建一个新的 Date 对象，避免修改原始传入的 date 对象
+		const nextDay = new Date(date.getTime());
+		// 将日期设置为下一天
+		nextDay.setDate(nextDay.getDate() + 1);
+		return this.formatDate(nextDay);
+	}
+
 	/**
 	 * 通用日期格式化：Date 转 yyyy-MM-dd 字符串
 	 * @param date 需格式化的日期

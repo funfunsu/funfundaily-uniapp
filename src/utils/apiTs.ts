@@ -22,7 +22,7 @@ const apiTs = {
             '/login',
             data
         ),
-        getInfo:():Promise<any> => api.get<any>(
+        getInfo: (): Promise<any> => api.get<any>(
             '/api/user/info',
             {}
         )
@@ -135,12 +135,6 @@ const apiTs = {
             method: 'GET',
             data
         }),
-        // 完成任务打卡
-        complete: (data: any): Promise<any> => request<any>({
-            url: '/api/task/complete',
-            method: 'POST',
-            data
-        }),
         // 获取任务完成记录列表
         records: (data: any): Promise<any> => request<any>({
             url: '/api/task/records',
@@ -148,8 +142,23 @@ const apiTs = {
             data
         })
     },
-    share:{
-        create:(data:any):Promise<Share> => api.post<Share>('/api/share/create', data),
+    checkin: {
+        // 完成任务打卡
+        task: {
+            complete: (data: any): Promise<any> => api.post<any>(
+                '/api/checkin/task/complete',
+                data
+            ),
+            list: (data: any): Promise<any> => api.get<any>('/api/checkin/task/list', data)
+        },
+        // 添加打卡
+        list: (data: any): Promise<any> => api.get<any>(
+            '/api/checkin/list',
+            data
+        ),
+    },
+    share: {
+        create: (data: any): Promise<Share> => api.post<Share>('/api/share/create', data),
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
     }
 }

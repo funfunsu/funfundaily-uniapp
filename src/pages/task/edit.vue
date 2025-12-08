@@ -6,7 +6,9 @@
     </view>
     <!-- 底部固定栏 -->
     <view class="bottom-bar">
-      <schedule-bottom-bar @add-click="handleAddClick" add-button-text="保存" />
+      <schedule-bottom-bar :buttons="buttons"
+                           @member-change="handleMemberChange"
+                           @buttonClick="handleButtonClick" />
     </view>
   </view>
 </template>
@@ -16,12 +18,8 @@ import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import scheduleEdit from '../../components/schedule/schedule-edit.vue'
 import apiTs from '../../utils/apiTs'
 
-import {
-  Schedule,ScheduleInfoRequest,ScheduleAddRequest
-} from '../../types/schedule'
-import {
-  ApiResponse
-} from '../../types/type'
+import {ScheduleAddRequest, ScheduleInfoRequest} from '../../types/schedule'
+
 export default {
   name: 'edit-demo',
   components: {
@@ -29,12 +27,16 @@ export default {
   },
   data() {
     return {
-      editingSchedule: {}
+      editingSchedule: {itemType:'task'},
+      buttons:[{code: 'save', text: '保存'}],
+      currentMember:{},
+      currentGroup:{}
     };
   },
   onLoad(query) {
-    // 模拟数据加载
-    this.loadSchedule(query.id);
+    if(query.id){
+      this.loadSchedule(query.id);
+    }
   },
   methods: {
     // 加载模拟数据
@@ -42,20 +44,25 @@ export default {
       const req :ScheduleInfoRequest = {
         id:id
       }
-      const resp:Schedule = await apiTs.schedule.info(req)
-      this.editingSchedule = resp
+      this.editingSchedule = await apiTs.schedule.info(req)
     },
 
-    // 处理添加按钮点击
-    handleAddClick() {
-      const req:ScheduleAddRequest = {
-        userId:"1",
-        groupId:"1",
-        items:[this.editingSchedule]
+    async handleButtonClick(buttonCode) {
+      if (buttonCode === 'save') {
+        const req:ScheduleAddRequest = {
+          targetUserId:"1",
+          groupId:"1",
+          items:[this.editingSchedule]
+        }
+        console.log('submit!', this.editingSchedule)
+        await apiTs.schedule.add(req);
       }
-      console.log('submit!', this.editingSchedule)
-      const resp:ApiResponse<boolean>  = apiTs.schedule.add(req);
     },
+    async handleMemberChange(e) {
+      this.currentMember = e.currentMember;
+      this.currentGroup = e.currentGroup;
+      console.log(this.currentGroup,this.currentMember)
+    }
   }
 };
 </script>

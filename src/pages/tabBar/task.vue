@@ -55,7 +55,7 @@
 					:class="{ 'task-item--completed': task.isCompleted }"
 					@click="itemClick(task.id)"
 				>
-					<view class="task-header">
+					<view class="task-header">{{task}}
 						<view class="task-title-section">
 							<text class="task-title">{{ task.itemTitle || '任务标题' }}</text>
 							<text class="task-point">+{{ task.extra?.pointCnt || 0 }}</text>
@@ -85,7 +85,9 @@
 
 		<!-- 底部栏 -->
 		<view class="bottom-bar">
-			<schedule-bottom-bar add-button-text="添加任务" @add-click="handleAddClick" />
+			<schedule-bottom-bar :buttons="buttons"
+                           @member-change="handleMemberChange"
+                           @buttonClick="handleButtonClick" />
 		</view>
 	</view>
 </template>
@@ -94,6 +96,7 @@
 import { ref, computed, onMounted } from 'vue'
 import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
+import DateUtils from "../../utils/util";
 
 // =============== 类型定义 ===============
 interface Task {
@@ -104,7 +107,7 @@ interface Task {
 		pointCnt?: number | string
 	}
 	isCompleted?: boolean
-	completedTime?: number | string | null
+	completedTime?: number | string | null,
 }
 
 interface PointData {
@@ -117,6 +120,9 @@ const taskList = ref<Task[]>([])
 const currentDate = ref(new Date())
 const listShow = ref(true)
 const isLoadingMore = ref(false)
+const buttons = ref<object[]>([{code: 'addEvent', text: '添加任务'}, {code: 'toShare', text: '分享'}])
+const currentMember =ref<object>()
+const currentGroup =ref<object>()
 
 // =============== 计算属性 ===============
 const formattedCurrentDate = computed(() => {
@@ -142,20 +148,37 @@ async function fetchAllData() {
 }
 
 async function fetchPoint() {
-	try {
-		const resp = await apiTs.point.get({})
-		point.value = resp.data || { count: 0 }
-	} catch (err) {
-		console.error('获取积分失败', err)
-	}
+
 }
+
+async function handleButtonClick(buttonCode) {
+  if (buttonCode === 'addEvent') {
+    // 跳转到日程编辑页面
+    uni.navigateTo({
+      url: '/pages/task/edit'
+    });
+  }
+}
+// 处理成员切换
+async function handleMemberChange(e) {
+  currentMember.value = e.currentMember;
+  currentGroup.value = e.currentGroup;
+  await fetchAllData()
+}
+
+
 
 async function fetchTaskList() {
 	try {
-		const req = { date: currentDate.value }
+    const req = {
+      fromDate: DateUtils.getTodayStr(),
+      toDate: DateUtils.getNextDayStr(),
+      userId: currentMember.value.id,
+      groupId: currentGroup.value.id
+    }
 		const [taskListResp, recordResp] = await Promise.all([
-			apiTs.task.list(req),
-			apiTs.task.records(req)
+			apiTs.checkin.task.list(req),
+			apiTs.checkin.list(req)
 		])
 
 		const tasks = taskListResp || []
@@ -197,6 +220,7 @@ function updateDate(days: number) {
 
 function handleTaskCheck(e: any, task: Task) {
 	const isChecked = e.detail.value
+  debugger
 	if (!isChecked) return // 实际不可取消（因 disabled）
 
 	const updatedTask: Task = {
@@ -211,8 +235,14 @@ function handleTaskCheck(e: any, task: Task) {
 		taskList.value.splice(index, 1, updatedTask)
 	}
 
+  const  data = {
+    taskId:task.id,
+    userId: currentMember.value.id,
+    groupId: currentGroup.value.id
+  }
+
 	// TODO: 调用 API 提交完成状态
-	// await apiTs.task.complete({ id: task.id })
+  apiTs.checkin.task.complete(data)
 }
 
 // =============== 导航方法 ===============

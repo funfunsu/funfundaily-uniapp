@@ -157,6 +157,8 @@
 
 <script>
 
+import DateUtils from "../../utils/util";
+
 export default {
   name: 'schedule-edit',
   props: {
@@ -304,7 +306,10 @@ export default {
       return dateTimeStr.split(' ')[1] || '00:00'
     },
     getDatePart(dateTimeStr) {
-      return dateTimeStr.split(' ')[0]
+      if (dateTimeStr){
+        return dateTimeStr.split(' ')[0]
+      }
+      return DateUtils.getTodayStr()
     },
     handleEventDateChange(e) {
       const dateStr = e.detail.value;
@@ -317,9 +322,15 @@ export default {
       const index = e.detail.value;
       const today = new Date()
 
+      if (!this.schedule.startTime){
+        this.schedule.startTime = this.formatDate(today)+' 00:00:00'
+      }
+      if (!this.schedule.endTime){
+        this.schedule.endTime = this.formatDate(today)+' 23:59:59'
+      }
+
       this.schedule.repeatType = this.repeatTypeValues[index];
       if (this.schedule.repeatType == 'none'){
-        this.schedule.startTime = this.formatDate(today)+' 00:00:00'
         return
       }
       // 如果不是每周重复，清空重复星期
