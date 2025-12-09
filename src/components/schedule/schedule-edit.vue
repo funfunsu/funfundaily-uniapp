@@ -192,10 +192,7 @@ export default {
   methods: {
     // 获取时间部分（HH:MM格式）
     getTimeOnly(dateTimeStr) {
-      if (!dateTimeStr) return '00:00';
-      const date = new Date(dateTimeStr);
-      if (isNaN(date.getTime())) return '00:00';
-      return `${this.padZero(date.getHours())}:${this.padZero(date.getMinutes())}`;
+      return DateUtils.getHourAndMinFromDateTimeStr(dateTimeStr)
     },
 
     // 获取月份中的日期
@@ -212,16 +209,15 @@ export default {
       return day - 1;
     },
 
-    // 格式化月日显示（MM-DD）
-    formatMonthDay(date) {
-      return `${this.padZero(date.getMonth() + 1)}-${this.padZero(date.getDate())}`;
-    },
-
     // 处理时间变更
     handleTimeChange(e, field) {
       const timeValue = e.detail.value;
-      this.schedule[field] = this.getDatePart(this.schedule[field]) + ' ' + timeValue + ':00';
-      console.log(this.schedule[field])
+      this.schedule[field] = DateUtils.replaceTimePart(this.schedule[field],timeValue+':00') ;
+      if (field === 'startTime'){
+        const date = new Date(this.schedule[field]);
+        date.setMinutes(date.getMinutes()+45)
+        this.schedule['endTime'] = DateUtils.formatDateTime(date) ;
+      }
     },
 
     // 处理每月日期变更
@@ -251,25 +247,11 @@ export default {
     toggleLocation() {
       this.showLocation = !this.showLocation;
     },
-    // 格式化日期时间显示
-    formatDateTime(dateTimeStr) {
-      if (!dateTimeStr) return '';
-      const date = new Date(dateTimeStr);
-      if (isNaN(date.getTime())) return '';
-      return `${date.getFullYear()}-${this.padZero(date.getMonth() + 1)}-${this.padZero(date.getDate())} ${this.padZero(date.getHours())}:${this.padZero(date.getMinutes())}`;
-    },
 
     // 格式化日期显示
     formatDate(dateTimeStr) {
-      if (!dateTimeStr) return '';
       const date = new Date(dateTimeStr);
-      if (isNaN(date.getTime())) return '';
-      return `${date.getFullYear()}-${this.padZero(date.getMonth() + 1)}-${this.padZero(date.getDate())}`;
-    },
-
-    // 补零
-    padZero(num) {
-      return num < 10 ? `0${num}` : num;
+      return DateUtils.getDateStr(date);
     },
 
     // 获取重复类型索引
@@ -299,22 +281,12 @@ export default {
 
     // 处理日期变更
     handleDateChange(e, field) {
-      const dateStr = e.detail.value;
-      this.schedule[field] = dateStr;
-    },
-    getTimePart(dateTimeStr) {
-      return dateTimeStr.split(' ')[1] || '00:00'
-    },
-    getDatePart(dateTimeStr) {
-      if (dateTimeStr){
-        return dateTimeStr.split(' ')[0]
-      }
-      return DateUtils.getTodayStr()
+      this.schedule[field] = e.detail.value;
     },
     handleEventDateChange(e) {
       const dateStr = e.detail.value;
-      this.schedule['startTime'] = dateStr + ' ' + this.getTimePart(this.schedule['startTime'])
-      this.schedule['endTime'] = dateStr + ' ' + this.getTimePart(this.schedule['endTime'])
+      this.schedule['startTime'] = DateUtils.replaceDatePart(this.schedule['startTime'],dateStr )
+      this.schedule['endTime'] = DateUtils.replaceDatePart(this.schedule['endTime'],dateStr )
     },
 
     // 处理重复类型变更
@@ -323,26 +295,26 @@ export default {
       const today = new Date()
 
       if (!this.schedule.startTime){
-        this.schedule.startTime = this.formatDate(today)+' 00:00:00'
+        this.schedule.startTime = DateUtils.getDayStartTimeStr(today)
       }
       if (!this.schedule.endTime){
-        this.schedule.endTime = this.formatDate(today)+' 23:59:59'
+        this.schedule.endTime = DateUtils.getDayEndTimeStr(today)
       }
 
       this.schedule.repeatType = this.repeatTypeValues[index];
-      if (this.schedule.repeatType == 'none'){
+      if (this.schedule.repeatType === 'none'){
         return
       }
       // 如果不是每周重复，清空重复星期
-      if (this.schedule.repeatType == 'weekly' || this.schedule.repeatType == '2weekly') {
-        this.schedule.repeatKeys = [new Date().getDay()];
-      }else if (this.schedule.repeatType == 'yearly') {
-        this.schedule.repeatKeys = [this.formatMonthDay(new Date())];
-      }else if (this.schedule.repeatType == 'monthly') {
-        this.schedule.repeatKeys = [this.padZero(new Date().getDate())];
+      if (this.schedule.repeatType === 'weekly' || this.schedule.repeatType === '2weekly') {
+        this.schedule.repeatKeys = [DateUtils.getWeekDay(today)];
+      }else if (this.schedule.repeatType === 'yearly') {
+        this.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
+      }else if (this.schedule.repeatType === 'monthly') {
+        this.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
       }
-      this.schedule.repeatStartDay = this.formatDate(today)
-      this.schedule.repeatEndDay = this.formatDate(new Date(today.setDate(180)));
+      this.schedule.repeatStartDay = DateUtils.getDateStr(today)
+      this.schedule.repeatEndDay = DateUtils.getDateStr(new Date(today.setDate(180)));
     },
 
     // 处理日程类型变更

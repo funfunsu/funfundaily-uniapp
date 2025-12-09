@@ -88,6 +88,8 @@
 </template>
 
 <script>
+import DateUtils from "../../utils/util";
+
 export default {
   props: {
 
@@ -163,9 +165,8 @@ export default {
       })
       let eventsForDate = []
       schedules.forEach(schedule => {
-        const startTime = schedule.startTime.split(' ')[1].slice(0, 5);
-        const endTime = schedule.endTime.split(' ')[1].slice(0, 5);
-
+        const startTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.startTime);
+        const endTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.endTime);
         let color = 'blue';
 
         const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);

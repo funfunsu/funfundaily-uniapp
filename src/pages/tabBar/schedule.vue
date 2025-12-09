@@ -37,8 +37,8 @@ export default {
       // 使用普通对象代替Map，确保Vue响应式正常工作
       events: {},
       shareMode: false,
-      currentGroup: null,
-      currentMember: null,
+      currentGroup: {},
+      currentMember: {},
       // 新日程表单数据
       newEventForm: {
         title: '',
@@ -128,7 +128,6 @@ export default {
     },
     // 处理成员切换
     handleMemberChange(e) {
-      debugger
       this.currentMember = e.currentMember;
       this.currentGroup = e.currentGroup;
       console.log(this.currentGroup,this.currentMember)
