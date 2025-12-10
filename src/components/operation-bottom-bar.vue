@@ -34,14 +34,13 @@ const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
 
 <style scoped>
 .bottom-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #fff;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
-  height: 60px;
-  z-index: 100;
+  height: 60px; /* 固定高度 */
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .bottom-bar-content {

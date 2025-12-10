@@ -11,12 +11,10 @@
     </view>
 
     <!-- 底部固定栏 -->
-    <view class="bottom-bar">
-      <schedule-bottom-bar
-          :buttons="buttons"
-          @member-change="handleMemberChange"
-          @buttonClick="handleButtonClick"/>
-    </view>
+    <schedule-bottom-bar
+        :buttons="buttons"
+        @member-change="handleMemberChange"
+        @buttonClick="handleButtonClick"/>
   </view>
 </template>
 
@@ -50,6 +48,11 @@ export default {
       totalEvents: 0,
       buttons: [{code: 'addEvent', text: '添加事件'}, {code: 'toShare', text: '分享'}]
     };
+  },
+  onLoad(query) {
+    if(query.refresh){
+      this.fetchScheduleData();
+    }
   },
   computed: {},
   onShareAppMessage(res) {
@@ -190,45 +193,18 @@ export default {
 </script>
 
 <style scoped>
-/* 根容器：使用flex布局，占据整个屏幕 */
 .page-container {
-  width: 100%;
-  height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  /* 禁止整体滚动 */
+  width: 100%;
+  height: 100vh; /* 占满整个视口高度 */
   box-sizing: border-box;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-
-/* 底部固定栏：高度60px，绿色背景 */
-.bottom-bar {
-  height: 60px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
-  flex-shrink: 0;
-  /* 防止被压缩 */
-  z-index: 100;
-  /* 确保在顶层 */
-}
-
-.bottom-bar-title {
-  color: white;
 }
 
 /* 内容容器样式 */
 .page-content-container {
-  height: calc(100% - 60px);
-  display: flex;
-  flex-direction: column;
+  flex: 1; /* 让内容区域占据所有可用空间 */
+  overflow-y: auto; /* 允许滚动 */
+  -webkit-overflow-scrolling: touch; /* 平滑滚动 */
 }
 </style>

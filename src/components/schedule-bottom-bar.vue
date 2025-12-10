@@ -45,6 +45,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import api from '../utils/apiTs'
+// ===== 引入存储管理模块 =====
+import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../utils/storageManager'; // 路径请根据实际情况调整
 
 // ===== Props 定义 =====
 const props = defineProps({
@@ -69,6 +71,7 @@ const _currentGroup = ref(null)
 const displayUserList = computed(() => {
   return props.userList.length > 0 ? props.userList : _userList.value
 })
+
 const displayMemberIndex = computed(() => {
   if (props.userList.length > 0) {
     return Math.max(0, props.currentMemberIndex)
@@ -86,60 +89,151 @@ const displayMember = computed(() => {
 })
 
 // ===== 方法 =====
+
+/**
+ * 从后端获取群组和成员列表，并更新本地存储
+ */
 const fetchGroupMembers = async () => {
   try {
     const groupRes = await api.group.list()
     _groupList.value = groupRes || []
+    setStoredData(STORAGE_KEYS.GROUP_LIST, _groupList.value); // 更新存储
 
     if (_groupList.value.length > 0) {
-      _currentGroup.value = _groupList.value[0]
+      // 尝试从存储恢复上次选中的 Group
+      const storedCurrentGroup = getStoredData(STORAGE_KEYS.CURRENT_GROUP);
+      if (storedCurrentGroup && _groupList.value.some(g => g.id === storedCurrentGroup.id)) {
+        _currentGroup.value = storedCurrentGroup;
+      } else {
+        _currentGroup.value = _groupList.value[0]; // 默认第一个
+        setStoredData(STORAGE_KEYS.CURRENT_GROUP, _currentGroup.value); // 更新存储
+      }
+
       const res = await api.group.user.list({ groupId: _currentGroup.value.id })
       const members = res || []
 
       _userList.value = members
+
+      let memberToSet = null;
       if (members.length > 0) {
-        _currentMemberIndex.value = 0
-        _currentMember.value = members[0]
+        // 尝试从存储恢复上次选中的 Member
+        const storedCurrentMember = getStoredData(STORAGE_KEYS.CURRENT_MEMBER);
+        if (storedCurrentMember && members.some(m => m.id === storedCurrentMember.id)) {
+          memberToSet = storedCurrentMember;
+        } else {
+          memberToSet = members[0]; // 默认第一个
+        }
+        _currentMemberIndex.value = members.findIndex(m => m.id === memberToSet.id);
+        _currentMember.value = memberToSet;
+
+        // 更新存储
+        setStoredData(STORAGE_KEYS.CURRENT_MEMBER, _currentMember.value);
+
       } else {
-        _currentMemberIndex.value = -1
-        _currentMember.value = null
+        _currentMemberIndex.value = -1;
+        _currentMember.value = null;
+        // 清除存储中的成员
+        removeStoredData(STORAGE_KEYS.CURRENT_MEMBER);
       }
 
       emit('member-change', {
-        currentMember:_currentMember.value,
+        currentMember: _currentMember.value,
         currentGroup: _currentGroup.value
       })
-
-      // emit('members-loaded', {
-      //   userList: _userList.value,
-      //   currentMemberIndex: _currentMemberIndex.value,
-      //   currentMember: _currentMember.value
-      // })
     }
   } catch (e) {
-    console.error('获取群组成员失败:', e)
+    console.error('[Component] 获取群组成员失败:', e)
   }
 }
 
+/**
+ * 处理成员选择变化
+ */
 const handleMemberChange = (e) => {
   const index = parseInt(e.detail.value, 10)
   const member = displayUserList.value[index] || null
 
   _currentMemberIndex.value = index
   _currentMember.value = member
-  console.log("handleMemberChange",_currentMember)
+
+  // 更新本地存储
+  if(member) {
+    setStoredData(STORAGE_KEYS.CURRENT_MEMBER, member);
+  } else {
+    removeStoredData(STORAGE_KEYS.CURRENT_MEMBER);
+  }
+
+  console.log("[Component] handleMemberChange", _currentMember.value)
 
   emit('member-change', {
-    currentMember:member,
+    currentMember: member,
     currentGroup: _currentGroup.value
   })
 }
-const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
+
+/**
+ * 处理按钮点击
+ */
+const handleButtonClick = (buttonCode) => emit('button-click', buttonCode)
+
 
 // ===== 生命周期 & Watchers =====
+
+/**
+ * 组件挂载时初始化数据
+ */
 onMounted(() => {
   if (props.autoLoadMembers && props.userList.length === 0) {
-    fetchGroupMembers()
+
+    // 1. 首先尝试从本地存储加载基础数据
+    const storedGroups = getStoredData(STORAGE_KEYS.GROUP_LIST);
+
+    if (storedGroups && Array.isArray(storedGroups) && storedGroups.length > 0) {
+      _groupList.value = storedGroups;
+
+      const storedCurrentGroup = getStoredData(STORAGE_KEYS.CURRENT_GROUP);
+      if(storedCurrentGroup && storedGroups.some(g => g.id === storedCurrentGroup.id)) {
+        _currentGroup.value = storedCurrentGroup;
+
+        // 如果有缓存的 Group，可以立即加载其成员列表
+        api.group.user.list({ groupId: _currentGroup.value.id }).then(res => {
+          const members = res || [];
+          _userList.value = members;
+
+          const storedCurrentMember = getStoredData(STORAGE_KEYS.CURRENT_MEMBER);
+          if(storedCurrentMember && members.some(m => m.id === storedCurrentMember.id)) {
+            _currentMember.value = storedCurrentMember;
+            _currentMemberIndex.value = members.findIndex(m => m.id === storedCurrentMember.id);
+          } else if(members.length > 0) {
+            _currentMember.value = members[0];
+            _currentMemberIndex.value = 0;
+            // 更新存储为默认选中的成员
+            setStoredData(STORAGE_KEYS.CURRENT_MEMBER, _currentMember.value);
+          } else {
+            _currentMember.value = null;
+            _currentMemberIndex.value = -1;
+            removeStoredData(STORAGE_KEYS.CURRENT_MEMBER);
+          }
+
+          // 触发一次初始的 member-change 事件，通知父组件当前状态
+          emit('member-change', {
+            currentMember: _currentMember.value,
+            currentGroup: _currentGroup.value
+          });
+          emit('members-loaded');
+        }).catch(err => {
+          console.error("[Component] 加载缓存群组的成员失败:", err);
+          fetchGroupMembers();
+        });
+
+      } else {
+        fetchGroupMembers();
+      }
+
+    } else {
+      fetchGroupMembers();
+    }
+
   } else {
     _userList.value = [...props.userList]
     if (props.userList.length > 0) {
@@ -149,39 +243,21 @@ onMounted(() => {
     }
   }
 })
-//
-// watch(
-//     () => props.userList,
-//     (newList) => {
-//       if (Array.isArray(newList)) {
-//         _userList.value = [...newList]
-//         if (newList.length > 0) {
-//           const idx = Math.max(0, props.currentMemberIndex)
-//           _currentMemberIndex.value = idx
-//           _currentMember.value = props.currentMember || newList[idx] || newList[0]
-//         } else {
-//           _currentMemberIndex.value = -1
-//           _currentMember.value = null
-//         }
-//       }
-//     },
-//     { deep: true, immediate: true }
-// )
-//
-// watch(
-//     () => props.currentMember,
-//     (newMember) => {
-//       if (newMember) {
-//         _currentMember.value = newMember
-//         const index = displayUserList.value.findIndex(
-//             u => (u.userId && u.userId === newMember.userId) || (u.id && u.id === newMember.id)
-//         )
-//         if (index >= 0) {
-//           _currentMemberIndex.value = index
-//         }
-//       }
-//     }
-// )
+
+// ===== 可选：监听 _currentGroup 变化并更新存储 =====
+watch(_currentGroup, (newGroup) => {
+  if(newGroup) {
+    setStoredData(STORAGE_KEYS.CURRENT_GROUP, newGroup);
+  } else {
+    removeStoredData(STORAGE_KEYS.CURRENT_GROUP);
+  }
+});
+
+// ===== 可选：监听 _groupList 变化并更新存储 =====
+watch(_groupList, (newList) => {
+  setStoredData(STORAGE_KEYS.GROUP_LIST, newList);
+}, { deep: true });
+
 </script>
 
 <style scoped>

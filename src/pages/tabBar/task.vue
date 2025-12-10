@@ -55,7 +55,7 @@
 					:class="{ 'task-item--completed': task.isCompleted }"
 					@click="itemClick(task.id)"
 				>
-					<view class="task-header">{{task}}
+					<view class="task-header">
 						<view class="task-title-section">
 							<text class="task-title">{{ task.itemTitle || '任务标题' }}</text>
 							<text class="task-point">+{{ task.extra?.pointCnt || 0 }}</text>
@@ -84,11 +84,9 @@
 		</view>
 
 		<!-- 底部栏 -->
-		<view class="bottom-bar">
-			<schedule-bottom-bar :buttons="buttons"
-                           @member-change="handleMemberChange"
-                           @buttonClick="handleButtonClick" />
-		</view>
+    <schedule-bottom-bar :buttons="buttons"
+                         @member-change="handleMemberChange"
+                         @buttonClick="handleButtonClick" />
 	</view>
 </template>
 

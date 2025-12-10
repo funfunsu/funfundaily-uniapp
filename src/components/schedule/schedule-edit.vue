@@ -250,8 +250,16 @@ export default {
 
     // 格式化日期显示
     formatDate(dateTimeStr) {
-      const date = new Date(dateTimeStr);
-      return DateUtils.getDateStr(date);
+      if (dateTimeStr){
+        const date = new Date(dateTimeStr);
+        return DateUtils.getDateStr(date);
+      }
+
+      if (!this.schedule.startTime){
+        const today = new Date()
+        this.schedule.startTime = DateUtils.getDayStartTimeStr(today)
+        this.schedule.endTime = DateUtils.getDayEndTimeStr(today)
+      }
     },
 
     // 获取重复类型索引
@@ -292,14 +300,7 @@ export default {
     // 处理重复类型变更
     handleRepeatTypeChange(e) {
       const index = e.detail.value;
-      const today = new Date()
-
-      if (!this.schedule.startTime){
-        this.schedule.startTime = DateUtils.getDayStartTimeStr(today)
-      }
-      if (!this.schedule.endTime){
-        this.schedule.endTime = DateUtils.getDayEndTimeStr(today)
-      }
+      const today = new Date();
 
       this.schedule.repeatType = this.repeatTypeValues[index];
       if (this.schedule.repeatType === 'none'){

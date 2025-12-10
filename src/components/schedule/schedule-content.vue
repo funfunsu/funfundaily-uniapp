@@ -140,13 +140,12 @@ export default {
         console.log("📅 eventList changed, updating dates...");
         this.updateDatesFromEventList(newList);
       },
-      immediate: true // 组件挂载时也执行一次
+      immediate: false // 组件挂载时也执行一次
     },
   },
   methods: {
     updateDatesFromEventList(list) {
-      const uniqueSortedDates = [...new Set(list.map(item => item.date))].sort();
-      this.dates = uniqueSortedDates;
+      this.dates = [...new Set(list.map(item => item.date))].sort();
       console.log("🗓️ Updated dates:", this.dates);
     },
 
@@ -312,14 +311,27 @@ export default {
 
 /* 中间内容区域 */
 .content-container {
-  flex: 1;
+  flex: 1; /* 占据父容器剩余空间 */
+  /* 关键：允许自身滚动 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   position: relative;
+  /* 确保它有明确的块级显示 */
+  display: flex;
+  flex-direction: column;
 }
 
 .content-wrapper {
-  margin-right: -6px;
+  flex: 1; /* 占据 content-container 的所有可用空间 */
+  /* margin-right: -6px; */ /* 如果滚动条导致布局偏移，可以考虑用 padding 或调整其他地方 */
+  /* 确保它也有明确的高度上下文 */
+  display: flex;
+  flex-direction: column;
+}
+/* 关键修改：让 flex-row 填充 content-wrapper */
+.content-wrapper > .flex-row { /* 使用子选择器更精确 */
+  flex: 1; /* 占据 wrapper 的所有可用空间 */
+  /* min-height: 0; */ /* 有时在嵌套 flex 中防止子项溢出不被截断 */
 }
 
 .content-container::-webkit-scrollbar {
