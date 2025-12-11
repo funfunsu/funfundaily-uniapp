@@ -70,6 +70,8 @@ const apiTs = {
                 data
             }),
             // 获取任务列表
+            get: (data: any) => api.get<any>('/api/group/user/get',data),
+            // 获取任务列表
             remove: (data: any) => request<any>({
                 url: '/api/group/user/remove',
                 method: 'POST',

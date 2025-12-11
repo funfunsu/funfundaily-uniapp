@@ -7,10 +7,10 @@
 // import groupUserList from './group/user/list.json';
 // import groupList from './group/list.json';
 // import groupInfo from './group/info.json';
-// import taskList from './task/list.json';
-// import taskInfo from './task/info.json';
-// import taskRecords from './task/records.json';
-// import taskHistory from './task/history.json';
+// import taskList from './TaskCard/list.json';
+// import taskInfo from './TaskCard/info.json';
+// import taskRecords from './TaskCard/records.json';
+// import taskHistory from './TaskCard/history.json';
 // import modify from './modify.json';
 // import add from './add.json';
 // import pointGet from './point/get.json';
@@ -56,12 +56,12 @@
 //     '/api/group/info': groupInfo,
 //     '/api/group/modify': modify,
 //     '/api/group/add': add,
-//     '/api/task/list': taskList,
-//     '/api/task/info': taskInfo,
-//     '/api/task/add': add,
-//     '/api/task/modify': modify,
-//     '/api/task/records': taskRecords,
-//     '/api/task/history': taskHistory,
+//     '/api/TaskCard/list': taskList,
+//     '/api/TaskCard/info': taskInfo,
+//     '/api/TaskCard/add': add,
+//     '/api/TaskCard/modify': modify,
+//     '/api/TaskCard/records': taskRecords,
+//     '/api/TaskCard/history': taskHistory,
 //     '/api/point/get': pointGet,
 //     '/api/discovery/list': discoveryList
 // };

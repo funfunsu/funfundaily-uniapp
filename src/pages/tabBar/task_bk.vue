@@ -50,13 +50,35 @@
 
 				<view
 					v-for="task in taskList"
+					:key="task.id"
+					class="task-item"
+					:class="{ 'task-item--completed': task.isCompleted }"
+					@click="itemClick(task.id)"
 				>
-          <TaskCard
-              @item-click="onTaskItemClick"
-              @edit-task="onEditTask"
-              @check-task="onTaskCheck"
-              :task=task
-          />
+					<view class="task-header">
+						<view class="task-title-section">
+							<text class="task-title">{{ task.itemTitle || '任务标题' }}</text>
+							<text class="task-point">+{{ task.extra?.pointCnt || 0 }}</text>
+						</view>
+						<view class="task-actions">
+							<text class="edit-icon" @click.stop="handleEditTaskClick(task.id)">⚙️</text>
+							<switch
+								:checked="!!task.isCompleted"
+								:disabled="!!task.isCompleted"
+								@change="handleTaskCheck($event, task)"
+								class="task-switch"
+							/>
+						</view>
+					</view>
+
+					<text class="task-desc">{{ task.itemDesc || '暂无任务描述' }}</text>
+
+					<view v-if="task.isCompleted" class="task-completion-info">
+						<text class="completed-text">
+							✓ <text class="point-earned">+{{ task.extra?.pointCnt }}</text>
+						</text>
+						<text class="completed-time">{{ formatTime(task.completedTime) }}</text>
+					</view>
 				</view>
 			</scroll-view>
 		</view>
@@ -72,7 +94,6 @@
 import { ref, computed, onMounted } from 'vue'
 import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
-import TaskCard from '../../components/task/task-card.vue'
 import DateUtils from "../../utils/util";
 
 // =============== 类型定义 ===============
@@ -81,7 +102,7 @@ interface Task {
 	itemTitle?: string
 	itemDesc?: string
 	extra?: {
-		score?: number | string
+		pointCnt?: number | string
 	}
 	isCompleted?: boolean
 	completedTime?: number | string | null,
@@ -151,38 +172,6 @@ async function handleMemberChange(e) {
   await fetchAllData()
 }
 
-// 事件处理函数
-const onTaskItemClick = (taskId) => {
-  console.log('点击了任务:', taskId)
-}
-
-const onEditTask = (taskId) => {
-  console.log('编辑任务:', taskId)
-}
-
-const onTaskCheck = ({ task, completed }) => {
-  console.log('任务完成状态变更:', task.id, completed)
-  const updatedTask: Task = {
-    ...task,
-    isCompleted: true,
-    completedTime: Date.now()
-  }
-
-  // 替换数组项（响应式安全）
-  const index = taskList.value.findIndex(t => t.id === task.id)
-  if (index !== -1) {
-    taskList.value.splice(index, 1, updatedTask)
-  }
-
-  const  data = {
-    taskId:task.id,
-    userId: currentMember.value.id,
-    groupId: currentGroup.value.id
-  }
-
-  apiTs.checkin.task.complete(data)
-}
-
 
 
 async function fetchTaskList() {
@@ -199,7 +188,6 @@ async function fetchTaskList() {
 		])
 
 		const tasks = taskListResp || []
-    debugger
 		const records = recordResp || []
 
 		const recordMap = new Map()
@@ -236,6 +224,32 @@ function updateDate(days: number) {
 	fetchTaskList()
 }
 
+function handleTaskCheck(e: any, task: Task) {
+	const isChecked = e.detail.value
+  debugger
+	if (!isChecked) return // 实际不可取消（因 disabled）
+
+	const updatedTask: Task = {
+		...task,
+		isCompleted: true,
+		completedTime: Date.now()
+	}
+
+	// 替换数组项（响应式安全）
+	const index = taskList.value.findIndex(t => t.id === task.id)
+	if (index !== -1) {
+		taskList.value.splice(index, 1, updatedTask)
+	}
+
+  const  data = {
+    taskId:task.id,
+    userId: currentMember.value.id,
+    groupId: currentGroup.value.id
+  }
+
+	// TODO: 调用 API 提交完成状态
+  apiTs.checkin.task.complete(data)
+}
 
 // =============== 导航方法 ===============
 function handleHistoryClick() {
@@ -377,6 +391,120 @@ onMounted(() => {
 	color: #999;
 }
 
+/* 任务项 */
+.task-item {
+	background: white;
+	border-radius: 16rpx;
+	padding: 28rpx;
+	margin-bottom: 20rpx;
+	box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+	transition: transform 0.2s;
+}
+
+.task-item:active {
+	transform: translateY(-4rpx);
+}
+
+.task-item--completed {
+	opacity: 0.85;
+}
+
+/* 任务头部 */
+.task-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 16rpx;
+}
+
+.task-title-section {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+}
+
+.task-title {
+	font-size: 32rpx;
+	font-weight: 600;
+	color: #333;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	flex: 1;
+}
+
+.task-point {
+	margin-left: 16rpx;
+	padding: 6rpx 16rpx;
+	background: #f0f5ff;
+	color: #2196f3;
+	border-radius: 20rpx;
+	font-size: 24rpx;
+	font-weight: bold;
+	flex-shrink: 0;
+}
+
+.task-actions {
+	display: flex;
+	align-items: center;
+	margin-left: 20rpx;
+}
+
+.edit-icon {
+	font-size: 32rpx;
+	color: #999;
+	margin-right: 16rpx;
+}
+
+.task-switch {
+	transform: scale(0.85);
+}
+
+/* 任务描述 */
+.task-desc {
+	font-size: 26rpx;
+	color: #666;
+	line-height: 1.5;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+/* 完成信息 */
+.task-completion-info {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 16rpx;
+	padding-top: 16rpx;
+	border-top: 1rpx solid #f0f0f0;
+}
+
+.completed-text {
+	font-size: 26rpx;
+	color: #4caf50;
+	font-weight: 500;
+}
+
+.point-earned {
+	color: #007aff;
+}
+
+.completed-time {
+	font-size: 24rpx;
+	color: #999;
+}
+
+/* 底部栏 */
+.bottom-bar {
+	height: 100rpx;
+	background: white;
+	box-shadow: 0 -2rpx 20rpx rgba(0, 0, 0, 0.1);
+	z-index: 10;
+}
 
 /* 小屏适配 */
 @media (max-width: 375px) {

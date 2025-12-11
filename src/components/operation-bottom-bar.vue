@@ -23,10 +23,9 @@
 <script setup>
 
 // ===== Props 定义 =====
-const props = defineProps({
+defineProps({
   buttons:{type: Array, default: () => []}
-})
-
+});
 // ===== Emits 定义 =====
 const emit = defineEmits(['button-click'])
 const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)

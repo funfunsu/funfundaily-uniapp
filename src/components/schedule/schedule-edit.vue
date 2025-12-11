@@ -9,25 +9,36 @@
           <text class="label">标题 *</text>
           <input class="input" v-model="schedule.itemTitle" placeholder="请输入日程标题"/>
         </view>
-        <text class="label expand-trigger" @click="toggleDescription">
-          更多信息
-          <text class="expand-icon">{{ showDescription ? '收起' : '展开' }}</text>
-        </text>
-        <view v-if="showDescription">
+        <view v-if="scheduleType === 'schedule'">
+          <text class="label expand-trigger" @click="toggleDescription">
+            更多信息
+            <text class="expand-icon">{{ showDescription ? '收起' : '展开' }}</text>
+          </text>
+          <view v-if="showDescription">
+            <view class="form-item">
+              <text class="label">描述</text>
+              <view class="expand-container">
+                <textarea class="textarea" v-model="schedule.itemDesc" placeholder="请输入日程描述"/>
+              </view>
+            </view>
+
+            <view class="form-item">
+              <text class="label">地点</text>
+              <view class="expand-container">
+                <input class="input" v-model="schedule.location" placeholder="请输入地点"/>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view v-if="scheduleType === 'task'">
           <view class="form-item">
             <text class="label">描述</text>
             <view class="expand-container">
               <textarea class="textarea" v-model="schedule.itemDesc" placeholder="请输入日程描述"/>
             </view>
           </view>
-
-          <view class="form-item">
-            <text class="label">地点</text>
-            <view class="expand-container">
-              <input class="input" v-model="schedule.location" placeholder="请输入地点"/>
-            </view>
-          </view>
         </view>
+
       </view>
 
       <view class="form-section">
@@ -130,7 +141,7 @@
         <view class="form-item">
           <text class="label">日程类型</text>
           <picker class="picker" mode="selector" :range="itemLabelOptions"
-                  :value="getItemLabelIndex(schedule.itemLabel)" @change="handleItemTypeChange">
+                  :value="getItemLabelIndex(schedule.itemLabel)" @change="handleItemLabelChange">
             <view class="picker-display">{{ getItemLabelText(schedule.itemType) }}</view>
           </picker>
         </view>
@@ -143,12 +154,12 @@
         <view class="form-row">
           <view class="form-item form-item-inline">
             <text class="label">积分数量</text>
-            <input class="input" v-model="schedule.score" placeholder="积分"/>
+            <input class="input" v-model="schedule.extra.score" placeholder="积分"/>
           </view>
-          <view class="form-item form-item-inline">
-            <text class="label">奖励机制</text>
-            <input class="input" v-model="schedule.scoreType" placeholder="奖励方式"/>
-          </view>
+<!--          <view class="form-item form-item-inline">-->
+<!--            <text class="label">奖励机制</text>-->
+<!--            <input class="input" v-model="schedule.extra.scoreType" placeholder="奖励方式"/>-->
+<!--          </view>-->
         </view>
       </view>
     </view>
@@ -185,9 +196,13 @@ export default {
     };
   },
   computed: {
-    isEditMode() {
-      return this.schedule !== null && this.schedule !== undefined;
-    }
+  },
+  mounted() {
+    // 当组件被挂载到 DOM 时调用
+    // if (this.scheduleType === 'TaskCard'){
+    //   this.showDescription = true;
+    // }
+    // 其他初始化逻辑...
   },
   methods: {
     // 获取时间部分（HH:MM格式）
@@ -233,11 +248,6 @@ export default {
       const [year, month, day] = dateStr.split('-');
       this.schedule.repeatKeys[0] = month + '-' + day
     },
-
-    bindTimeChange(e, field) {
-      this.time = e.detail.value;
-    },
-
     // 切换描述字段显示状态
     toggleDescription() {
       this.showDescription = !this.showDescription;
@@ -259,6 +269,12 @@ export default {
         const today = new Date()
         this.schedule.startTime = DateUtils.getDayStartTimeStr(today)
         this.schedule.endTime = DateUtils.getDayEndTimeStr(today)
+      }
+      if (!this.schedule.itemType){
+        this.schedule.itemType = this.scheduleType
+      }
+      if(!this.schedule.extra){
+        this.schedule.extra = {}
       }
     },
 
@@ -319,9 +335,9 @@ export default {
     },
 
     // 处理日程类型变更
-    handleItemTypeChange(e) {
+    handleItemLabelChange(e) {
       const index = e.detail.value;
-      this.schedule.itemType = this.itemLabelValues[index];
+      this.schedule.label = this.itemLabelValues[index];
     },
 
     // 切换星期选择
