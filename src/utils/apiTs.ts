@@ -25,6 +25,10 @@ const apiTs = {
         getInfo: (): Promise<any> => api.get<any>(
             '/api/user/info',
             {}
+        ),
+        updateProfile:(data:object): Promise<any> => api.post<any>(
+            '/api/user/update-profile',
+            data
         )
     },
     discovery: {

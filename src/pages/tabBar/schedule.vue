@@ -174,6 +174,9 @@ export default {
     // 获取日程数据
     async fetchScheduleData() {
       try {
+        if(!this.currentMember || !this.currentGroup){
+          return;
+        }
         const requestData = {
           fromDate: DateUtils.getMondayStr(),
           toDate: DateUtils.getSundayStr(),

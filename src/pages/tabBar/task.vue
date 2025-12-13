@@ -187,6 +187,9 @@ const onTaskCheck = ({ task, completed }) => {
 
 async function fetchTaskList() {
 	try {
+    if(!this.currentMember || !this.currentGroup){
+      return;
+    }
     const req = {
       fromDate: DateUtils.getTodayStr(),
       toDate: DateUtils.getNextDayStr(),
@@ -199,7 +202,6 @@ async function fetchTaskList() {
 		])
 
 		const tasks = taskListResp || []
-    debugger
 		const records = recordResp || []
 
 		const recordMap = new Map()

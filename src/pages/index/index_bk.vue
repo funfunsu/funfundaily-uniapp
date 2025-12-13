@@ -1,10 +1,13 @@
 <!-- pages/index/index.vue -->
 <template>
   <view class="container">    <!-- 主内容 -->
-    <view v-if="showProfileAuth">欢迎回来！</view>
-    <view>
-      <view>请设置昵称</view>
-      <input class="nickname" type="nickname" :value="userInfo.nickname" @blur="setCustomNickname"></input>
+    <view v-if="isLoggedIn">欢迎回来！</view>
+    <button v-if="showProfileAuth" @tap="onLoginTap">点击获取昵称和头像</button>
+    <!-- 手机号授权弹窗（仅首次） -->
+    <view v-if="showPhoneAuth" class="auth-modal">
+      <button open-type="getPhoneNumber" @getphonenumber="onGetPhoneNumber">
+        授权手机号登录
+      </button>
     </view>
   </view>
 </template>
@@ -19,7 +22,6 @@ import {STORAGE_KEYS,setStoredData,getStoredData} from '../../utils/storageManag
 const isLoggedIn = ref(false)
 const showPhoneAuth = ref(false)
 const showProfileAuth = ref(false)
-const userInfo = ref({})
 
 onMounted(async () => {
   try {
@@ -42,13 +44,6 @@ onMounted(async () => {
     }
   }
 })
-
-
-const updateNickname= async (e: any) => {
-  const user = apiTs.user.updateProfile(res);
-}
-
-
 
 const onLoginTap= async (e: any) => {
   console.log("按钮被点击，即将调用 uni.getUserProfile");
@@ -75,9 +70,26 @@ const onLoginTap= async (e: any) => {
   });
 }
 
+const onGetPhoneNumber = async (e: any) => {
+  if (e.detail.errMsg !== 'getPhoneNumber:ok') {
+    uni.showToast({ title: '授权失败', icon: 'none' });
+    return;
+  }
 
-const setCustomNickname = (e) =>{
-  userInfo.nickname = e.detail.value;
+  try {
+    // 调用后端完成注册/绑定
+    // const res = await api.auth.bindPhone({
+    //   encryptedData: e.detail.encryptedData,
+    //   iv: e.detail.iv,
+    //   openid: /* 之前保存的 openid */
+    // });
+    //
+    // uni.setStorageSync('token', res.data.token);
+    showPhoneAuth.value = false;
+    isLoggedIn.value = true;
+  } catch (err) {
+    uni.showToast({ title: '绑定失败', icon: 'none' });
+  }
 }
 </script>
 

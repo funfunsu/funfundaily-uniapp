@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
     GROUP_LIST: 'cached_group_list',
     CURRENT_GROUP: 'cached_current_group',
     CURRENT_MEMBER: 'cached_current_member',
+    USER_INFO:'cached_user_info'
     // 可以在这里添加更多键名...
 } as const; // 使用 'as const' 使键值成为字面量类型，增强类型安全性
 
