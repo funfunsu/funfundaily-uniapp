@@ -4,48 +4,26 @@
     <!-- 用户信息区域 -->
     <view class="user-info-section">
       <view class="avatar">
-        <text class="avatar-text">U</text>
+        <text class="avatar-text">{{userInfo.nickname[0]}}</text>
       </view>
       <view class="user-details">
         <text class="user-name">{{ userInfo.nickname || '未知用户' }}</text>
       </view>
-<!--      <view class="group-selector-container">-->
-<!--        <view class="group-label">当前群组：</view>-->
-<!--        <view class="group-picker-wrapper">-->
-<!--          <picker-->
-<!--              class="group-picker"-->
-<!--              @change="bindGroupChange"-->
-<!--              :value="selectedGroupIdx"-->
-<!--              :range="groupList"-->
-<!--              range-key="groupName"-->
-<!--          >-->
-<!--            <view class="picker-value">-->
-<!--              {{ groupList[selectedGroupIdx]?.groupName || '请选择群组' }}-->
-<!--              <text class="picker-arrow">▼</text>-->
-<!--            </view>-->
-<!--          </picker>-->
-<!--        </view>-->
-<!--        <view class="add-group-btn" @click="showCreateGroupForm">-->
-<!--          <text class="add-icon">+</text>-->
-<!--        </view>-->
-<!--      </view>-->
     </view>
 
     <!-- 功能菜单区域 -->
-    <view class="menu-section">
-      <view class="menu-item">
-        <view class="menu-left">
-          <text class="menu-title">家庭：{{ groupList[selectedGroupIdx]?.groupName}}</text>
+    <view>
+      <view class="menu-section group-section" v-for="(group,index) in groupList">
+        <view class="menu-item" @click="handleGroupMembersClick(group)">
+          <view class="menu-left">
+            <text v-if="groupList.length>1">群组{{ index+1 }}-</text>
+            <text class="menu-title">{{ group.groupName }}</text>
+          </view>
+          <text class="menu-arrow">›</text>
         </view>
-        <text class="menu-arrow" @click="editGroup(group)">修改名称</text>
-      </view>
-      <view class="menu-item" @click="handleGroupMembersClick">
-        <view class="menu-left">
-          <text class="menu-title">成员管理</text>
-        </view>
-        <text class="menu-arrow">›</text>
       </view>
     </view>
+
 
     <!-- 创建群组表单弹窗 -->
     <view v-if="showGroupForm" class="group-form-modal" @click="cancelCreateGroup">
@@ -85,8 +63,12 @@
 
 <script>
 import api from '../../utils/apiTs'
+import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../utils/storageManager';
+import scheduleBottomBar from "../../components/schedule-bottom-bar.vue"; // 路径请根据实际情况调整
+
 
 export default {
+  components: {scheduleBottomBar},
   data() {
     return {
       userInfo: {},
@@ -94,7 +76,8 @@ export default {
       selectedGroupIdx: 0,
       showGroupForm: false,
       newGroupName: '',
-      inputFocus: false
+      inputFocus: false,
+      buttons:[]
     }
   },
   mounted() {
@@ -111,17 +94,18 @@ export default {
         uni.showToast({ title: '获取用户信息失败', icon: 'none' })
       }
     },
-    async editGroup(){
+    async editGroup(group){
       // 编辑群组逻辑
       // 第一步：输入昵称
       uni.showModal({
         title: '修改群组',
-        placeholderText: '请输入群组名称',
+        placeholderText: group.groupName,
         editable: true,
         success: async(res1) => {
           if (res1.confirm && res1.content.trim()) {
             const groupName = res1.content.trim()
-            await api.group.modify({ id: this.groupList[this.selectedGroupIdx].id, groupName: groupName })
+            await api.group.modify({ id: group.id, groupName: groupName })
+            await this.fetchGroupList();
           }
         },
         fail: () => {}
@@ -130,15 +114,14 @@ export default {
 
     async fetchGroupList() {
       try {
-        const res = await api.group.list()
-        this.groupList = Array.isArray(res) ? res : []
+        this.groupList = await api.group.list();
+        setStoredData(STORAGE_KEYS.GROUP_LIST,this.groupList)
         // 如果有群组，默认选中第一个
         if (this.groupList.length > 0) {
           this.selectedGroupIdx = 0
         }
       } catch (err) {
         console.error('获取群组列表失败', err)
-        uni.showToast({ title: '获取群组失败', icon: 'none' })
       }
     },
 
@@ -152,14 +135,11 @@ export default {
       })
     },
 
-    handleGroupMembersClick() {
-      const currentGroup = this.groupList[this.selectedGroupIdx]
-      if (!currentGroup) {
-        uni.showToast({ title: '请先选择或创建群组', icon: 'none' })
-        return
-      }
+    handleGroupMembersClick(group) {
+      const currentGroup = group
+      setStoredData(STORAGE_KEYS.CURRENT_GROUP,group);
       uni.navigateTo({
-        url: `/pages/profile/group-member?groupId=${currentGroup.id}&groupName=${encodeURIComponent(currentGroup.groupName)}`
+        url: `/pages/profile/group-member`
       })
     },
 
@@ -323,6 +303,11 @@ export default {
   border-radius: 20rpx;
   overflow: hidden;
   box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+.group-section{
+  padding: 10px 20px;
+  margin-bottom:10px;
 }
 
 .menu-item {

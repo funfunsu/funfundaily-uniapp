@@ -193,7 +193,7 @@ async function fetchTaskList() {
     const req = {
       fromDate: DateUtils.getTodayStr(),
       toDate: DateUtils.getNextDayStr(),
-      userId: currentMember.value.id,
+      userId: currentMember.value.userId,
       groupId: currentGroup.value.id
     }
 		const [taskListResp, recordResp] = await Promise.all([

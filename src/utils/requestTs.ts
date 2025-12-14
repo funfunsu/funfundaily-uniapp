@@ -88,6 +88,8 @@ const requestConfig : RequestConfig = {
 				}
 			}
 
+			uni.showToast({title: response.message, icon: "none"}).then(r => {});
+
 			// 2. 统一抛出错误信息
 			const error = new Error(response.message || '请求失败') as Error & { response ?: ApiResponse<T> }
 			error.response = response

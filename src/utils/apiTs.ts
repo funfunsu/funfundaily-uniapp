@@ -26,8 +26,8 @@ const apiTs = {
             '/api/user/info',
             {}
         ),
-        updateProfile:(data:object): Promise<any> => api.post<any>(
-            '/api/user/update-profile',
+        update:(data:object): Promise<any> => api.post<any>(
+            '/api/user/update',
             data
         )
     },
@@ -166,6 +166,7 @@ const apiTs = {
     share: {
         create: (data: any): Promise<Share> => api.post<Share>('/api/share/create', data),
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
+        accept: (token: string): Promise<any> => api.post(`/api/share/accept/${token}`),
     }
 }
 

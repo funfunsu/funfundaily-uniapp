@@ -174,13 +174,13 @@ export default {
     // 获取日程数据
     async fetchScheduleData() {
       try {
-        if(!this.currentMember || !this.currentGroup){
+        if(!this.currentMember || !this.currentMember.userId){
           return;
         }
         const requestData = {
           fromDate: DateUtils.getMondayStr(),
           toDate: DateUtils.getSundayStr(),
-          userId: this.currentMember.id,
+          userId: this.currentMember.userId,
           groupId: this.currentGroup.id
         }
 
