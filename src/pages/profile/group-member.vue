@@ -31,8 +31,8 @@
               <!-- 非群主才显示操作按钮 -->
               <template v-if="isAdminRole(myRole)">
 <!--                <button class="action-btn invite-btn" v-if="member.bindType === 'None'" open-type="share">邀请绑定</button>-->
-                <text class="action-btn remove-btn" v-if="!member.role === 'Creator'" @click="removeMember(member.userId)">移除</text>
-                <text class="action-btn set-role-btn" v-if="!isAdminRole(member.role) &  member.bindType !== 'None'" @click="removeMember(member.userId)">设为管理员</text>
+                <text class="action-btn remove-btn" v-if="member.role !== 'Creator'" @click="removeMember(member.userId)">移除</text>
+                <text class="action-btn set-role-btn" v-if="!isAdminRole(member.role) &  member.bindType !== 'None'" @click="setAdmin(member.userId)">设为管理员</text>
               </template>
             </view>
           </view>
@@ -259,18 +259,32 @@ const addMember = async () => {
 const inviteMember = (memberId) => {
   console.log('inviteMember',memberId)
 };
+const setAdmin = (memberId) => {
+  console.log('setAdmin',memberId)
+  uni.showModal({
+    title: '设置管理员',
+    content: '确定要设置成管理员吗？',
+    success: async (res) => {
+      if (res.confirm) {
+        // 实际调用移除接口 (模拟)
+        await api.group.user.remove({groupId: currentGroupId.value, memberId})
+        await uni.showToast({title: '移除成功', icon: 'success'});
+      }
+    }
+  });
+};
 
 // ========== 移除成员 ==========
 const removeMember = (memberId) => {
   uni.showModal({
     title: '确认移除',
     content: '确定要移除该成员吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
         // 实际调用移除接口 (模拟)
-        // await api.group.removeMember({ groupId: currentGroupId.value, memberId })
+        await api.group.user.remove({groupId: currentGroup.value.id, memberId})
         members.value = members.value.filter(m => m.id !== memberId);
-        uni.showToast({ title: '移除成功', icon: 'success' });
+        await uni.showToast({title: '移除成功', icon: 'success'});
       }
     }
   });

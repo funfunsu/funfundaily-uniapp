@@ -48,7 +48,7 @@ export default {
     async handleButtonClick(buttonCode) {
       if (buttonCode === 'save') {
         const req:ScheduleAddRequest = {
-          targetUserId:this.currentMember.id,
+          targetUserId:this.currentMember.userId,
           groupId:this.currentGroup.id,
           items:[this.editingSchedule]
         }

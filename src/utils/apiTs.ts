@@ -78,7 +78,7 @@ const apiTs = {
             // 获取任务列表
             remove: (data: any) => request<any>({
                 url: '/api/group/user/remove',
-                method: 'POST',
+                method: 'DELETE',
                 data
             }),
             // 获取任务列表

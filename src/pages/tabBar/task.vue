@@ -126,7 +126,7 @@ async function fetchAllData() {
 
 async function fetchPoint() {
   const req = {
-    userId: currentMember.value.id,
+    userId: currentMember.value.userId,
     groupId: currentGroup.value.id
   }
   const member = await apiTs.group.user.get(req)
@@ -176,7 +176,7 @@ const onTaskCheck = ({ task, completed }) => {
 
   const  data = {
     taskId:task.id,
-    userId: currentMember.value.id,
+    userId: currentMember.value.userId,
     groupId: currentGroup.value.id
   }
 
@@ -187,7 +187,7 @@ const onTaskCheck = ({ task, completed }) => {
 
 async function fetchTaskList() {
 	try {
-    if(!this.currentMember || !this.currentGroup){
+    if(!currentMember.value || !currentGroup.value){
       return;
     }
     const req = {
