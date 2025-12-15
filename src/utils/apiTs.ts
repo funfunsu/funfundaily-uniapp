@@ -77,13 +77,12 @@ const apiTs = {
             get: (data: any) => api.get<any>('/api/group/user/get',data),
             // 获取任务列表
             remove: (data: any) => request<any>({
-                url: '/api/group/user/remove',
+                url: `/api/group/user/${data.groupId}/${data.userId}`,
                 method: 'DELETE',
                 data
             }),
-            // 获取任务列表
-            modify: (data: any) => request<any>({
-                url: '/api/group/user/modify',
+            update: (data: any) => request<any>({
+                url: `/api/group/user/update`,
                 method: 'POST',
                 data
             })

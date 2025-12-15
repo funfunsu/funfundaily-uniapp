@@ -12,6 +12,7 @@
     <!-- 底部固定栏 -->
     <schedule-bottom-bar
         :buttons="buttons"
+        :show-group-member="!shareMode"
         :top-side-config = "barTopSideConfig"
         @member-change="handleMemberChange"
         @buttonClick="handleButtonClick"/>
@@ -33,7 +34,7 @@ export default {
   data() {
     return {
       // 使用普通对象代替Map，确保Vue响应式正常工作
-      events: {},
+      events: [],
       shareMode: false,
       currentGroup: {},
       currentMember: {},
@@ -47,14 +48,15 @@ export default {
       selectedCount: 0,
       totalEvents: 0,
       buttons: [{code: 'addEvent', text: '添加事件'}, {code: 'toShare', text: '分享'}],
-      barTopSideConfig : {left:{text:'←上一周',code:'lastWeek'},center:{text:'',code:'date'},right:{text:'下一周→',code:'nextWeek'}}
+      barTopSideConfig : {left:{text:'←上一周',code:'lastWeek'},center:{text:'',code:'date'},right:{text:'下一周→',code:'nextWeek'}},
+      currentDate : new Date()
     };
   },
   onLoad(query) {
     if(query.refresh){
       this.fetchScheduleData();
     }
-    this.barTopSideConfig.center.text = DateUtils.formatDate(new Date())
+    this.initSideConfig()
   },
   computed: {},
   onShareAppMessage(res) {
@@ -118,6 +120,9 @@ export default {
         url: `/pages/schedule/edit?id=${event.id}&title=${event.itemTitle}`
       });
     },
+    initSideConfig(){
+      this.barTopSideConfig.center.text = DateUtils.getDateStr(this.currentDate);
+    },
     handleButtonClick(buttonCode) {
       console.log(buttonCode)
       if (buttonCode === 'addEvent') {
@@ -130,7 +135,17 @@ export default {
         this.toggleSelectAll()
       } else if (buttonCode === 'cancelShare') {
         this.exitShareMode()
+      }else if (buttonCode === 'nextWeek') {
+        this.currentDate = DateUtils.getDayOff(this.currentDate,7)
+        this.handleCurrentDateChange()
+      }else if (buttonCode === 'lastWeek') {
+        this.currentDate = DateUtils.getDayOff(this.currentDate,-7)
+        this.handleCurrentDateChange()
       }
+    },
+    handleCurrentDateChange(){
+      this.initSideConfig();
+      this.fetchScheduleData();
     },
     // 处理成员切换
     handleMemberChange(e) {
@@ -181,8 +196,8 @@ export default {
           return;
         }
         const requestData = {
-          fromDate: DateUtils.getMondayStr(),
-          toDate: DateUtils.getSundayStr(),
+          fromDate: DateUtils.getMondayStr(this.currentDate),
+          toDate: DateUtils.getSundayStr(this.currentDate),
           userId: this.currentMember.userId,
           groupId: this.currentGroup.id
         }

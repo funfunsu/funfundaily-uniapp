@@ -45,14 +45,6 @@
       }
     },
     {
-      "path": "pages/profile/group-member",
-      "style": {
-        "navigationBarTitleText": "群组成员",
-        "navigationBarBackgroundColor": "#ffffff",
-        "navigationBarTextStyle": "black"
-      }
-    },
-    {
       "path": "pages/profile/share",
       "style": {
         "navigationBarTitleText": "邀请",

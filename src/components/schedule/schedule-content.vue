@@ -87,215 +87,212 @@
   </view>
 </template>
 
-<script>
-import DateUtils from "../../utils/util";
+<script setup>
+import { ref, watch, onMounted } from 'vue';
+import DateUtils from '../../utils/util';
 
-export default {
-  props: {
+// Props 定义
+const props = defineProps({
+  eventList: {
+    type: Array,
+    default: () => []
+  },
+  weekDays: {
+    type: Array,
+    default: () => ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+  },
+  hours: {
+    type: Array,
+    default: () => [
+      '8:00', '9:00', '10:00', '11:00', '12:00', '13:00',
+      '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
+    ]
+  },
+  shareMode: {
+    type: Boolean,
+    default: false
+  }
+});
 
-    events: {
-      type: Object,
-      default: () => ({})
-    },
-    eventList: {
-      type: Array,
-      default: () => []
-    },
-    weekDays: {
-      type: Array,
-      default: () => ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-    },
-    hours: {
-      type: Array,
-      default: () => [
-        '8:00', '9:00', '10:00', '11:00', '12:00', '13:00',
-        '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
-      ]
-    },
-    // 新增：是否处于分享模式（控制多选框显示）
-    shareMode: {
-      type: Boolean,
-      default: false
+// State
+const selectedEvents = ref(new Set());
+const dates = ref([]);
+
+const emit = defineEmits([ 'event-click'])
+
+
+// Methods
+const updateDatesFromEventList = (list) => {
+  dates.value = [...new Set(list.map(item => item.date))].sort();
+  console.log("🗓️ Updated dates:", dates.value);
+};
+
+const getAllEventsForDate = (date) => {
+  let schedules = [];
+  props.eventList.forEach(event => {
+    if (event.date === date) {
+      schedules = event.schedules;
     }
-  },
-  data() {
-    return {
-      selectedEvents: new Set(),
-      dates: {
-        type: Array,
-        default: () => []
-      }
-    };
-  },
-  watch: {
-    // 当 shareMode 关闭时，自动清空选择
-    shareMode(newVal) {
-      if (!newVal) {
-        this.clearSelection();
-      }
-    },
-    // ✅ 监听 eventList 变化，更新 dates
-    eventList: {
-      handler(newList) {
-        console.log("📅 eventList changed, updating dates...");
-        this.updateDatesFromEventList(newList);
-      },
-      immediate: false // 组件挂载时也执行一次
-    },
-  },
-  methods: {
-    updateDatesFromEventList(list) {
-      this.dates = [...new Set(list.map(item => item.date))].sort();
-      console.log("🗓️ Updated dates:", this.dates);
-    },
+  });
+  let eventsForDate = [];
+  schedules.forEach(schedule => {
+    const startTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.startTime);
+    const endTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.endTime);
+    let color = 'blue';
 
-    handleEventClick(date, index) {
-      const schedules = this.events[date] || [];
-      this.$emit('event-click', schedules[index]);
-    },
+    const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+    const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+    const durationMinutes = endMinutes - startMinutes;
+    const durationHours = durationMinutes / 60;
 
-    getAllEventsForDate(date) {
-      let schedules = [];
-      // 遍历数组形式的数据
-      this.eventList.forEach(event => {
-        if (event.date === date) {
-          schedules = event.schedules;
-        }
-      })
-      let eventsForDate = []
-      schedules.forEach(schedule => {
-        const startTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.startTime);
-        const endTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.endTime);
-        let color = 'blue';
+    eventsForDate.push({
+      id: schedule.id,
+      title: schedule.itemTitle,
+      startHour: parseInt(startTime.split(':')[0]),
+      startMinute: parseInt(startTime.split(':')[1]),
+      durationHours: durationHours,
+      durationMinutes: durationMinutes,
+      color: color
+    });
+  });
+  return eventsForDate;
+};
 
-        const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
-        const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
-        const durationMinutes = endMinutes - startMinutes;
-        const durationHours = durationMinutes / 60;
+const getEventStyle = (event) => {
+  const hourHeight = 60;
+  const topOffset = (event.startHour - 8) * hourHeight + (event.startMinute / 60) * hourHeight;
+  const eventHeight = event.durationHours * hourHeight;
 
-        eventsForDate.push({
-          id: schedule.id,
-          title: schedule.itemTitle,
-          startHour: parseInt(startTime.split(':')[0]),
-          startMinute: parseInt(startTime.split(':')[1]),
-          durationHours: durationHours,
-          durationMinutes: durationMinutes,
-          color: color
-        });
-      });
-      return eventsForDate;
-    },
+  return {
+    position: 'absolute',
+    top: `${topOffset}px`,
+    height: `${eventHeight}px`,
+    zIndex: 10
+  };
+};
 
-    getEventStyle(event) {
-      const hourHeight = 60;
-      const topOffset = (event.startHour - 8) * hourHeight + (event.startMinute / 60) * hourHeight;
-      const eventHeight = event.durationHours * hourHeight;
+const getEventKey = (event, date) => {
+  return event.id != null ? String(event.id) : `${date}-${event.startHour}-${event.title}`;
+};
 
-      return {
-        position: 'absolute',
-        top: `${topOffset}px`,
-        height: `${eventHeight}px`,
-        zIndex: 10
-      };
-    },
+const toggleEventSelection = (event, date) => {
+  if (!props.shareMode) {
+    emit('event-click',event)
+    return; // 非分享模式不可选
+  }
+  const key = getEventKey(event, date);
+  if (selectedEvents.value.has(key)) {
+    selectedEvents.value.delete(key);
+  } else {
+    selectedEvents.value.add(key);
+  }
+  // emit('selection-change', Array.from(selectedEvents.value));
+};
 
-    getEventKey(event, date) {
-      return event.id != null ? String(event.id) : `${date}-${event.startHour}-${event.title}`;
-    },
+const isSelected = (event, date) => {
+  return selectedEvents.value.has(getEventKey(event, date));
+};
 
-    toggleEventSelection(event, date) {
-      if (!this.shareMode) return; // 非分享模式不可选
-      const key = this.getEventKey(event, date);
-      if (this.selectedEvents.has(key)) {
-        this.selectedEvents.delete(key);
-      } else {
-        this.selectedEvents.add(key);
-      }
-      this.$emit('selection-change', Array.from(this.selectedEvents));
-    },
+const clearSelection = () => {
+  selectedEvents.value.clear();
+  // emit('selection-change', []);
+};
 
-    isSelected(event, date) {
-      return this.selectedEvents.has(this.getEventKey(event, date));
-    },
+const getTotalEventCount = () => {
+  let total = 0;
+  props.eventList.forEach(event => {
+    total += (event.schedules || []).length;
+  });
+  return total;
+}
 
-    // 清空选中
-    clearSelection() {
-      this.selectedEvents.clear();
-      this.$emit('selection-change', []);
-    },
 
-    // 全选所有事件
-    selectAll() {
-      if (!this.shareMode) return;
-      this.selectedEvents.clear();
-      for (const date of this.dates) {
-        const events = this.getAllEventsForDate(date);
-        for (const event of events) {
-          this.selectedEvents.add(this.getEventKey(event, date));
-        }
-      }
-      this.$emit('selection-change', Array.from(this.selectedEvents));
-    },
-
-    // 反选（已选的取消，未选的选中）
-    toggleSelectAll() {
-      if (!this.shareMode) return;
-      const allKeys = new Set();
-      for (const date of this.dates) {
-        const events = this.getAllEventsForDate(date);
-        for (const event of events) {
-          allKeys.add(this.getEventKey(event, date));
-        }
-      }
-
-      const newSelected = new Set();
-      for (const key of allKeys) {
-        if (!this.selectedEvents.has(key)) {
-          newSelected.add(key);
-        }
-      }
-      this.selectedEvents = newSelected;
-      this.$emit('selection-change', Array.from(this.selectedEvents));
-    },
-
-    // 获取完整选中事件对象（含原始数据）
-    getSelectedEventObjects() {
-      const selected = [];
-      for (const date in this.events) {
-        const list = this.events[date] || [];
-        list.forEach(schedule => {
-          const fakeEvent = {
-            id: schedule.id,
-            title: schedule.itemTitle,
-            startTime: schedule.startTime,
-            endTime: schedule.endTime
-          };
-          const key = this.getEventKey(fakeEvent, date);
-          if (this.selectedEvents.has(key)) {
-            selected.push({...schedule, date});
-          }
-        });
-      }
-      return selected;
-    },
-
-    // 获取当前选中数量
-    getSelectedCount() {
-      return this.selectedEvents.size;
-    },
-
-    // 获取总事件数量
-    getTotalEventCount() {
-      let total = 0;
-      for (const date of this.dates) {
-        total += (this.events[date] || []).length;
-      }
-      return total;
+// 全选所有事件
+const selectAll= () =>  {
+  if (!this.shareMode) return;
+  selectedEvents.value.clear();
+  for (const date of dates.value) {
+    const events = getAllEventsForDate(date);
+    for (const event of events) {
+      selectedEvents.value.add(getEventKey(event, date));
     }
   }
-};
-</script>
+  // this.$emit('selection-change', Array.from(selectedEvents.value));
+}
 
+// 反选（已选的取消，未选的选中）
+const toggleSelectAll= () => {
+  if (!this.shareMode) return;
+  const allKeys = new Set();
+  for (const date of dates.value) {
+    const events = getAllEventsForDate(date);
+    for (const event of events) {
+      allKeys.add(getEventKey(event, date));
+    }
+  }
+
+  const newSelected = new Set();
+  for (const key of allKeys) {
+    if (!selectedEvents.value.has(key)) {
+      newSelected.add(key);
+    }
+  }
+  selectedEvents.value = newSelected;
+  // this.$emit('selection-change', Array.from(selectedEvents.value));
+}
+
+
+// 获取完整选中事件对象（含原始数据）
+const getSelectedEventObjects= () => {
+  const selected = [];
+  props.eventList.forEach(event => {
+    const date = event.date;
+    const list = event.schedules;
+    list.forEach(schedule => {
+      const fakeEvent = {
+        id: schedule.id,
+        title: schedule.itemTitle,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime
+      };
+      const key = getEventKey(fakeEvent, date);
+      if (selectedEvents.value.has(key)) {
+        selected.push({...schedule, date});
+      }
+    });
+  });
+  return selected;
+}
+
+// Watchers
+watch(() => props.shareMode, (newVal) => {
+  if (!newVal) {
+    clearSelection();
+  }
+});
+
+watch(() => props.eventList, (newList) => {
+  console.log("📅 eventList changed, updating dates...");
+  updateDatesFromEventList(newList);
+}, { immediate: false });
+
+// Lifecycle Hooks
+onMounted(() => {
+  updateDatesFromEventList(props.eventList);
+});
+
+
+
+// --- 新增：暴露给父组件的方法 ---
+defineExpose({
+  // 暴露获取选中事件对象的方法
+  getSelectedEventObjects,
+  getTotalEventCount,
+  // clearSelection,
+  // getSelectedCount,
+  // getTotalEventCount
+});
+</script>
 <style scoped>
 /* 顶部固定栏 */
 .top-bar {
@@ -467,7 +464,6 @@ export default {
 
 .event-title {
   margin-bottom: 2px;
-  margin-right: 20px;
   text-align: center;
   font-size: small;
 }

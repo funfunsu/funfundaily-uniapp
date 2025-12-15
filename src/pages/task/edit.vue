@@ -5,109 +5,96 @@
       <schedule-edit :schedule="editingSchedule" :schedule-type="'task'" />
     </view>
     <!-- 底部固定栏 -->
-    <view class="bottom-bar">
-      <schedule-bottom-bar :buttons="buttons"
-                           @member-change="handleMemberChange"
-                           @buttonClick="handleButtonClick" />
-    </view>
+    <schedule-bottom-bar :buttons="buttons"
+                         @member-change="handleMemberChange"
+                         @buttonClick="handleButtonClick" />
   </view>
 </template>
+<script setup>
+import { ref } from 'vue';
+import { onLoad } from '@dcloudio/uni-app'; // 引入 uni-app 的生命周期钩子
+import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
+import scheduleEdit from '../../components/schedule/schedule-edit.vue';
+import apiTs from '../../utils/apiTs';
 
-<script lang = "ts">
-import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
-import scheduleEdit from '../../components/schedule/schedule-edit.vue'
-import apiTs from '../../utils/apiTs'
+// --- 数据定义 (使用 ref) ---
+const editingSchedule = ref({ itemType: 'task' }); // 使用 ref 包裹对象使其具有响应性
+const buttons = [{ code: 'save', text: '保存' }];
+const currentMember = ref({}); // 使用 ref
+const currentGroup = ref({});  // 使用 ref
 
-import {ScheduleAddRequest, ScheduleInfoRequest} from '../../types/schedule'
+// --- 生命周期 ---
+// onLoad 是 uni-app 特有的，需要从 @dcloudio/uni-app 导入
+onLoad((query) => {
+  if (query && query.id) { // 检查 query 和 query.id 是否存在
+    loadSchedule(query.id);
+  }
+});
 
-export default {
-  name: 'edit-demo',
-  components: {
-    scheduleEdit,scheduleBottomBar
-  },
-  data() {
-    return {
-      editingSchedule: {itemType:'task'},
-      buttons:[{code: 'save', text: '保存'}],
-      currentMember:{},
-      currentGroup:{}
+// --- 方法定义 (async/await 语法保持不变) ---
+const loadSchedule = async (id) => { // 移除了类型注解
+  try {
+    const req = { // 移除了类型注解
+      id: id
     };
-  },
-  onLoad(query) {
-    if(query.id){
-      this.loadSchedule(query.id);
-    }
-  },
-  methods: {
-    // 加载模拟数据
-    async loadSchedule(id) {
-      const req :ScheduleInfoRequest = {
-        id:id
-      }
-      this.editingSchedule = await apiTs.schedule.info(req)
-    },
+    // 因为 editingSchedule 是 ref，所以需要 .value 来访问/修改其内部值
+    editingSchedule.value = await apiTs.schedule.info(req);
+  } catch (error) {
+    console.error('加载计划信息失败:', error);
+    // 可以添加错误提示逻辑
+  }
+};
 
-    async handleButtonClick(buttonCode) {
-      if (buttonCode === 'save') {
-        const req:ScheduleAddRequest = {
-          targetUserId:this.currentMember.userId,
-          groupId:this.currentGroup.id,
-          items:[this.editingSchedule]
-        }
-        console.log('submit!', this.editingSchedule)
-        await apiTs.schedule.add(req);
-      }
-    },
-    async handleMemberChange(e) {
-      this.currentMember = e.currentMember;
-      this.currentGroup = e.currentGroup;
-      console.log(this.currentGroup,this.currentMember)
+const handleButtonClick = async (buttonCode) => { // 移除了类型注解
+  if (buttonCode === 'save') {
+    try {
+      const req = { // 移除了类型注解
+        targetUserId: currentMember.value.userId, // 访问 ref 的值
+        groupId: currentGroup.value.id,          // 访问 ref 的值
+        items: [editingSchedule.value]           // 访问 ref 的值
+      };
+      console.log('submit!', editingSchedule.value);
+
+      await apiTs.schedule.add(req);
+
+      await uni.switchTab({
+        url: '/pages/tabBar/task'
+      });
+
+
+    } catch (error) {
+      console.error('保存失败:', error);
+      // 可以添加错误提示逻辑
     }
   }
 };
+
+const handleMemberChange = (e) => { // 移除了类型注解
+                                    // 修改 ref 的值需要 .value
+  currentMember.value = e.currentMember;
+  currentGroup.value = e.currentGroup;
+  console.log(currentGroup.value, currentMember.value); // 访问 ref 的值
+};
+
+// --- 暴露给模板的数据和方法 ---
+// 在 <script setup> 中，顶层定义的变量和函数会自动暴露给模板，无需 return
 </script>
 
 <style scoped>
-/* 根容器：使用flex布局，占据整个屏幕 */
+
 .page-container {
-  width: 100%;
-  height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  /* 禁止整体滚动 */
+  width: 100%;
+  height: 100vh; /* 占满整个视口高度 */
   box-sizing: border-box;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-
-/* 底部固定栏：高度60px，绿色背景 */
-.bottom-bar {
-  height: 60px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
-  flex-shrink: 0;
-  /* 防止被压缩 */
-  z-index: 100;
-  /* 确保在顶层 */
-}
-
-.bottom-bar-title {
-  color: white;
 }
 
 /* 内容容器样式 */
 .page-content-container {
-  height: calc(100% - 120px);
-  display: flex;
-  flex-direction: column;
+  flex: 1; /* 让内容区域占据所有可用空间 */
+  overflow-y: auto; /* 允许滚动 */
+  -webkit-overflow-scrolling: touch; /* 平滑滚动 */
   margin-bottom: 60px;
 }
 </style>

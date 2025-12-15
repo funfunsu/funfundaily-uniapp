@@ -46,7 +46,7 @@ export default {
       dates: [],  // 从 events 的 key 中提取并排序
       selectedCount: 0,
       totalEvents: 0,
-      buttons: [{code: 'copy', text: '添加到日程'},{code: 'copyToNewMember', text: '添加到新成员的日程'}],
+      buttons: [{code: 'copy', text: '收下'},{code: 'copyToNewMember', text: '新成员收下'}],
       isLoginSuccessful : false,
       currentMember : null,
       currentGroup : null
@@ -154,7 +154,7 @@ export default {
     },
 
     async fetchSharedContent(token) {
-      uni.showLoading({ title: "加载中..." });
+      await uni.showLoading({title: "加载中..."});
       try {
         // 1. 调用后端接口获取分享内容
         const response = await apiTs.share.getContent(token);
@@ -172,7 +172,7 @@ export default {
 
       } catch (err) {
         console.error("❌ 获取分享内容失败:", err);
-        uni.showToast({
+        await uni.showToast({
           title: "加载失败，请稍后重试",
           icon: "none"
         });

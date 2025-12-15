@@ -4,7 +4,7 @@
     <!-- 用户信息区域 -->
     <view class="user-info-section">
       <view class="avatar">
-        <text class="avatar-text">{{userInfo.nickname[0]}}</text>
+        <text class="avatar-text">{{userInfo.nickname?.charAt(0)}}</text>
       </view>
       <view class="user-details">
         <text class="user-name">{{ userInfo.nickname || '未知用户' }}</text>
@@ -139,7 +139,7 @@ export default {
       const currentGroup = group
       setStoredData(STORAGE_KEYS.CURRENT_GROUP,group);
       uni.navigateTo({
-        url: `/pages/profile/group-member`
+        url: `/pages/profile/group-manage`
       })
     },
 

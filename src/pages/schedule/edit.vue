@@ -56,7 +56,7 @@ export default {
         const res = await apiTs.schedule.add(req);
         if(res){
           // 跳转到日程编辑页面
-          uni.switchTab({
+          await uni.switchTab({
             url: '/pages/tabBar/schedule?refresh=true' // 请确保此路径是你在 pages.json 中配置的 tabBar 页面路径
           });
         }

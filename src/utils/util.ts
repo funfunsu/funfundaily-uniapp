@@ -112,6 +112,14 @@ export default class DateUtils {
 		return this.formatDate(nextDay);
 	}
 
+
+	static getDayOff(date : Date = new Date(),dayOff: int) : Date {
+		// 创建一个新的 Date 对象，避免修改原始传入的 date 对象
+		const nextDay = new Date(date.getTime());
+		nextDay.setDate(nextDay.getDate() + dayOff);
+		return nextDay;
+	}
+
 	/**
 	 * 通用日期格式化：Date 转 yyyy-MM-dd 字符串
 	 * @param date 需格式化的日期

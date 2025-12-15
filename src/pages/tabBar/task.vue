@@ -21,17 +21,17 @@
 					</view>
 				</view>
 
-				<view class="date-control-row">
-					<view class="date-nav" @click="handleLastDayClick">
-						<text class="nav-icon">←</text>
-					</view>
-					<view class="current-date">
-						<text class="date-text">{{ formattedCurrentDate }}</text>
-					</view>
-					<view class="date-nav" @click="handleNextDayClick">
-						<text class="nav-icon">→</text>
-					</view>
-				</view>
+<!--				<view class="date-control-row">-->
+<!--					<view class="date-nav" @click="handleLastDayClick">-->
+<!--						<text class="nav-icon">←</text>-->
+<!--					</view>-->
+<!--					<view class="current-date">-->
+<!--						<text class="date-text">{{ formattedCurrentDate }}</text>-->
+<!--					</view>-->
+<!--					<view class="date-nav" @click="handleNextDayClick">-->
+<!--						<text class="nav-icon">→</text>-->
+<!--					</view>-->
+<!--				</view>-->
 			</view>
 
 			<!-- 任务列表 -->
@@ -62,9 +62,11 @@
 		</view>
 
 		<!-- 底部栏 -->
-    <schedule-bottom-bar :buttons="buttons"
-                         @member-change="handleMemberChange"
-                         @buttonClick="handleButtonClick" />
+    <schedule-bottom-bar
+        :buttons="buttons"
+        :top-side-config = "barTopSideConfig"
+        @member-change="handleMemberChange"
+        @buttonClick="handleButtonClick"/>
 	</view>
 </template>
 
@@ -74,6 +76,8 @@ import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import TaskCard from '../../components/task/task-card.vue'
 import DateUtils from "../../utils/util";
+import {onLoad} from "@dcloudio/uni-app";
+import {getStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 
 // =============== 类型定义 ===============
 interface Task {
@@ -98,8 +102,11 @@ const currentDate = ref(new Date())
 const listShow = ref(true)
 const isLoadingMore = ref(false)
 const buttons = ref<object[]>([{code: 'addEvent', text: '添加任务'}, {code: 'toShare', text: '分享'}])
+const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},center:{text:DateUtils.getDateStr(currentDate.value),code:'date'},right:{text:'后一天→',code:'nextDay'}})
+
 const currentMember =ref<object>()
 const currentGroup =ref<object>()
+
 
 // =============== 计算属性 ===============
 const formattedCurrentDate = computed(() => {
@@ -118,6 +125,14 @@ const todayPoints = computed(() =>
 		.filter(t => t.isCompleted && t.extra?.score)
 		.reduce((sum, t) => sum + (Number(t.extra.score) || 0), 0)
 )
+
+
+// --- 生命周期 ---
+
+// 页面加载时获取 groupId 参数
+onLoad(async (query) => {
+  // await fetchTaskList();
+});
 
 // =============== 方法 ===============
 async function fetchAllData() {
@@ -142,6 +157,10 @@ async function handleButtonClick(buttonCode) {
     uni.navigateTo({
       url: '/pages/task/edit'
     });
+  }else if(buttonCode === 'lastDay'){
+    updateDate(-1)
+  }else if(buttonCode === 'nextDay'){
+    updateDate(1)
   }
 }
 // 处理成员切换
@@ -191,8 +210,8 @@ async function fetchTaskList() {
       return;
     }
     const req = {
-      fromDate: DateUtils.getTodayStr(),
-      toDate: DateUtils.getNextDayStr(),
+      fromDate: DateUtils.getDateStr(currentDate.value),
+      toDate: DateUtils.getDateStr(DateUtils.getDayOff(currentDate.value,1)),
       userId: currentMember.value.userId,
       groupId: currentGroup.value.id
     }
@@ -231,11 +250,10 @@ function handleLastDayClick() {
 	updateDate(-1)
 }
 
-function updateDate(days: number) {
-	const newDate = new Date(currentDate.value)
-	newDate.setDate(newDate.getDate() + days)
-	currentDate.value = newDate
-	fetchTaskList()
+async function updateDate(days: number) {
+	currentDate.value = DateUtils.getDayOff(currentDate.value,days)
+  barTopSideConfig.value.center.text = DateUtils.getDateStr(currentDate.value);
+  await fetchTaskList()
 }
 
 

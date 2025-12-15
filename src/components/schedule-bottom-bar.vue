@@ -1,7 +1,7 @@
 <template>
   <view class="bottom-bar" :style="getBarStyle()">
 
-    <view class="bottom-bar-top">
+    <view class="bottom-bar-top" v-if="topSideConfig">
       <!-- 左侧：群组信息 + 成员选择器 -->
       <view class="left-section" @click="handleButtonClick(topSideConfig.left.code)" v-if="topSideConfig.left">
         <text class="nav-icon">{{topSideConfig.left.text}}</text>
@@ -16,7 +16,7 @@
     </view>
     <view class="bottom-bar-content">
       <!-- 左侧：群组信息 + 成员选择器 -->
-      <view class="left-section">
+      <view class="left-section" v-if="showGroupMember">
         <!-- 群组信息 -->
         <view class="group-info">
           <view class="member-switcher">
@@ -81,7 +81,8 @@ const props = defineProps({
   currentMember: { type: Object, default: null },
   autoLoadMembers: { type: Boolean, default: true },
   buttons:{type: Array, default: () => []},
-  topSideConfig:{type: Object, default: null }
+  topSideConfig:{type: Object, default: null },
+  showGroupMember: { type: Boolean, default: true },
 })
 
 //topSideConfig = {left:{text:'',code:''},center:{text:'',code:''},right:{text:'',code:''}}
@@ -344,7 +345,6 @@ watch(_groupList, (newList) => {
   bottom: 0;
   left: 0;
   right: 0;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
   background: transparent;
   z-index: 100;
 }
@@ -354,7 +354,7 @@ watch(_groupList, (newList) => {
   align-items: center;    /* 垂直居中 */
   /* justify-content: space-between; */ /* 移除这个 */
   box-sizing: border-box;
-  background-color: transparent; /* 明确设置背景透明 */
+  background-color: rgba(255, 255, 255, 0.6);
   width: 100%;
   padding-left: 16px;    /* 控制内容与边界距离 */
   padding-right: 16px;
@@ -370,8 +370,7 @@ watch(_groupList, (newList) => {
   box-sizing: border-box;
   width: 100%;
   background: #ffffff;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  /* 不使用 justify-content，靠 margin-left: auto 实现右对齐 */
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* —————— 左侧区域 —————— */
