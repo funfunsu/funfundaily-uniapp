@@ -1,5 +1,19 @@
 <template>
-  <view class="bottom-bar">
+  <view class="bottom-bar" :style="getBarStyle()">
+
+    <view class="bottom-bar-top">
+      <!-- 左侧：群组信息 + 成员选择器 -->
+      <view class="left-section" @click="handleButtonClick(topSideConfig.left.code)" v-if="topSideConfig.left">
+        <text class="nav-icon">{{topSideConfig.left.text}}</text>
+      </view>
+      <view class="center-section" @click="handleButtonClick(topSideConfig.center.code)" v-if="topSideConfig.center">
+        {{topSideConfig.center.text}}
+      </view>
+      <!-- 右侧：两个按钮（靠右） -->
+      <view class="right-section" v-if="topSideConfig.right">
+        <text class="nav-icon" @click="handleButtonClick(topSideConfig.right.code)">{{topSideConfig.right.text}}</text>
+      </view>
+    </view>
     <view class="bottom-bar-content">
       <!-- 左侧：群组信息 + 成员选择器 -->
       <view class="left-section">
@@ -66,8 +80,11 @@ const props = defineProps({
   currentGroupIndex: { type: Number, default: 0 },
   currentMember: { type: Object, default: null },
   autoLoadMembers: { type: Boolean, default: true },
-  buttons:{type: Array, default: () => []}
+  buttons:{type: Array, default: () => []},
+  topSideConfig:{type: Object, default: null }
 })
+
+//topSideConfig = {left:{text:'',code:''},center:{text:'',code:''},right:{text:'',code:''}}
 
 // ===== Emits 定义 =====
 const emit = defineEmits(['member-change', 'button-click', 'members-loaded'])
@@ -197,6 +214,16 @@ const handleGroupChange = async (e) => {
   await fetchMembers();
 }
 
+const getBarStyle = () => {
+  let barHeight = 60;
+  if (props.topSideConfig){
+    barHeight = 100;
+  }
+  return {
+    height: `${barHeight}px`
+  };
+}
+
 /**
  * 处理成员选择变化
  */
@@ -317,19 +344,33 @@ watch(_groupList, (newList) => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: #fff;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
-  height: 60px;
+  background: transparent;
   z-index: 100;
+}
+.bottom-bar-top {
+  height: 40px;
+  display: flex;          /* 设置为 Flex 容器 */
+  align-items: center;    /* 垂直居中 */
+  /* justify-content: space-between; */ /* 移除这个 */
+  box-sizing: border-box;
+  background-color: transparent; /* 明确设置背景透明 */
+  width: 100%;
+  padding-left: 16px;    /* 控制内容与边界距离 */
+  padding-right: 16px;
+  gap: 10px;
+  color: #007aff;
 }
 
 .bottom-bar-content {
-  height: 100%;
+  height: 60px;
   padding: 0 16px;
   display: flex;
   align-items: center;
   box-sizing: border-box;
   width: 100%;
+  background: #ffffff;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   /* 不使用 justify-content，靠 margin-left: auto 实现右对齐 */
 }
 
@@ -340,6 +381,12 @@ watch(_groupList, (newList) => {
   align-items: center;
   gap: 12px;
   min-width: 0; /* 允许内部文本省略 */
+}
+
+.center-section {
+  text-align: center;    /* 关键：让内部内容（文字）在此区域内居中 */
+  flex: 1;               /* 关键：占据所有可用的剩余空间 */
+  min-width: 0;          /* 允许内部文本溢出时被省略 */
 }
 
 .group-info {
@@ -432,4 +479,6 @@ watch(_groupList, (newList) => {
 .add-text {
   font-weight: 500;
 }
+
+
 </style>

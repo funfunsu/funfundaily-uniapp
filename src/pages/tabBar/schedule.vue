@@ -6,13 +6,13 @@
                         :event-list="events"
                         :share-mode="shareMode"
                         @eventClick="handleEventClick"
-
                         @selection-change="onSelectionChange"/>
     </view>
 
     <!-- 底部固定栏 -->
     <schedule-bottom-bar
         :buttons="buttons"
+        :top-side-config = "barTopSideConfig"
         @member-change="handleMemberChange"
         @buttonClick="handleButtonClick"/>
   </view>
@@ -46,13 +46,15 @@ export default {
       },
       selectedCount: 0,
       totalEvents: 0,
-      buttons: [{code: 'addEvent', text: '添加事件'}, {code: 'toShare', text: '分享'}]
+      buttons: [{code: 'addEvent', text: '添加事件'}, {code: 'toShare', text: '分享'}],
+      barTopSideConfig : {left:{text:'←上一周',code:'lastWeek'},center:{text:'',code:'date'},right:{text:'下一周→',code:'nextWeek'}}
     };
   },
   onLoad(query) {
     if(query.refresh){
       this.fetchScheduleData();
     }
+    this.barTopSideConfig.center.text = DateUtils.formatDate(new Date())
   },
   computed: {},
   onShareAppMessage(res) {
@@ -117,6 +119,7 @@ export default {
       });
     },
     handleButtonClick(buttonCode) {
+      console.log(buttonCode)
       if (buttonCode === 'addEvent') {
         this.handleAddClick();
       } else if (buttonCode === 'toShare') {
