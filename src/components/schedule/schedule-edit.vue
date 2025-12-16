@@ -68,7 +68,7 @@
             <text class="label">重复星期</text>
             <view class="week-days-container">
               <view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
-                    :class="{ selected: schedule.repeatKeys.includes(index) }"
+                    :class="{ selected: schedule.repeatKeys.includes(index+'') }"
                     @click="toggleWeekDay(index)">
                 {{ day }}
               </view>
@@ -118,7 +118,7 @@
             <text class="label">重复开始日期</text>
             <picker class="picker" mode="date" :value="formatDate(schedule.repeatStartDay)"
                     start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleDateChange(e, 'repeatStartDay')">
+                    @change="(e) => handleRepeatDateChange(e, 'repeatStartDay')">
               <view class="picker-display">{{ formatDate(schedule.repeatStartDay) }}</view>
             </picker>
           </view>
@@ -127,7 +127,7 @@
             <text class="label">重复结束日期</text>
             <picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
                     start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleDateChange(e, 'repeatEndDay')">
+                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
               <view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
             </picker>
           </view>
@@ -304,13 +304,15 @@ export default {
     },
 
     // 处理日期变更
-    handleDateChange(e, field) {
-      this.schedule[field] = e.detail.value;
+    handleRepeatDateChange(e, field) {
+      const dateStr = e.detail.value;
+      this.schedule[field] = DateUtils.replaceDatePart(this.schedule[field],dateStr );
     },
     handleEventDateChange(e) {
       const dateStr = e.detail.value;
       this.schedule['startTime'] = DateUtils.replaceDatePart(this.schedule['startTime'],dateStr )
       this.schedule['endTime'] = DateUtils.replaceDatePart(this.schedule['endTime'],dateStr )
+      console.log(this.schedule)
     },
 
     // 处理重复类型变更
@@ -330,8 +332,8 @@ export default {
       }else if (this.schedule.repeatType === 'monthly') {
         this.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
       }
-      this.schedule.repeatStartDay = DateUtils.getDateStr(today)
-      this.schedule.repeatEndDay = DateUtils.getDateStr(new Date(today.setDate(180)));
+      this.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today)
+      this.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(new Date(today.setDate(180)));
     },
 
     // 处理日程类型变更

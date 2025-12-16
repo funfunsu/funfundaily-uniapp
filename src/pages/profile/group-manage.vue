@@ -286,7 +286,7 @@ const setRole = (memberId,role) => {
     success: async (res) => {
       if (res.confirm) {
         // 实际调用设置角色接口 (模拟)
-        await api.group.user.update({groupId: currentGroupId.value, userId:memberId, role: role})
+        await api.group.user.update({groupId: currentGroup.value.id, userId:memberId, role: role})
         const member = members.value.find(m => m.id === memberId);
         if (member) {
           member.role = role; // 更新本地显示
