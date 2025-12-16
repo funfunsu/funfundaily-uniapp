@@ -1,5 +1,6 @@
 <template>
-  <view class="bottom-bar" :style="getBarStyle()">
+  <view class="bottom-bar-wrapper" :style="getBarStyle()">
+  <view class="bottom-bar-inner" >
 
     <view class="bottom-bar-top" v-if="topSideConfig">
       <!-- 左侧：群组信息 + 成员选择器 -->
@@ -65,6 +66,7 @@
       </view>
     </view>
   </view>
+  </view>
 </template>
 
 <script setup>
@@ -83,6 +85,7 @@ const props = defineProps({
   buttons:{type: Array, default: () => []},
   topSideConfig:{type: Object, default: null },
   showGroupMember: { type: Boolean, default: true },
+  isTabBarPage: { type: Boolean, default: true },
 })
 
 //topSideConfig = {left:{text:'',code:''},center:{text:'',code:''},right:{text:'',code:''}}
@@ -220,8 +223,23 @@ const getBarStyle = () => {
   if (props.topSideConfig){
     barHeight = 100;
   }
+  let bottom = 0;
+
+
+  /* #ifdef H5 */
+  /* 在 H5 平台，可能没有复杂的系统 UI 占据底部，
+     或者为了在浏览器中调试时不被模拟器底部遮挡，
+     你可以设置一个特定的值，甚至可能是 0。
+     （注意：这只是为了 H5 调试方便，真机以 MP 为准） */
+  bottom = '40px';
+  /* #endif */
+
+  if (!props.isTabBarPage){
+    bottom = 0;
+  }
   return {
-    height: `${barHeight}px`
+    height: `${barHeight}px`,
+    bottom: bottom
   };
 }
 
@@ -340,14 +358,26 @@ watch(_groupList, (newList) => {
 </script>
 
 <style scoped>
-.bottom-bar {
-  position: absolute;
-  bottom: 0;
+.bottom-bar-wrapper {
+  position: fixed;
   left: 0;
   right: 0;
-  background: transparent;
+  display: flex;
+  flex-direction: column;
   z-index: 100;
+  background: transparent; /* 背景交给内部元素 */
+  box-sizing: border-box;
 }
+
+/* --- Inner: 包含你的原始内容 --- */
+.bottom-bar-inner {
+  flex-shrink: 0; /* 防止被压缩 */
+  display: flex;
+  flex-direction: column;
+  border-top-left-radius: 10px; /* 示例圆角 */
+  border-top-right-radius: 10px;
+}
+
 .bottom-bar-top {
   height: 40px;
   display: flex;          /* 设置为 Flex 容器 */

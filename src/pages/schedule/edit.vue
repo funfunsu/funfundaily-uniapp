@@ -6,6 +6,7 @@
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
+                         :is-tab-bar-page="false"
                          @member-change="handleMemberChange"
                          @buttonClick="handleButtonClick" />
   </view>
@@ -53,7 +54,7 @@ export default {
           items:[this.editingSchedule]
         }
         console.log('submit!', this.editingSchedule)
-        const res = await apiTs.schedule.add(req);
+        const res = await apiTs.schedule.save(req);
         if(res){
           // 跳转到日程编辑页面
           await uni.switchTab({

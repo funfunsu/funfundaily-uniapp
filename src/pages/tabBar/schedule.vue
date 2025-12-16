@@ -186,9 +186,6 @@ export default {
     toggleSelectAll() {
       this.$refs.schedule.toggleSelectAll();
     },
-    clearSelection() {
-      this.$refs.schedule.clearSelection();
-    },
     // 获取日程数据
     async fetchScheduleData() {
       try {

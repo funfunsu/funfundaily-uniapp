@@ -69,7 +69,7 @@
             <view class="week-days-container">
               <view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
                     :class="{ selected: schedule.repeatKeys.includes(index+'') }"
-                    @click="toggleWeekDay(index)">
+                    @click="toggleWeekDay(index+'')">
                 {{ day }}
               </view>
             </view>
@@ -165,197 +165,175 @@
     </view>
   </view>
 </template>
-
-<script>
-
+<script setup>
+// 引入必要的 Vue 功能
+import { ref, reactive, computed, onMounted } from 'vue'; // 移除了 watch，除非你需要它
 import DateUtils from "../../utils/util";
 
-export default {
-  name: 'schedule-edit',
-  props: {
-    schedule: Object,
-    scheduleType: String
-  },
-  data() {
-    return {
-      scheduleData: {},
-      // 重复类型选项
-      repeatTypeOptions: ['不重复', '每天', '每周','每两周', '每月', '每年'],
-      repeatTypeValues: ['none', 'daily', 'weekly','2weekly', 'monthly', 'yearly'],
-      // 星期选项
-      weekDays: ['日', '一', '二', '三', '四', '五', '六'],
-      // 月份天数选项（1-31）
-      monthDays: Array.from({length: 31}, (_, i) => (i + 1).toString()),
-      // 日程类型选项
-      itemLabelOptions: ['学校', '家里'],
-      itemLabelValues: ['school', 'home'],
-      // 控制描述字段显示状态
-      showDescription: false,
-      // 控制地点字段显示状态
-      showLocation: false
-    };
-  },
-  computed: {
-  },
-  mounted() {
-    // 当组件被挂载到 DOM 时调用
-    // if (this.scheduleType === 'TaskCard'){
-    //   this.showDescription = true;
-    // }
-    // 其他初始化逻辑...
-  },
-  methods: {
-    // 获取时间部分（HH:MM格式）
-    getTimeOnly(dateTimeStr) {
-      return DateUtils.getHourAndMinFromDateTimeStr(dateTimeStr)
-    },
+// --- Props 定义 ---
+const props = defineProps({
+  schedule: Object,
+  scheduleType: String
+});
 
-    // 获取月份中的日期
-    getMonthDay(dateTimeStr) {
-      if (!dateTimeStr) return 1;
-      const date = new Date(dateTimeStr);
-      if (isNaN(date.getTime())) return 1;
-      return date.getDate();
-    },
+// --- Refs for static-ish options (对应 Vue 2 data 中的静态选项) ---
+// 使用 ref 定义这些不太会改变的选项数组
+const repeatTypeOptions = ref(['不重复', '每天', '每周','每两周', '每月', '每年']);
+const repeatTypeValues = ref(['none', 'daily', 'weekly','2weekly', 'monthly', 'yearly']);
+const weekDays = ref(['日', '一', '二', '三', '四', '五', '六']);
+const monthDays = ref(Array.from({length: 31}, (_, i) => (i + 1).toString()));
+const itemLabelOptions = ref(['学校', '家里']);
+const itemLabelValues = ref(['school', 'home']);
+const showDescription = ref(false)
 
-    // 获取月份日期索引
-    getMonthDayIndex(dateTimeStr) {
-      const day = this.getMonthDay(dateTimeStr);
-      return day - 1;
-    },
+// --- Methods ---
+// 注意：以下所有修改 props.schedule 的方法都存在直接修改 props 的问题，
+// 正确的做法是 $emit 事件通知父组件修改。此处仅为迁移示例。
 
-    // 处理时间变更
-    handleTimeChange(e, field) {
-      const timeValue = e.detail.value;
-      this.schedule[field] = DateUtils.replaceTimePart(this.schedule[field],timeValue+':00') ;
-      if (field === 'startTime'){
-        const date = new Date(this.schedule[field]);
-        date.setMinutes(date.getMinutes()+45)
-        this.schedule['endTime'] = DateUtils.formatDateTime(date) ;
-      }
-    },
+const getTimeOnly = (dateTimeStr) => {
+  return DateUtils.getHourAndMinFromDateTimeStr(dateTimeStr);
+};
 
-    // 处理每月日期变更
-    handleMonthDayChange(e, field) {
-      const dayIndex = e.detail.value;
-      this.schedule.repeatKeys[0] = this.monthDays[dayIndex];
+const getMonthDay = (dateTimeStr) => {
+  if (!dateTimeStr) return 1;
+  const date = new Date(dateTimeStr);
+  if (isNaN(date.getTime())) return 1;
+  return date.getDate();
+};
 
-    },
+const getMonthDayIndex = (dateTimeStr) => {
+  const day = getMonthDay(dateTimeStr);
+  return day - 1;
+};
 
-    // 处理每年日期变更（只保留月日）
-    handleYearDateChange(e) {
-      const dateStr = e.detail.value;
-      const [year, month, day] = dateStr.split('-');
-      this.schedule.repeatKeys[0] = month + '-' + day
-    },
-    // 切换描述字段显示状态
-    toggleDescription() {
-      this.showDescription = !this.showDescription;
-    },
-
-    // 切换地点字段显示状态
-    toggleLocation() {
-      this.showLocation = !this.showLocation;
-    },
-
-    // 格式化日期显示
-    formatDate(dateTimeStr) {
-      if (dateTimeStr){
-        const date = new Date(dateTimeStr);
-        return DateUtils.getDateStr(date);
-      }
-
-      if (!this.schedule.startTime){
-        const today = new Date()
-        this.schedule.startTime = DateUtils.getDayStartTimeStr(today)
-        this.schedule.endTime = DateUtils.getDayEndTimeStr(today)
-      }
-      if (!this.schedule.itemType){
-        this.schedule.itemType = this.scheduleType
-      }
-      if(!this.schedule.extra){
-        this.schedule.extra = {}
-      }
-    },
-
-    // 获取重复类型索引
-    getRepeatTypeIndex(type) {
-      if(!this.schedule.repeatType){
-        this.schedule.repeatType = 'none'
-      }
-      return this.repeatTypeValues.indexOf(type) || 0;
-    },
-
-    // 获取重复类型文本
-    getRepeatTypeText(type) {
-      const index = this.repeatTypeValues.indexOf(type);
-      return index !== -1 ? this.repeatTypeOptions[index] : this.repeatTypeOptions[0];
-    },
-
-    // 获取日程类型索引
-    getItemLabelIndex(type) {
-      return this.itemLabelValues.indexOf(type) || 0;
-    },
-
-    // 获取日程类型文本
-    getItemLabelText(type) {
-      const index = this.itemLabelValues.indexOf(type);
-      return index !== -1 ? this.itemLabelOptions[index] : this.itemLabelOptions[0];
-    },
-
-    // 处理日期变更
-    handleRepeatDateChange(e, field) {
-      const dateStr = e.detail.value;
-      this.schedule[field] = DateUtils.replaceDatePart(this.schedule[field],dateStr );
-    },
-    handleEventDateChange(e) {
-      const dateStr = e.detail.value;
-      this.schedule['startTime'] = DateUtils.replaceDatePart(this.schedule['startTime'],dateStr )
-      this.schedule['endTime'] = DateUtils.replaceDatePart(this.schedule['endTime'],dateStr )
-      console.log(this.schedule)
-    },
-
-    // 处理重复类型变更
-    handleRepeatTypeChange(e) {
-      const index = e.detail.value;
-      const today = new Date();
-
-      this.schedule.repeatType = this.repeatTypeValues[index];
-      if (this.schedule.repeatType === 'none'){
-        return
-      }
-      // 如果不是每周重复，清空重复星期
-      if (this.schedule.repeatType === 'weekly' || this.schedule.repeatType === '2weekly') {
-        this.schedule.repeatKeys = [DateUtils.getWeekDay(today)];
-      }else if (this.schedule.repeatType === 'yearly') {
-        this.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
-      }else if (this.schedule.repeatType === 'monthly') {
-        this.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
-      }
-      this.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today)
-      this.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(new Date(today.setDate(180)));
-    },
-
-    // 处理日程类型变更
-    handleItemLabelChange(e) {
-      const index = e.detail.value;
-      this.schedule.label = this.itemLabelValues[index];
-    },
-
-    // 切换星期选择
-    toggleWeekDay(dayIndex) {
-      const key = dayIndex;
-      const index = this.schedule.repeatKeys.indexOf(key);
-      if (index > -1) {
-        this.schedule.repeatKeys.splice(index, 1);
-      } else {
-        this.schedule.repeatKeys.push(key);
-      }
-      // 排序
-      this.schedule.repeatKeys.sort((a, b) => parseInt(a) - parseInt(b));
-    }
+const handleTimeChange = (e, field) => {
+  const timeValue = e.detail.value;
+  props.schedule[field] = DateUtils.replaceTimePart(props.schedule[field], timeValue + ':00');
+  if (field === 'startTime') {
+    const date = new Date(props.schedule[field]);
+    date.setMinutes(date.getMinutes() + 45);
+    props.schedule['endTime'] = DateUtils.formatDateTime(date);
   }
 };
+
+const handleMonthDayChange = (e, field) => {
+  const dayIndex = e.detail.value;
+  if (props.schedule.repeatKeys && Array.isArray(props.schedule.repeatKeys)) {
+    props.schedule.repeatKeys[0] = monthDays.value[dayIndex]; // 使用 .value 访问 ref
+  }
+};
+
+const handleYearDateChange = (e) => {
+  const dateStr = e.detail.value;
+  const [year, month, day] = dateStr.split('-');
+  const formattedKey = month + '-' + day;
+  if (props.schedule.repeatKeys && Array.isArray(props.schedule.repeatKeys)) {
+    props.schedule.repeatKeys[0] = formattedKey;
+  }
+};
+
+const toggleDescription = () => {
+  showDescription.value = !showDescription.value; // 修改 reactive 对象
+};
+
+const formatDate = (dateTimeStr) => {
+  if (dateTimeStr) {
+    const date = new Date(dateTimeStr);
+    return DateUtils.getDateStr(date);
+  }
+
+  if (!props.schedule.startTime) {
+    const today = new Date();
+    props.schedule.startTime = DateUtils.getDayStartTimeStr(today);
+    props.schedule.endTime = DateUtils.getDayEndTimeStr(today);
+  }
+  if (!props.schedule.itemType) {
+    props.schedule.itemType = props.scheduleType;
+  }
+  if (!props.schedule.extra) {
+    props.schedule.extra = {};
+  }
+};
+
+const getRepeatTypeIndex = (type) => {
+  if (!props.schedule.repeatType) {
+    props.schedule.repeatType = 'none';
+  }
+  const index = repeatTypeValues.value.indexOf(props.schedule.repeatType); // 使用 .value
+  return index !== -1 ? index : 0;
+};
+
+const getRepeatTypeText = (type) => {
+  const index = repeatTypeValues.value.indexOf(type); // 使用 .value
+  return index !== -1 ? repeatTypeOptions.value[index] : repeatTypeOptions.value[0]; // 使用 .value
+};
+
+const getItemLabelIndex = (type) => {
+  const index = itemLabelValues.value.indexOf(type); // 使用 .value
+  return index !== -1 ? index : 0;
+};
+
+const getItemLabelText = (type) => {
+  const index = itemLabelValues.value.indexOf(type); // 使用 .value
+  return index !== -1 ? itemLabelOptions.value[index] : itemLabelOptions.value[0]; // 使用 .value
+};
+
+const handleRepeatDateChange = (e, field) => {
+  const dateStr = e.detail.value;
+  props.schedule[field] = DateUtils.replaceDatePart(props.schedule[field], dateStr);
+};
+
+const handleEventDateChange = (e) => {
+  const dateStr = e.detail.value;
+  props.schedule['startTime'] = DateUtils.replaceDatePart(props.schedule['startTime'], dateStr);
+  props.schedule['endTime'] = DateUtils.replaceDatePart(props.schedule['endTime'], dateStr);
+  console.log(props.schedule);
+};
+
+const handleRepeatTypeChange = (e) => {
+  const index = e.detail.value;
+  const today = new Date();
+
+  props.schedule.repeatType = repeatTypeValues.value[index]; // 使用 .value
+  if (props.schedule.repeatType === 'none') {
+    return;
+  }
+  if (props.schedule.repeatType === 'weekly' || props.schedule.repeatType === '2weekly') {
+    props.schedule.repeatKeys = [DateUtils.getWeekDay(today).toString()];
+  } else if (props.schedule.repeatType === 'yearly') {
+    props.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
+  } else if (props.schedule.repeatType === 'monthly') {
+    props.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
+  }
+  props.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today);
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + 180);
+  props.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(endDate);
+};
+
+const handleItemLabelChange = (e) => {
+  const index = e.detail.value;
+  props.schedule.label = itemLabelValues.value[index]; // 使用 .value
+};
+
+const toggleWeekDay = (dayIndex) => {
+  const key = dayIndex.toString();
+  if (!Array.isArray(props.schedule.repeatKeys)) {
+    props.schedule.repeatKeys = [];
+  }
+  const index = props.schedule.repeatKeys.indexOf(key);
+  if (index > -1) {
+    props.schedule.repeatKeys.splice(index, 1);
+  } else {
+    props.schedule.repeatKeys.push(key);
+  }
+  props.schedule.repeatKeys.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+};
+
+// --- Lifecycle Hooks ---
+onMounted(() => {
+  // console.log('Component mounted');
+});
 </script>
 
 <style scoped>

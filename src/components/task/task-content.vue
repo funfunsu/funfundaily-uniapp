@@ -1,53 +1,46 @@
 <template>
-  <view class="page-container">
-    <!-- 内容区域 -->
-    <view class="content-container">
-      <!-- 任务统计卡片 -->
-      <view class="task-stats-card">
-        <view class="stats-row">
-          <view class="stat-block">
-            <text class="stat-number">{{ completedCount }}/{{ totalCount }}</text>
-            <text class="stat-label">今日任务</text>
-          </view>
-          <view class="stat-divider"></view>
-          <view class="stat-block" @click="handleHistoryClick">
-            <text class="stat-number">{{ point.count || 0 }}</text>
-            <text class="stat-label">总积分</text>
-          </view>
-          <view class="stat-divider"></view>
-          <view class="stat-block">
-            <text class="stat-number">{{ todayPoints }}</text>
-            <text class="stat-label">今日积分</text>
-          </view>
+  <!-- 顶部固定栏 -->
+  <view class="top-bar">
+    <view class="task-stats-card">
+      <view class="stats-row">
+        <view class="stat-block">
+          <text class="stat-number">{{ completedCount }}/{{ totalCount }}</text>
+          <text class="stat-label">今日任务</text>
         </view>
-      </view>
-
-      <!-- 任务列表 -->
-      <view v-show="listShow" class="task-list">
-        <view v-if="taskList.length === 0" class="empty-state">
-          <text class="empty-icon">📋</text>
-          <text class="empty-text">今天没有任务，休息一下吧！</text>
+        <view class="stat-divider"></view>
+        <view class="stat-block" @click="handleHistoryClick">
+          <text class="stat-number">{{ point.count || 0 }}</text>
+          <text class="stat-label">总积分</text>
         </view>
-
-        <view v-for="task in taskList" :key="task.id"> <!-- 添加 key 提高性能 -->
-          <TaskCard
-              @item-click="onTaskItemClick"
-              @edit-task="onEditTask"
-              @check-task="onTaskCheck"
-              :task="task"
-          />
+        <view class="stat-divider"></view>
+        <view class="stat-block">
+          <text class="stat-number">{{ todayPoints }}</text>
+          <text class="stat-label">今日积分</text>
         </view>
       </view>
     </view>
+  </view>
 
-    <!-- 底部栏 -->
-    <schedule-bottom-bar
-        :buttons="buttons"
-        :top-side-config = "barTopSideConfig"
-        @member-change="handleMemberChange"
-        @buttonClick="handleButtonClick"/>
+  <!-- 中间内容区域 -->
+  <view class="content-container">
+    <view class="content-wrapper">
+      <view v-if="taskList.length === 0" class="empty-state">
+        <text class="empty-icon">📋</text>
+        <text class="empty-text">今天没有任务，休息一下吧！</text>
+      </view>
+
+      <view v-for="task in taskList" :key="task.id"> <!-- 添加 key -->
+        <TaskCard
+            @item-click="onTaskItemClick"
+            @edit-task="onEditTask"
+            @check-task="onTaskCheck"
+            :task="task"
+        />
+      </view>
+    </view>
   </view>
 </template>
+
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
@@ -154,8 +147,11 @@ const onTaskItemClick = (taskId) => {
   console.log('点击了任务:', taskId)
 }
 
-const onEditTask = (taskId) => {
-  console.log('编辑任务:', taskId)
+const onEditTask = (task) => {
+  // 跳转到日程编辑页面
+  uni.navigateTo({
+    url: `/pages/task/edit?id=${task.id}`
+  });
 }
 
 const onTaskCheck = ({ task, completed }) => {
@@ -262,112 +258,71 @@ function onScrollTolower() {
   }, 500)
 }
 
+function formatTime(timestamp: number | string | null): string {
+  if (!timestamp) return ''
+  const d = new Date(timestamp as number)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 // =============== 生命周期 ===============
 onMounted(() => {
   fetchAllData()
 })
 </script>
+
+
 <style scoped>
-/* --- 全局容器 --- */
-.page-container {
-  height: 100vh;
+/* 顶部固定栏 */
+.top-bar {
+  height: 40px;
+  color: white;
   display: flex;
-  flex-direction: column;
-  background-color: #f5f5f5;
-  /* position: relative; 可加可不加，fixed 默认相对于 viewport */
-}
-
-/* --- 内容容器 --- */
-.content-container {
-  /* flex: 1; */ /* 移除或注释掉，因为我们现在要设置明确的高度 */
-  display: flex;
-  flex-direction: column;
-  /* 关键：让它占据剩余空间并可滚动 */
-  flex-grow: 1; /* 或者保持 flex: 1; 但要确保父级 page-container 是 flex column */
-  overflow-y: auto; /* 启用滚动 */
-  -webkit-overflow-scrolling: touch; /* 平滑滚动 */
-  /* 关键：为固定的底部栏预留空间 */
-  /* 假设你的 schedule-bottom-bar 高度是 100rpx (50px)，这里用更大的值保险 */
-  padding-bottom: 120rpx; /* 使用 rpx 与设计稿一致，或转换为 px */
-  box-sizing: border-box; /* 确保 padding 不增加总高度 */
-}
-
-/* --- 任务统计卡片 --- */
-.task-stats-card {
-  background: white;
-  border-radius: 16rpx;
-  padding: 24rpx 20rpx;
-  margin: 0 0 20rpx 0;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
-  flex-shrink: 0;
-}
-
-/* --- 任务统计卡片内部样式 --- */
-.stats-row,
-.date-control-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.stat-block {
-  text-align: center;
-  flex: 1;
-}
-
-.stat-number {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #2196f3;
-  display: block;
-}
-
-.stat-label {
-  font-size: 24rpx;
-  color: #888;
-  margin-top: 8rpx;
-}
-
-.stat-divider {
-  width: 2rpx;
-  height: 40rpx;
-  background: #eee;
-}
-
-/* --- 任务列表 (scroll-view) --- */
-.task-list {
-  padding: 0 16rpx; /* 左右 padding 保留 */
-}
-
-
-/* --- 空状态 --- */
-.empty-state {
-  text-align: center;
-  padding: 120rpx 40rpx 80rpx; /* 调整 padding-bottom 以适应上面的预留空间 */
-  /* 或者使用 min-height 结合 calc */
-  /* min-height: calc(100% - 70px); */
-  display: flex;
-  flex-direction: column;
   justify-content: center;
-  align-items: center;
+  font-size: 16px;
+  font-weight: bold;
+  flex-shrink: 0;
+  z-index: 100;
 }
 
-.empty-icon {
-  font-size: 72rpx;
-  margin-bottom: 20rpx;
+/* 中间内容区域 */
+.content-container {
+  flex: 1; /* 占据父容器剩余空间 */
+  /* 关键：允许自身滚动 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  /* 确保它有明确的块级显示 */
+  display: flex;
+  flex-direction: column;
 }
 
-.empty-text {
-  font-size: 28rpx;
-  color: #999;
+.content-wrapper {
+  flex: 1; /* 占据 content-container 的所有可用空间 */
+  /* margin-right: -6px; */ /* 如果滚动条导致布局偏移，可以考虑用 padding 或调整其他地方 */
+  /* 确保它也有明确的高度上下文 */
+  display: flex;
+  flex-direction: column;
+}
+/* 关键修改：让 flex-row 填充 content-wrapper */
+.content-wrapper > .flex-row { /* 使用子选择器更精确 */
+  flex: 1; /* 占据 wrapper 的所有可用空间 */
+  /* min-height: 0; */ /* 有时在嵌套 flex 中防止子项溢出不被截断 */
 }
 
-
-/* --- 小屏适配 --- */
-@media (max-width: 375px) {
-  .stat-number {
-    font-size: 32rpx;
-  }
+.content-container::-webkit-scrollbar {
+  width: 6px;
 }
 
+.content-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.content-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.content-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
 </style>

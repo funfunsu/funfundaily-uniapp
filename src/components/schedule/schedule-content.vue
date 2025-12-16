@@ -209,7 +209,7 @@ const getTotalEventCount = () => {
 
 // 全选所有事件
 const selectAll= () =>  {
-  if (!this.shareMode) return;
+  if (!props.shareMode) return;
   selectedEvents.value.clear();
   for (const date of dates.value) {
     const events = getAllEventsForDate(date);
@@ -222,7 +222,7 @@ const selectAll= () =>  {
 
 // 反选（已选的取消，未选的选中）
 const toggleSelectAll= () => {
-  if (!this.shareMode) return;
+  if (!props.shareMode) return;
   const allKeys = new Set();
   for (const date of dates.value) {
     const events = getAllEventsForDate(date);
@@ -288,6 +288,8 @@ defineExpose({
   // 暴露获取选中事件对象的方法
   getSelectedEventObjects,
   getTotalEventCount,
+  selectAll,
+  toggleSelectAll,
   // clearSelection,
   // getSelectedCount,
   // getTotalEventCount
@@ -441,7 +443,7 @@ defineExpose({
 .event-container {
   border-radius: 16px;
   padding: 0;
-  border: solid;
+  border: 0.5px solid #ffffff;
   color: #fff;
   font-size: 12px;
   display: flex;

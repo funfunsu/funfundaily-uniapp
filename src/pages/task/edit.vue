@@ -6,6 +6,7 @@
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
+                         :is-tab-bar-page="false"
                          @member-change="handleMemberChange"
                          @buttonClick="handleButtonClick" />
   </view>
@@ -55,7 +56,7 @@ const handleButtonClick = async (buttonCode) => { // 移除了类型注解
       };
       console.log('submit!', editingSchedule.value);
 
-      await apiTs.schedule.add(req);
+      await apiTs.schedule.save(req);
 
       await uni.switchTab({
         url: '/pages/tabBar/task'

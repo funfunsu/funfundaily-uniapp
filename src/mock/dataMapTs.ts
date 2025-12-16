@@ -57,7 +57,7 @@ export default {
     '/api/user/info': infoData,
     '/api/schedule/list': generateRecent7DaysSchedule(),
     '/api/schedule/info': scheduleInfo,
-    '/api/schedule/add': add,
+    '/api/schedule/save': add,
     '/api/schedule/copy': add,
     '/api/schedule/modify': modify,
     '/api/group/user/list': groupUserList,

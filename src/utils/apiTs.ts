@@ -45,7 +45,7 @@ const apiTs = {
         // 获取日程详情
         info: (data: ScheduleInfoRequest): Promise<Schedule> => api.get<Schedule>('/api/schedule/' + data.id, data),
         // 添加日程
-        add: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/add', data),
+        save: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/save', data),
         copy: (data: ScheduleCopyRequest): Promise<boolean> => api.post<boolean>('/api/schedule/copy', data),
         // 修改日程
         modify: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/modify', data)
@@ -124,7 +124,7 @@ const apiTs = {
         }),
         // 添加任务
         add: (data: any): Promise<any> => request<any>({
-            url: '/api/task/add',
+            url: '/api/task/save',
             method: 'POST',
             data
         }),

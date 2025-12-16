@@ -6,11 +6,11 @@
   >
     <view class="task-header">
       <view class="task-title-section">
-        <text class="task-title">{{ task.itemTitle || '任务标题' }}</text>
+        <text class="task-title"  @click.stop="handleEditTaskClick()">{{ task.itemTitle || '任务标题' }}<text class="edit-icon"></text></text>
       </view>
 
       <view class="task-actions">
-        <text class="edit-icon" @click.stop="handleEditTaskClick()">⚙️</text>
+
         <switch
             :checked="!!task.isCompleted"
             :disabled="!!task.isCompleted"
@@ -97,7 +97,6 @@ const formatTime = (timestamp) => {
 }
 
 .task-item--completed {
-  background-color: #f5f5f5;
 }
 
 /* --- 头部行 --- */
@@ -115,9 +114,7 @@ const formatTime = (timestamp) => {
 }
 
 .task-title {
-  font-weight: bold;
-  font-size: 16px;
-  color: #333;
+  color: #007aff;
   word-break: break-word;
 }
 
@@ -143,7 +140,7 @@ const formatTime = (timestamp) => {
   flex-shrink: 1; /* 允许收缩 */
   min-width: 0; /* 允许长文本溢出并换行 */
   word-break: break-word;
-  /* 移除之前的 display: block */
+  font-size: smaller;
 }
 
 .task-item--completed .task-desc {
@@ -186,7 +183,6 @@ const formatTime = (timestamp) => {
 }
 
 .task-item--completed .task-switch  {
-  opacity: 0.5;
 }
 
 /* --- 开关样式调整 --- */
