@@ -108,7 +108,7 @@ export default function request<T = any>(options : RequestOptions) : Promise<T> 
 	const processedOptions = requestConfig.requestInterceptor(options)
 	// 处理 URL
 	const url = !config.mock
-		? `${config.baseUrl.prod}${processedOptions.url}`
+		? `${config.baseUrl}${processedOptions.url}`
 		: processedOptions.url
 
 	// Mock 环境下直接返回模拟数据

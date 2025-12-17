@@ -2,10 +2,19 @@
   <view class="container">
     <!-- 卡片式内容区域 -->
     <view class="card">
-      <!-- 欢迎信息 -->
-      <view v-if="isInLoginLoading" class="welcome-text">登录中...</view>
+      <!-- 登录加载区域 -->
+      <view v-if="isInLoginLoading" class="login-loading">
+        <text class="loading-text">登录中</text>
+        <view class="loading-dots">
+          <text class="dot dot-1">.</text>
+          <text class="dot dot-2">.</text>
+          <text class="dot dot-3">.</text>
+        </view>
+      </view>
+
+      <!-- 昵称设置区域 -->
       <view v-else-if="showProfileUpdate">
-        <view  class="welcome-text">欢迎回来！</view>
+        <view class="welcome-text">欢迎回来！</view>
 
         <!-- 昵称设置表单 -->
         <view class="form-section">
@@ -20,7 +29,6 @@
           <button class="submit-button" @click="updateNickname">提交</button>
         </view>
       </view>
-
     </view>
   </view>
 </template>
@@ -37,7 +45,7 @@ import { STORAGE_KEYS, setStoredData } from '../../utils/storageManager';
 // --- 响应式状态 ---
 // 控制是否显示昵称设置区域
 const showProfileUpdate = ref(false);
-const isInLoginLoading= ref(true);
+const isInLoginLoading = ref(true);
 // 存储用户信息
 const userInfo = ref<{ nickname?: string }>({});
 // 存储重定向路径
@@ -65,7 +73,7 @@ onMounted(async () => {
   try {
     const token = await autoLogin();
     if (token) {
-      isInLoginLoading.value = false
+      isInLoginLoading.value = false;
       const fetchedUserInfo = await apiTs.user.getInfo();
       userInfo.value = fetchedUserInfo;
 
@@ -80,6 +88,10 @@ onMounted(async () => {
     }
   } catch (err: any) {
     console.error('Index page - Auto login or fetch user info failed:', err);
+    // 即使出错，也应停止加载状态，或显示错误信息
+    isInLoginLoading.value = false;
+    // 可以在这里添加错误提示
+    uni.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
   }
 });
 
@@ -159,9 +171,60 @@ const setCustomNickname = (e: any) => {
   overflow: hidden;
   padding: 30px 25px;
   box-sizing: border-box;
+  display: flex; /* 添加 */
+  align-items: center; /* 添加 */
+  justify-content: center; /* 添加 */
+  min-height: 200px; /* 添加，防止卡片过小 */
 }
 
-/* --- 内容区域样式 --- */
+/* --- 登录加载动画样式 --- */
+.login-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 600;
+  color: #1d2129;
+}
+
+.loading-text {
+  margin-right: 5px; /* 文字和点之间的间距 */
+}
+
+.loading-dots {
+  display: flex;
+  align-items: center;
+  height: 24px; /* 给容器一个固定高度，使点居中 */
+}
+
+.dot {
+  font-size: 22px;
+  line-height: 1;
+  animation: bounce 1.5s infinite ease-in-out both;
+}
+
+.dot-1 {
+  animation-delay: -0.32s;
+}
+
+.dot-2 {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* --- 欢迎文本样式 --- */
 .welcome-text {
   font-size: 22px;
   font-weight: 600;
@@ -170,9 +233,11 @@ const setCustomNickname = (e: any) => {
   margin-bottom: 25px;
 }
 
+/* --- 表单区域样式 --- */
 .form-section {
   display: flex;
   flex-direction: column;
+  width: 100%; /* 确保表单占满卡片宽度 */
 }
 
 .label {
@@ -185,7 +250,7 @@ const setCustomNickname = (e: any) => {
 
 /* --- 表单控件样式 --- */
 .nickname-input {
-  padding: 12px 15px; /* 使用 padding 控制高度和内容间距 */
+  padding: 12px 15px;
   font-size: 16px;
   height: 100%;
   color: #1d2129;
@@ -219,7 +284,7 @@ const setCustomNickname = (e: any) => {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
-  /* margin 已经在 scoped style 中调整 */
+  padding: 12px; /* 添加内边距 */
 }
 
 .submit-button:hover {

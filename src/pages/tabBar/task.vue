@@ -1,26 +1,25 @@
 <template>
   <view class="page-container">
-    <!-- 内容区域 -->
-    <view class="content-container">
-      <!-- 任务统计卡片 -->
-      <view class="task-stats-card">
-        <view class="stats-row">
-          <view class="stat-block">
-            <text class="stat-number">{{ completedCount }}/{{ totalCount }}</text>
-            <text class="stat-label">今日任务</text>
-          </view>
-          <view class="stat-divider"></view>
-          <view class="stat-block" @click="handleHistoryClick">
-            <text class="stat-number">{{ point.count || 0 }}</text>
-            <text class="stat-label">总积分</text>
-          </view>
-          <view class="stat-divider"></view>
-          <view class="stat-block">
-            <text class="stat-number">{{ todayPoints }}</text>
-            <text class="stat-label">今日积分</text>
-          </view>
+    <view class="task-stats-card">
+      <view class="stats-row">
+        <view class="stat-block">
+          <text class="stat-number">{{ completedCount }}/{{ totalCount }}</text>
+          <text class="stat-label">今日任务</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-block" @click="handleHistoryClick">
+          <text class="stat-number">{{ point.count || 0 }}</text>
+          <text class="stat-label">总积分</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-block">
+          <text class="stat-number">{{ todayPoints }}</text>
+          <text class="stat-label">今日积分</text>
         </view>
       </view>
+    </view>
+    <!-- 内容区域 -->
+    <view class="content-container">
 
       <!-- 任务列表 -->
       <view v-show="listShow" class="task-list">
@@ -50,13 +49,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import TaskCard from '../../components/task/task-card.vue'
 import DateUtils from "../../utils/util";
-import {onLoad} from "@dcloudio/uni-app";
-import {getStoredData, STORAGE_KEYS} from "../../utils/storageManager";
+import {onLoad, onPullDownRefresh} from "@dcloudio/uni-app";
 
 // =============== 类型定义 ===============
 interface Task {
@@ -81,7 +79,7 @@ const currentDate = ref(new Date())
 const listShow = ref(true)
 const isLoadingMore = ref(false)
 const buttons = ref<object[]>([{code: 'addEvent', text: '添加任务'}, {code: 'toShare', text: '分享'}])
-const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},center:{text:DateUtils.getDateStr(currentDate.value),code:'date'},right:{text:'后一天→',code:'nextDay'}})
+const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},center:{text:`${DateUtils.getDateStr(currentDate.value)}↻`,code:'date-refresh'},right:{text:'后一天→',code:'nextDay'}})
 
 const currentMember =ref<object>()
 const currentGroup =ref<object>()
@@ -119,6 +117,9 @@ async function fetchAllData() {
 }
 
 async function fetchPoint() {
+  if(!currentMember.value){
+    return;
+  }
   const req = {
     userId: currentMember.value.userId,
     groupId: currentGroup.value.id
@@ -133,13 +134,15 @@ async function fetchPoint() {
 async function handleButtonClick(buttonCode) {
   if (buttonCode === 'addEvent') {
     // 跳转到日程编辑页面
-    uni.navigateTo({
+    await uni.navigateTo({
       url: '/pages/task/edit'
     });
   }else if(buttonCode === 'lastDay'){
-    updateDate(-1)
+    await updateDate(-1)
   }else if(buttonCode === 'nextDay'){
-    updateDate(1)
+    await updateDate(1)
+  }else if(buttonCode === 'date-refresh'){
+    await fetchAllData()
   }
 }
 // 处理成员切换
@@ -154,8 +157,10 @@ const onTaskItemClick = (taskId) => {
   console.log('点击了任务:', taskId)
 }
 
-const onEditTask = (taskId) => {
-  console.log('编辑任务:', taskId)
+const onEditTask = (task) => {
+  uni.navigateTo({
+    url: `/pages/task/edit?id=${task.id}`
+  });
 }
 
 const onTaskCheck = ({ task, completed }) => {
@@ -262,6 +267,28 @@ function onScrollTolower() {
   }, 500)
 }
 
+onPullDownRefresh(async () => {
+  debugger
+  console.log('触发下拉刷新');
+  try {
+    await fetchAllData(); // 执行刷新数据的逻辑
+    await uni.showToast({
+      title: '刷新成功',
+      icon: 'success'
+    });
+  } catch (error) {
+    console.error('刷新失败:', error);
+    await uni.showToast({
+      title: '刷新失败',
+      icon: 'none'
+    });
+  } finally {
+    // *** 关键：无论成功与否，都需要调用 uni.stopPullDownRefresh() ***
+    // 这会停止下拉刷新的动画，收回下拉区域
+    uni.stopPullDownRefresh();
+  }
+});
+
 // =============== 生命周期 ===============
 onMounted(() => {
   fetchAllData()
@@ -270,26 +297,22 @@ onMounted(() => {
 <style scoped>
 /* --- 全局容器 --- */
 .page-container {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: #f5f5f5;
-  /* position: relative; 可加可不加，fixed 默认相对于 viewport */
 }
 
 /* --- 内容容器 --- */
 .content-container {
-  /* flex: 1; */ /* 移除或注释掉，因为我们现在要设置明确的高度 */
   display: flex;
   flex-direction: column;
-  /* 关键：让它占据剩余空间并可滚动 */
   flex-grow: 1; /* 或者保持 flex: 1; 但要确保父级 page-container 是 flex column */
   overflow-y: auto; /* 启用滚动 */
   -webkit-overflow-scrolling: touch; /* 平滑滚动 */
-  /* 关键：为固定的底部栏预留空间 */
-  /* 假设你的 schedule-bottom-bar 高度是 100rpx (50px)，这里用更大的值保险 */
-  padding-bottom: 120rpx; /* 使用 rpx 与设计稿一致，或转换为 px */
   box-sizing: border-box; /* 确保 padding 不增加总高度 */
+  margin-top: 84px;
+  padding-top: 10px;
 }
 
 /* --- 任务统计卡片 --- */
@@ -300,11 +323,14 @@ onMounted(() => {
   margin: 0 0 20rpx 0;
   box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
+  position: fixed;
+  width: 100%;
+  height: 60px;
+  z-index:100
 }
 
 /* --- 任务统计卡片内部样式 --- */
-.stats-row,
-.date-control-row {
+.stats-row{
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -334,18 +360,16 @@ onMounted(() => {
   background: #eee;
 }
 
-/* --- 任务列表 (scroll-view) --- */
 .task-list {
   padding: 0 16rpx; /* 左右 padding 保留 */
+  flex-grow: 1;
 }
 
 
 /* --- 空状态 --- */
 .empty-state {
   text-align: center;
-  padding: 120rpx 40rpx 80rpx; /* 调整 padding-bottom 以适应上面的预留空间 */
-  /* 或者使用 min-height 结合 calc */
-  /* min-height: calc(100% - 70px); */
+  padding: 40rpx;
   display: flex;
   flex-direction: column;
   justify-content: center;

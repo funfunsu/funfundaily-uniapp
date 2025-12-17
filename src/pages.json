@@ -90,13 +90,17 @@
         "pagePath": "pages/tabBar/schedule",
         "text": "日程",
         "iconPath": "static/icons/schedule.png",
-        "selectedIconPath": "static/icons/scheduleHL.png"
+        "selectedIconPath": "static/icons/scheduleHL.png",
+        "enablePullDownRefresh": true,
+        "backgroundTextStyle": "dark"
       },
       {
         "pagePath": "pages/tabBar/task",
         "text": "打卡",
         "iconPath": "static/icons/task.png",
-        "selectedIconPath": "static/icons/taskHL.png"
+        "selectedIconPath": "static/icons/taskHL.png",
+        "enablePullDownRefresh": true,
+        "backgroundTextStyle": "dark"
       },
       {
         "pagePath": "pages/tabBar/more",

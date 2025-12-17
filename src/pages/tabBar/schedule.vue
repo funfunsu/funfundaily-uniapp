@@ -48,7 +48,7 @@ export default {
       selectedCount: 0,
       totalEvents: 0,
       buttons: [{code: 'addEvent', text: '添加事件'}, {code: 'toShare', text: '分享'}],
-      barTopSideConfig : {left:{text:'←上一周',code:'lastWeek'},center:{text:'',code:'date'},right:{text:'下一周→',code:'nextWeek'}},
+      barTopSideConfig : {left:{text:'←上一周',code:'lastWeek'},center:{text:'',code:'date-refresh'},right:{text:'下一周→',code:'nextWeek'}},
       currentDate : new Date()
     };
   },
@@ -121,7 +121,7 @@ export default {
       });
     },
     initSideConfig(){
-      this.barTopSideConfig.center.text = DateUtils.getDateStr(this.currentDate);
+      this.barTopSideConfig.center.text = `${DateUtils.getDateStr(this.currentDate)}↻`;
     },
     handleButtonClick(buttonCode) {
       console.log(buttonCode)
@@ -141,6 +141,8 @@ export default {
       }else if (buttonCode === 'lastWeek') {
         this.currentDate = DateUtils.getDayOff(this.currentDate,-7)
         this.handleCurrentDateChange()
+      }else if (buttonCode === 'date-refresh') {
+        this.fetchScheduleData()
       }
     },
     handleCurrentDateChange(){
