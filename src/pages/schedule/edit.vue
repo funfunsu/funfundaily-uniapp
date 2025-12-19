@@ -12,65 +12,108 @@
   </view>
 </template>
 
-<script lang = "ts">
+<script setup>
+import { ref } from 'vue'; // 导入 ref
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import scheduleEdit from '../../components/schedule/schedule-edit.vue'
 import apiTs from '../../utils/apiTs'
+import { onLoad } from '@dcloudio/uni-app';
+import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager"; // 导入 onLoad 生命周期
 
-import {ScheduleAddRequest, ScheduleInfoRequest} from '../../types/schedule'
+// =============== 响应式数据 (使用 ref) ===============
+const editingSchedule = ref({ itemType: 'schedule' }); // 初始化为一个带有 itemType 的对象
+const buttons = ref([{ code: 'save', text: '保存' }]);
+const currentMember = ref({});
+const currentGroup = ref({});
 
-export default {
-  name: 'edit-demo',
-  components: {
-    scheduleEdit,scheduleBottomBar
-  },
-  data() {
-    return {
-      editingSchedule: {itemType:'schedule'},
-      buttons:[{code: 'save', text: '保存'}],
-      currentMember:{},
-      currentGroup:{}
-    };
-  },
-  onLoad(query) {
-    if(query.id){
-      this.loadSchedule(query.id);
-    }
-  },
-  methods: {
-    // 加载模拟数据
-    async loadSchedule(id) {
-      const req :ScheduleInfoRequest = {
-        id:id
-      }
-      this.editingSchedule = await apiTs.schedule.info(req)
-    },
 
-    async handleButtonClick(buttonCode) {
-      if (buttonCode === 'save') {
-        const req:ScheduleAddRequest = {
-          targetUserId:this.currentMember.userId,
-          groupId:this.currentGroup.id,
-          items:[this.editingSchedule]
-        }
-        console.log('submit!', this.editingSchedule)
-        const res = await apiTs.schedule.save(req);
-        if(res){
-          // 跳转到日程编辑页面
-          await uni.switchTab({
-            url: '/pages/tabBar/schedule?refresh=true' // 请确保此路径是你在 pages.json 中配置的 tabBar 页面路径
-          });
-        }
-      }
-    },
-    async handleMemberChange(e) {
-      this.currentMember = e.currentMember;
-      this.currentGroup = e.currentGroup;
-      console.log(this.currentGroup,this.currentMember)
-    }
+// =============== 生命周期 ===============
+onLoad((query) => {
+  if (query.id) {
+    buttons.value =  [{ code: 'delete', text: '删除' },{ code: 'save', text: '保存' }]
+    loadSchedule(query.id);
   }
-};
+});
+
+
+// =============== 方法 ===============
+// 加载数据
+async function loadSchedule(id) {
+  try {
+    const req = {
+      id: id
+    };
+    // 假设 apiTs.schedule.info 返回一个符合 editingSchedule 结构的对象
+    const scheduleData = await apiTs.schedule.info(req);
+    // 更新 ref 的 value
+    editingSchedule.value = scheduleData;
+  } catch (error) {
+    console.error('加载日程信息失败:', error);
+    // 可以在这里添加用户提示，比如 uni.showToast
+  }
+}
+
+const switchToTab = ()=>{
+  const uri = '/pages/tabBar/schedule'
+  setStoredData(STORAGE_KEYS.REFRESH_TAB,uri)
+  uni.switchTab({
+    url: uri // 确保路径正确
+  });
+}
+
+
+const save = async () => {
+  try {
+    const req = {
+      targetUserId: currentMember.value.userId,
+      groupId: currentGroup.value.id,
+      items: [editingSchedule.value] // 使用 .value 获取当前值
+    };
+
+    console.log('提交的数据:', editingSchedule.value);
+
+    const res = await apiTs.schedule.save(req);
+
+    if (res) {
+      switchToTab();
+      // 如果需要刷新，可以在 /pages/tabBar/schedule 页面的 onLoad 中检查来源或使用全局事件/状态
+    } else {
+      await uni.showToast({ title: '保存失败', icon: 'none' });
+    }
+
+  } catch (error) {
+    console.error('保存失败:', error);
+    // 可以添加错误提示逻辑
+  }
+}
+
+
+const deleteItem = async () => {
+  try {
+    await apiTs.schedule.delete(editingSchedule.value.id);
+    switchToTab();
+  } catch (error) {
+    console.error('删除失败:', error);
+    // 可以添加错误提示逻辑
+  }
+}
+
+// 处理底部按钮点击
+async function handleButtonClick(buttonCode) {
+  switch (buttonCode){
+    case 'save':await save();return;
+    case 'delete':await deleteItem();return;
+  }
+}
+
+// 处理成员切换
+function handleMemberChange(e) {
+  currentMember.value = e.currentMember;
+  currentGroup.value = e.currentGroup;
+  console.log('当前成员:', currentMember.value, '当前群组:', currentGroup.value);
+}
 </script>
+
 
 <style scoped>
 

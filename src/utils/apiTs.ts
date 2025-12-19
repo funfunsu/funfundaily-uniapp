@@ -47,8 +47,7 @@ const apiTs = {
         // 添加日程
         save: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/save', data),
         copy: (data: ScheduleCopyRequest): Promise<boolean> => api.post<boolean>('/api/schedule/copy', data),
-        // 修改日程
-        modify: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/modify', data)
+        delete: (id): Promise<boolean> => api.delete<boolean>(`/api/schedule/${id}`, {})
     },
     // 积分相关接口
     point: {
@@ -93,7 +92,7 @@ const apiTs = {
             data
         }),
         add: (data: any) => request<any>({
-            url: '/api/group/add',
+            url: '/api/group/create',
             method: 'POST',
             data
         }),

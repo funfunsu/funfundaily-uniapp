@@ -4,7 +4,7 @@
     <!-- 用户信息区域 -->
     <view class="user-info-section">
       <view class="avatar">
-        <text class="avatar-text">{{userInfo.nickname?.charAt(0)}}</text>
+        <text class="avatar-text">{{ userInfo.nickname?.charAt(0) || '?' }}</text>
       </view>
       <view class="user-details">
         <text class="user-name">{{ userInfo.nickname || '未知用户' }}</text>
@@ -13,17 +13,16 @@
 
     <!-- 功能菜单区域 -->
     <view>
-      <view class="menu-section group-section" v-for="(group,index) in groupList">
+      <view class="menu-section group-section" v-for="(group, index) in groupList" :key="group.id">
         <view class="menu-item" @click="handleGroupMembersClick(group)">
           <view class="menu-left">
-            <text v-if="groupList.length>1">群组{{ index+1 }}-</text>
+            <text v-if="groupList.length > 1">群组{{ index + 1 }}-</text>
             <text class="menu-title">{{ group.groupName }}</text>
           </view>
           <text class="menu-arrow">›</text>
         </view>
       </view>
     </view>
-
 
     <!-- 创建群组表单弹窗 -->
     <view v-if="showGroupForm" class="group-form-modal" @click="cancelCreateGroup">
@@ -35,13 +34,13 @@
           <view class="form-item">
             <text class="form-label">群组名称 *</text>
             <input
-                ref="groupNameInput"
-                class="form-input"
-                v-model="newGroupName"
-                placeholder="请输入群组名称"
-                placeholder-class="placeholder-text"
-                @focus="inputFocus = true"
-                @blur="inputFocus = false"
+                ref="groupNameInputRef"
+            class="form-input"
+            v-model="newGroupName"
+            placeholder="请输入群组名称"
+            placeholder-class="placeholder-text"
+            @focus="inputFocus = true"
+            @blur="inputFocus = false"
             />
           </view>
         </view>
@@ -58,147 +57,183 @@
         </view>
       </view>
     </view>
+    <view class="contact-service-section">
+      <button class="create-btn" @click="showCreateGroupForm">
+        <text class="contact-icon">+</text> <!-- 可选：添加一个聊天气泡图标 -->
+        <text>创建群组</text>
+      </button>
+    </view>
+    <view class="contact-service-section">
+      <button class="contact-service-btn" open-type="contact">
+        <text class="contact-icon">&#x1F4AC;</text> <!-- 可选：添加一个聊天气泡图标 -->
+        <text>联系客服</text>
+      </button>
+    </view>
   </view>
 </template>
 
-<script>
+<script setup>
+// 导入必要的 Vue 3 Composition API 函数
+import { ref, onMounted, nextTick } from 'vue'
+// 导入 uni-app 提供的页面跳转等 API
+import { onLoad, onShow } from '@dcloudio/uni-app'
+
+// --- 响应式状态 ---
+const userInfo = ref({})
+const groupList = ref([])
+const selectedGroupIdx = ref(0)
+const showGroupForm = ref(false)
+const newGroupName = ref('')
+const inputFocus = ref(false)
+
+// --- 模板引用 ---
+const groupNameInputRef = ref(null)
+
+// --- 导入工具和组件 ---
 import api from '../../utils/apiTs'
-import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../utils/storageManager';
-import scheduleBottomBar from "../../components/schedule-bottom-bar.vue"; // 路径请根据实际情况调整
+import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../utils/storageManager'
+// import scheduleBottomBar from "../../components/schedule-bottom-bar.vue"; // 如果需要底部栏组件，可以在这里导入并使用
 
+// --- 方法定义 ---
 
-export default {
-  components: {scheduleBottomBar},
-  data() {
-    return {
-      userInfo: {},
-      groupList: [],
-      selectedGroupIdx: 0,
-      showGroupForm: false,
-      newGroupName: '',
-      inputFocus: false,
-      buttons:[]
-    }
-  },
-  mounted() {
-    this.fetchUserInfo()
-    this.fetchGroupList()
-  },
-  methods: {
-    async fetchUserInfo() {
-      try {
-        const res = await api.user.getInfo()
-        this.userInfo = res || {}
-      } catch (err) {
-        console.error('获取用户信息失败', err)
-        uni.showToast({ title: '获取用户信息失败', icon: 'none' })
-      }
-    },
-    async editGroup(group){
-      // 编辑群组逻辑
-      // 第一步：输入昵称
-      uni.showModal({
-        title: '修改群组',
-        placeholderText: group.groupName,
-        editable: true,
-        success: async(res1) => {
-          if (res1.confirm && res1.content.trim()) {
-            const groupName = res1.content.trim()
-            await api.group.modify({ id: group.id, groupName: groupName })
-            await this.fetchGroupList();
-          }
-        },
-        fail: () => {}
-      })
-    },
-
-    async fetchGroupList() {
-      try {
-        this.groupList = await api.group.list();
-        setStoredData(STORAGE_KEYS.GROUP_LIST,this.groupList)
-        // 如果有群组，默认选中第一个
-        if (this.groupList.length > 0) {
-          this.selectedGroupIdx = 0
-        }
-      } catch (err) {
-        console.error('获取群组列表失败', err)
-      }
-    },
-
-    bindGroupChange(e) {
-      this.selectedGroupIdx = e.detail.value
-    },
-
-    handleGroupManageClick() {
-      uni.navigateTo({
-        url: '/pages/profile/group-manage'
-      })
-    },
-
-    handleGroupMembersClick(group) {
-      const currentGroup = group
-      setStoredData(STORAGE_KEYS.CURRENT_GROUP,group);
-      uni.navigateTo({
-        url: `/pages/profile/group-manage`
-      })
-    },
-
-    showCreateGroupForm() {
-      this.showGroupForm = true
-      this.newGroupName = ''
-      this.$nextTick(() => {
-        // 自动聚焦输入框（App/小程序支持有限，但尽量尝试）
-        const input = this.$refs.groupNameInput
-        if (input && typeof input.focus === 'function') {
-          input.focus()
-        }
-        // 滚动到可视区域（可选）
-        uni.createSelectorQuery()
-            .select('.group-form-container')
-            .boundingClientRect((rect) => {
-              if (rect && rect.top < 0) {
-                uni.pageScrollTo({ scrollTop: 0, duration: 200 })
-              }
-            })
-            .exec()
-      })
-    },
-
-    cancelCreateGroup() {
-      this.showGroupForm = false
-      this.newGroupName = ''
-      this.inputFocus = false
-    },
-
-    async submitCreateGroup() {
-      const name = this.newGroupName.trim()
-      if (!name) {
-        uni.showToast({ title: '请输入群组名称', icon: 'none' })
-        return
-      }
-
-      try {
-        uni.showLoading({ title: '创建中...' })
-        const res = await api.group.add({ groupName: name })
-        // 假设返回 { id, groupName }
-        const newGroup = { id: res.id, groupName: name }
-        this.groupList.push(newGroup)
-        this.selectedGroupIdx = this.groupList.length - 1
-
-        uni.showToast({ title: '群组创建成功', icon: 'success' })
-        this.cancelCreateGroup()
-      } catch (error) {
-        console.error('创建群组失败:', error)
-        uni.showToast({ title: '创建失败，请重试', icon: 'none' })
-      } finally {
-        uni.hideLoading()
-      }
-    }
+const fetchUserInfo = async () => {
+  try {
+    const res = await api.user.getInfo()
+    userInfo.value = res || {}
+  } catch (err) {
+    console.error('获取用户信息失败', err)
+    uni.showToast({ title: '获取用户信息失败', icon: 'none' })
   }
 }
+
+const editGroup = async (group) => {
+  // 编辑群组逻辑
+  // 第一步：输入昵称
+  uni.showModal({
+    title: '修改群组',
+    placeholderText: group.groupName,
+    editable: true,
+    success: async (res1) => {
+      if (res1.confirm && res1.content?.trim()) {
+        const groupName = res1.content.trim()
+        try {
+          await api.group.modify({ id: group.id, groupName: groupName })
+          await fetchGroupList() // 刷新列表
+        } catch (error) {
+          console.error('修改群组失败:', error)
+          uni.showToast({ title: '修改失败', icon: 'none' })
+        }
+      }
+    },
+    fail: () => {
+      console.log("编辑群组操作被取消或失败");
+    }
+  })
+}
+
+
+const fetchGroupList = async () => {
+  try {
+    const res = await api.group.list()
+    groupList.value = Array.isArray(res) ? res : [] // 确保是数组
+    setStoredData(STORAGE_KEYS.GROUP_LIST, groupList.value)
+    // 如果有群组，默认选中第一个
+    if (groupList.value.length > 0) {
+      selectedGroupIdx.value = 0
+    }
+  } catch (err) {
+    console.error('获取群组列表失败', err)
+    // 可以从本地存储加载缓存数据作为备选
+    // const cachedGroups = getStoredData(STORAGE_KEYS.GROUP_LIST);
+    // if (Array.isArray(cachedGroups)) {
+    //   groupList.value = cachedGroups;
+    // }
+  }
+}
+
+// const bindGroupChange = (e) => { // 如果使用 picker
+//   selectedGroupIdx.value = e.detail.value
+// }
+
+const handleGroupManageClick = () => {
+  uni.navigateTo({
+    url: '/pages/profile/group-manage'
+  })
+}
+
+const handleGroupMembersClick = (group) => {
+  setStoredData(STORAGE_KEYS.CURRENT_GROUP, group)
+  uni.navigateTo({
+    url: `/pages/profile/group-manage?id=${group.id}` // 推荐传递ID以便目标页面获取最新数据
+  })
+}
+
+const showCreateGroupForm = () => {
+  showGroupForm.value = true
+  newGroupName.value = ''
+  nextTick(() => {
+    // 自动聚焦输入框（App/小程序支持有限，但尽量尝试）
+    if (groupNameInputRef.value && typeof (groupNameInputRef.value ).focus === 'function') {
+      (groupNameInputRef.value ).focus() // uni-app 特定调用方式
+    }
+    // 滚动到可视区域（可选）
+    // uni.createSelectorQuery()... (这部分在 Vue 3 中可能需要调整，但逻辑类似)
+  })
+}
+
+const cancelCreateGroup = () => {
+  showGroupForm.value = false
+  newGroupName.value = ''
+  inputFocus.value = false
+}
+
+const submitCreateGroup = async () => {
+  showGroupForm.value = false
+  const name = newGroupName.value.trim()
+  if (!name) {
+    await uni.showToast({title: '请输入群组名称', icon: 'none'})
+    return
+  }
+
+  await uni.showLoading({title: '创建中...'})
+  const res = await api.group.add({ groupName: name })
+  // 假设返回包含 id 和 groupName
+  const newGroup = { id: res.id, groupName: name }
+  groupList.value.push(newGroup)
+  selectedGroupIdx.value = groupList.value.length - 1
+
+  await uni.showToast({title: '群组创建成功', icon: 'success'})
+  cancelCreateGroup()
+}
+
+// --- 生命周期钩子 ---
+// 页面加载时执行
+onLoad(async (option) => {
+  // 可以在这里处理页面参数 option
+  await fetchUserInfo()
+  await fetchGroupList()
+})
+
+// 页面显示时也可能需要刷新数据（例如从管理页返回）
+onShow(() => {
+  // 如果需要实时更新，可以考虑在这里调用 fetchGroupList()
+  // 但要注意性能，避免不必要的请求。通常由后端推送或手动刷新更好。
+})
+
+// 如果需要在组件挂载后立即执行某些 DOM 相关操作（虽然这里不太需要）
+// onMounted(() => {
+//   console.log('Profile page mounted');
+// })
+
+// 将需要在模板中调用的方法暴露出去（在 <script setup> 中通常是隐式暴露的，
+// 但如果需要在父组件调用或更复杂的场景下，可以明确导出）
+// defineExpose({ fetchUserInfo, fetchGroupList }) // 示例
+
 </script>
 
 <style scoped>
+/* ... (你的样式部分保持不变) ... */
+
 .profile-container {
   background-color: #f8f9fa;
   min-height: 100vh;
@@ -442,5 +477,58 @@ export default {
 .submit-btn.disabled {
   color: #ccc;
   opacity: 1;
+}
+
+.contact-service-section {
+  display: flex;
+  justify-content: center;
+  margin-top: 40rpx; /* 与上方内容保持一定距离 */
+  padding: 0 20rpx; /* 与页面左右边距一致 */
+  box-sizing: border-box;
+}
+.create-btn{
+  background-color: #007aff;
+  color: white;
+  height: 40px;
+  width: 100%; /* 或者设置一个固定最大宽度，如 max-width: 600rpx; */
+  padding: 24rpx 0;
+  border: 2rpx solid #007aff; /* 蓝色边框 */
+  border-radius: 12rpx; /* 圆角 */
+  font-size: 32rpx;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx; /* 图标和文字之间的间距 */
+  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1); /* 可选：轻微阴影 */
+  transition: all 0.2s ease; /* 可选：过渡动画 */
+}
+
+.contact-service-btn {
+  height: 40px;
+  width: 100%; /* 或者设置一个固定最大宽度，如 max-width: 600rpx; */
+  padding: 24rpx 0;
+  background-color: #ffffff; /* 白色背景 */
+  border: 2rpx solid #007aff; /* 蓝色边框 */
+  border-radius: 12rpx; /* 圆角 */
+  color: #007aff; /* 蓝色文字 */
+  font-size: 32rpx;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx; /* 图标和文字之间的间距 */
+  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1); /* 可选：轻微阴影 */
+  transition: all 0.2s ease; /* 可选：过渡动画 */
+}
+
+.contact-service-btn:hover,
+.contact-service-btn:active { /* 可选：鼠标悬停或按下时的效果 */
+  background-color: #f0f8ff; /* 浅蓝色背景 */
+  transform: scale(0.98); /* 轻微缩小 */
+}
+
+.contact-icon {
+  font-size: 36rpx; /* 稍大一点的图标 */
 }
 </style>

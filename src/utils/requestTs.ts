@@ -87,8 +87,15 @@ const requestConfig : RequestConfig = {
 					}
 				}
 			}
-
-			uni.showToast({title: response.message, icon: "none"}).then(r => {});
+			// 使用 .catch 捕获潜在错误
+			uni.showToast({
+				title: `${response.code}:${response.message}`, // 加前缀方便识别
+				icon: 'none',
+				duration: 3000
+			}).then(() => {
+			}).catch((err) => {
+				console.error('uni.showToast 调用失败:', err); // *** 非常重要的日志 ***
+			});
 
 			// 2. 统一抛出错误信息
 			const error = new Error(response.message || '请求失败') as Error & { response ?: ApiResponse<T> }
@@ -127,11 +134,11 @@ export default function request<T = any>(options : RequestOptions) : Promise<T> 
 			header: processedOptions.header || {
 				'content-type': 'application/json'
 			},
-			success: (res) => {
+			success: async (res) => {
 				if (res.statusCode === 200 || res.statusCode === 201 ) {
 					try {
 						// 执行响应拦截器
-						const processedResponse : ApiResponse<T> = requestConfig.responseInterceptor<T>(res.data)
+						const processedResponse : ApiResponse<T> =  await requestConfig.responseInterceptor<T>(res.data)
 						resolve(processedResponse.data)
 					} catch (error) {
 						reject(error)

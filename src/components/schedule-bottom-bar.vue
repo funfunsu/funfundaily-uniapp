@@ -86,6 +86,7 @@ const props = defineProps({
   topSideConfig:{type: Object, default: null },
   showGroupMember: { type: Boolean, default: true },
   isTabBarPage: { type: Boolean, default: true },
+  allSelectAllMember: { type: Boolean, default: false }
 })
 
 //topSideConfig = {left:{text:'',code:''},center:{text:'',code:''},right:{text:'',code:''}}
@@ -103,7 +104,13 @@ const _currentGroup = ref(null)
 
 // ===== 计算属性 =====
 const displayUserList = computed(() => {
-  return props.userList.length > 0 ? props.userList : _userList.value
+  if (props.userList.length > 0 ){
+    return props.userList;
+  }
+  if (props.allSelectAllMember){
+    return [{ userId: 'ALL', userInfo: { nickname: '全部' } }, ..._userList.value]
+  }
+  return _userList.value
 })
 
 const displayGroupList = computed(() => {
@@ -298,9 +305,9 @@ onMounted(() => {
           _userList.value = members;
 
           const storedCurrentMember = getStoredData(STORAGE_KEYS.CURRENT_MEMBER);
-          if(storedCurrentMember && members.some(m => m.id === storedCurrentMember.id)) {
+          if(storedCurrentMember && members.some(m => m.userId === storedCurrentMember.userId)) {
             _currentMember.value = storedCurrentMember;
-            _currentMemberIndex.value = members.findIndex(m => m.id === storedCurrentMember.id);
+            _currentMemberIndex.value = members.findIndex(m => m.userId === storedCurrentMember.userId);
           } else if(members.length > 0) {
             _currentMember.value = members[0];
             _currentMemberIndex.value = 0;

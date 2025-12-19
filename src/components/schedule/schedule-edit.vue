@@ -142,7 +142,7 @@
           <text class="label">日程类型</text>
           <picker class="picker" mode="selector" :range="itemLabelOptions"
                   :value="getItemLabelIndex(schedule.itemLabel)" @change="handleItemLabelChange">
-            <view class="picker-display">{{ getItemLabelText(schedule.itemType) }}</view>
+            <view class="picker-display">{{ getItemLabelText(schedule.itemLabel) }}</view>
           </picker>
         </view>
       </view>
@@ -154,7 +154,7 @@
         <view class="form-row">
           <view class="form-item form-item-inline">
             <text class="label">积分数量</text>
-            <input class="input" v-model="schedule.extra.score" placeholder="积分"/>
+            <input class="input" type="number" v-model.number="schedule.extra.score" placeholder="积分"/>
           </view>
 <!--          <view class="form-item form-item-inline">-->
 <!--            <text class="label">奖励机制</text>-->
@@ -313,7 +313,7 @@ const handleRepeatTypeChange = (e) => {
 
 const handleItemLabelChange = (e) => {
   const index = e.detail.value;
-  props.schedule.label = itemLabelValues.value[index]; // 使用 .value
+  props.schedule.itemLabel = itemLabelValues.value[index]; // 使用 .value
 };
 
 const toggleWeekDay = (dayIndex) => {
@@ -332,7 +332,12 @@ const toggleWeekDay = (dayIndex) => {
 
 // --- Lifecycle Hooks ---
 onMounted(() => {
-  // console.log('Component mounted');
+  console.log('Component mounted');
+  if (props.scheduleType === 'task'){
+    if(!props.schedule.extra.score){
+      props.schedule.extra.score = 1
+    }
+  }
 });
 </script>
 

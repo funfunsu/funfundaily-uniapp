@@ -2,7 +2,6 @@
   <view
       class="task-item"
       :class="{ 'task-item--completed': task.isCompleted }"
-      @click="!task.isCompleted && itemClick()"
   >
     <view class="task-header">
       <view class="task-title-section">
@@ -32,14 +31,16 @@
       <text class="task-desc">{{ task.itemDesc || '暂无任务描述' }}</text>
       <!-- 完成后时间，与描述同行并靠右 -->
       <text v-if="task.isCompleted" class="completed-time">
-        {{ formatTime(task.completedTime) }}
+        {{ DateUtils.formatDateTimeToShow(new Date(task.completedTime)) }}
       </text>
+      <text class="delay" v-else-if="task.repeatType !== 'daily'" @click.stop="delayClick">推迟</text>
     </view>
   </view>
 </template>
 
 <script setup>
 import { defineProps, defineEmits } from 'vue'
+import DateUtils from "../../utils/util";
 
 // Props：接收单个任务对象
 const props = defineProps({
@@ -53,12 +54,18 @@ const props = defineProps({
 const emit = defineEmits([
   'item-click',
   'edit-task',
-  'check-task'
+  'check-task',
+  'delay-click'
 ])
 
 // 方法：点击任务项主体（未完成状态下）
 const itemClick = () => {
   emit('item-click', props.task)
+}
+
+const delayClick = () =>{
+  console.log('delay!')
+  emit('delay-click', props.task)
 }
 
 // 方法：点击编辑图标
@@ -76,14 +83,8 @@ const handleTaskCheck = (event) => {
 
 // 辅助函数：格式化时间
 const formatTime = (timestamp) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}`
+  debugger
+  DateUtils.formatDate(new Date(timestamp))
 }
 </script>
 
@@ -152,6 +153,15 @@ const formatTime = (timestamp) => {
   flex-shrink: 0; /* 时间不收缩 */
   font-size: 12px;
   color: #4caf50; /* 成功绿色 */
+  font-weight: 500;
+  white-space: nowrap; /* 防止时间戳换行 */
+  margin-left: auto; /* 确保靠右 (虽然 justify-content: space-between 已经做到了) */
+}
+/* --- 完成时间 --- */
+.delay {
+  flex-shrink: 0; /* 时间不收缩 */
+  font-size: 12px;
+  color: #e57427; /* 成功绿色 */
   font-weight: 500;
   white-space: nowrap; /* 防止时间戳换行 */
   margin-left: auto; /* 确保靠右 (虽然 justify-content: space-between 已经做到了) */

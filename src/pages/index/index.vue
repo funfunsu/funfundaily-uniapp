@@ -1,19 +1,16 @@
 <template>
   <view class="container">
-    <!-- 卡片式内容区域 -->
-    <view class="card">
-      <!-- 登录加载区域 -->
-      <view v-if="isInLoginLoading" class="login-loading">
-        <text class="loading-text">登录中</text>
-        <view class="loading-dots">
-          <text class="dot dot-1">.</text>
-          <text class="dot dot-2">.</text>
-          <text class="dot dot-3">.</text>
-        </view>
+    <view v-if="isInLoginLoading" class="login-loading">
+      <view class="loading-dots">
+        <text class="dot dot-1">.</text>
+        <text class="dot dot-2">.</text>
+        <text class="dot dot-3">.</text>
       </view>
-
+    </view>
+    <!-- 卡片式内容区域 -->
+    <view v-else-if="showProfileUpdate" class="card">
       <!-- 昵称设置区域 -->
-      <view v-else-if="showProfileUpdate">
+      <view>
         <view class="welcome-text">欢迎回来！</view>
 
         <!-- 昵称设置表单 -->
@@ -183,7 +180,6 @@ const setCustomNickname = (e: any) => {
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  font-weight: 600;
   color: #1d2129;
 }
 
@@ -194,7 +190,9 @@ const setCustomNickname = (e: any) => {
 .loading-dots {
   display: flex;
   align-items: center;
+  color: #007aff;
   height: 24px; /* 给容器一个固定高度，使点居中 */
+  font-weight: bold;
 }
 
 .dot {

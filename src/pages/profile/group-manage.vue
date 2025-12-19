@@ -49,6 +49,7 @@
       </view>
     </view>
   </view>
+<!--  <share-card v-if="showShareModel" :fields="shareField"></share-card>-->
 </template>
 
 <script setup>
@@ -58,6 +59,8 @@ import {onLoad, onShareAppMessage} from '@dcloudio/uni-app'; // 导入 onShareAp
 import api from '../../utils/apiTs';
 import {getStoredData, setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 import scheduleBottomBar from "../../components/schedule-bottom-bar.vue";
+import ShareCard from "../../components/share-card.vue";
+import {getConstantType} from "@vue/compiler-core";
 
 // --- 响应式状态 ---
 const groupName = ref('加载中...');
@@ -74,7 +77,11 @@ const loginUser = ref({});
 const myRole = ref('');
 
 const buttons =ref([]);
-
+const showShareModel =ref(false);
+const shareField = ref([
+  { key: 'title', label: '锄禾日当午' },
+  { key: 'category', label: 'Category', type: 'select', options: [{ label: 'Option 1', value: 'opt1' }, { label: 'Option 2', value: 'opt2' }] }
+])
 
 
 // --- 生命周期 ---
@@ -243,14 +250,9 @@ const addMember = async () => {
     success: async (res1) => {
       if (res1.confirm && res1.content.trim()) {
         const nickname = res1.content.trim();
-        try {
-          await api.group.user.add({ groupId: currentGroup.value.id, nickname: nickname });
-          await loadMembers(currentGroup.value.id); // 重新加载列表
-          uni.showToast({ title: '添加成功', icon: 'success' });
-        } catch (err) {
-          console.error('添加成员失败:', err);
-          uni.showToast({ title: '添加失败', icon: 'none' });
-        }
+        await api.group.user.add({ groupId: currentGroup.value.id, nickname: nickname });
+        await loadMembers(currentGroup.value.id); // 重新加载列表
+        await uni.showToast({title: '添加成功', icon: 'success'});
       }
     },
     fail: () => {}

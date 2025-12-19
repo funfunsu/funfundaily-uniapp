@@ -62,7 +62,7 @@
                   <view
                       v-for="(event, index) in getAllEventsForDate(date)"
                       :key="getEventKey(event, date)"
-                      :class="['event-container', `event-${event.color}`]"
+                      :class="['event-container', getEventColorClass(event)]"
                       :style="getEventStyle(event)"
                       @click.stop="toggleEventSelection(event, date)"
                   >
@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue';
+import {ref, watch, onMounted, reactive} from 'vue';
 import DateUtils from '../../utils/util';
 
 // Props 定义
@@ -97,6 +97,7 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  currentUser:{type:String,default:() => ''},
   weekDays: {
     type: Array,
     default: () => ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -117,6 +118,8 @@ const props = defineProps({
 // State
 const selectedEvents = ref(new Set());
 const dates = ref([]);
+const personColorMap = reactive({})
+const availableColors = ['blue', '1', '2', '3', '4', '5', '6']; // 定义可用的颜色类名
 
 const emit = defineEmits([ 'event-click'])
 
@@ -125,6 +128,20 @@ const emit = defineEmits([ 'event-click'])
 const updateDatesFromEventList = (list) => {
   dates.value = [...new Set(list.map(item => item.date))].sort();
   console.log("🗓️ Updated dates:", dates.value);
+};
+
+const getEventColorClass = (event) => {
+  if (props.currentUser !== 'ALL'){
+    return `event-blue`;
+  }
+  // 假设 event 对象中有 personId 字段，如果没有，请替换为实际字段
+  const userId = event.userId || 'default_person'; // 提供默认值以防缺失
+  if (!personColorMap[userId]) {
+    // 如果该 personId 还没有分配颜色，则分配一个
+    const colorIndex = Object.keys(personColorMap).length % availableColors.length;
+    personColorMap[userId] = `event-${availableColors[colorIndex]}`;
+  }
+  return personColorMap[userId];
 };
 
 const getAllEventsForDate = (date) => {
@@ -138,7 +155,6 @@ const getAllEventsForDate = (date) => {
   schedules.forEach(schedule => {
     const startTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.startTime);
     const endTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.endTime);
-    let color = 'blue';
 
     const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
     const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
@@ -152,7 +168,7 @@ const getAllEventsForDate = (date) => {
       startMinute: parseInt(startTime.split(':')[1]),
       durationHours: durationHours,
       durationMinutes: durationMinutes,
-      color: color
+      userId:schedule.userId
     });
   });
   return eventsForDate;
@@ -306,6 +322,8 @@ defineExpose({
   font-weight: bold;
   flex-shrink: 0;
   z-index: 100;
+  position: fixed;
+  width: 100%;
 }
 
 /* 中间内容区域 */
@@ -326,6 +344,7 @@ defineExpose({
   /* 确保它也有明确的高度上下文 */
   display: flex;
   flex-direction: column;
+  padding-top: 40px;
 }
 /* 关键修改：让 flex-row 填充 content-wrapper */
 .content-wrapper > .flex-row { /* 使用子选择器更精确 */
@@ -456,14 +475,6 @@ defineExpose({
   position: relative;
 }
 
-.event-blue {
-  background: #2196f3;
-}
-
-.event-orange {
-  background: #ff9800;
-}
-
 .event-title {
   margin-bottom: 2px;
   text-align: center;
@@ -491,6 +502,36 @@ defineExpose({
 
 .event-checkbox.checked {
   background: white;
+}
+
+
+/* 为每种颜色定义具体的背景色 */
+.event-blue {
+  background: #2196F3;
+}
+.event-1 {
+  background: #1565C0;
+}
+
+.event-2 {
+  background: #00B8D4;
+}
+
+.event-3 {
+
+  background: #3D5AFE;
+}
+
+.event-4 {
+  background: cornflowerblue;
+}
+
+.event-5 {
+  background: #1565C0;
+}
+
+.event-6 {
+  background: #0D47A1;
 }
 
 .time-line-top {

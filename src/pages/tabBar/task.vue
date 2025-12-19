@@ -33,6 +33,7 @@
               @item-click="onTaskItemClick"
               @edit-task="onEditTask"
               @check-task="onTaskCheck"
+              @delay-click="onTaskDelay"
               :task="task"
           />
         </view>
@@ -54,7 +55,8 @@ import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import TaskCard from '../../components/task/task-card.vue'
 import DateUtils from "../../utils/util";
-import {onLoad, onPullDownRefresh} from "@dcloudio/uni-app";
+import {onLoad, onPullDownRefresh, onShow} from "@dcloudio/uni-app";
+import {getStoredData, removeStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 
 // =============== 类型定义 ===============
 interface Task {
@@ -78,8 +80,8 @@ const taskList = ref<Task[]>([])
 const currentDate = ref(new Date())
 const listShow = ref(true)
 const isLoadingMore = ref(false)
-const buttons = ref<object[]>([{code: 'addEvent', text: '添加任务'}, {code: 'toShare', text: '分享'}])
-const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},center:{text:`${DateUtils.getDateStr(currentDate.value)}↻`,code:'date-refresh'},right:{text:'后一天→',code:'nextDay'}})
+const buttons = ref<object[]>([{code: 'addEvent', text: '添加任务'}])
+const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},center:{text:`${DateUtils.getDateStr(currentDate.value)}`,code:'date-refresh'},right:{text:'后一天→',code:'nextDay'}})
 
 const currentMember =ref<object>()
 const currentGroup =ref<object>()
@@ -142,6 +144,7 @@ async function handleButtonClick(buttonCode) {
   }else if(buttonCode === 'nextDay'){
     await updateDate(1)
   }else if(buttonCode === 'date-refresh'){
+    currentDate.value = new Date();
     await fetchAllData()
   }
 }
@@ -163,6 +166,25 @@ const onEditTask = (task) => {
   });
 }
 
+const onTaskDelay = async (task) => {
+  const startDate = DateUtils.getDateFromDateTimeStr(task.startTime);
+  task.startTime = DateUtils.replaceDatePart(task.startTime,DateUtils.getDateStr(DateUtils.getDayOff(new Date(startDate),1)))
+  const endDate = DateUtils.getDateFromDateTimeStr(task.endTime);
+  task.endTime = DateUtils.replaceDatePart(task.endTime,DateUtils.getDateStr(DateUtils.getDayOff(new Date(endDate),1)))
+
+  try {
+    const req = { // 移除了类型注解
+      targetUserId: currentMember.value.userId, // 访问 ref 的值
+      groupId: currentGroup.value.id,          // 访问 ref 的值
+      items: [task]           // 访问 ref 的值
+    };
+    await apiTs.schedule.save(req);
+    await fetchTaskList()
+  }catch (e){
+
+  }
+}
+
 const onTaskCheck = ({ task, completed }) => {
   console.log('任务完成状态变更:', task.id, completed)
   const updatedTask: Task = {
@@ -179,8 +201,9 @@ const onTaskCheck = ({ task, completed }) => {
 
   const  data = {
     taskId:task.id,
-    userId: currentMember.value.userId,
-    groupId: currentGroup.value.id
+    targetUserId: currentMember.value.userId,
+    groupId: currentGroup.value.id,
+    taskTime: DateUtils.formatDateTime(currentDate.value)
   }
 
   apiTs.checkin.task.complete(data)
@@ -217,7 +240,7 @@ async function fetchTaskList() {
       return {
         ...task,
         isCompleted: !!record,
-        completedTime: record ? record.createTime : null
+        completedTime: record ? record.completeTime : null
       }
     })
   } catch (error) {
@@ -293,6 +316,22 @@ onPullDownRefresh(async () => {
 onMounted(() => {
   fetchAllData()
 })
+
+
+/**
+ * 页面每次显示时调用
+ */
+onShow(() => {
+  const currentTab = '/pages/tabBar/task'
+  const refreshUri = getStoredData(STORAGE_KEYS.REFRESH_TAB)
+  if (!refreshUri){
+    return
+  }
+  if (refreshUri === currentTab){
+    fetchTaskList()
+    removeStoredData(STORAGE_KEYS.REFRESH_TAB)
+  }
+});
 </script>
 <style scoped>
 /* --- 全局容器 --- */
@@ -313,6 +352,7 @@ onMounted(() => {
   box-sizing: border-box; /* 确保 padding 不增加总高度 */
   margin-top: 84px;
   padding-top: 10px;
+  padding-bottom: 84px;
 }
 
 /* --- 任务统计卡片 --- */

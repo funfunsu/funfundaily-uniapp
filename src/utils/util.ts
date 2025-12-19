@@ -139,6 +139,9 @@ export default class DateUtils {
 	static formatDateTime(date : Date) : string {
 		return this.formatDate(date)+splitStr+this.getTimeStr(date);
 	}
+	static formatDateTimeToShow(date : Date) : string {
+		return this.formatDate(date)+' '+this.getTimeStr(date);
+	}
 
 	/**
 	 * 通用日期格式化：Date 转 yyyy-MM-dd 字符串

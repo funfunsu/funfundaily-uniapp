@@ -8,7 +8,8 @@ export const STORAGE_KEYS = {
     MEMBER_LIST: 'cached_group_member_list',
     CURRENT_GROUP: 'cached_current_group',
     CURRENT_MEMBER: 'cached_current_member',
-    USER_INFO:'cached_user_info'
+    USER_INFO:'cached_user_info',
+    REFRESH_TAB:'cached_refresh_tab',
     // 可以在这里添加更多键名...
 } as const; // 使用 'as const' 使键值成为字面量类型，增强类型安全性
 
