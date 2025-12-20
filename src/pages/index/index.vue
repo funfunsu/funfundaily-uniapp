@@ -7,9 +7,9 @@
         <text class="dot dot-3">.</text>
       </view>
     </view>
+
     <!-- 卡片式内容区域 -->
     <view v-else-if="showProfileUpdate" class="card">
-      <!-- 昵称设置区域 -->
       <view>
         <view class="welcome-text">欢迎回来！</view>
 
@@ -23,7 +23,8 @@
               :value="userInfo.nickname || ''"
               @blur="setCustomNickname"
           />
-          <button class="submit-button" @click="updateNickname">提交</button>
+          <button class="submit-button primary" @click="updateNickname">提交</button>
+          <button class="submit-button secondary" @click="skipNicknameSetup">我先逛逛</button>
         </view>
       </view>
     </view>
@@ -33,86 +34,67 @@
 <script setup lang="ts">
 // --- 导入部分 ---
 import { ref, onMounted } from 'vue';
-// 导入 onLoad 生命周期钩子
-import { onLoad } from '@dcloudio/uni-app'; // 确保路径正确，根据你的项目配置
+import { onLoad } from '@dcloudio/uni-app';
 import { autoLogin } from '../../utils/auth';
 import apiTs from '../../utils/apiTs';
-import { STORAGE_KEYS, setStoredData } from '../../utils/storageManager';
+import {STORAGE_KEYS, setStoredData, getStoredData} from '../../utils/storageManager';
 
 // --- 响应式状态 ---
-// 控制是否显示昵称设置区域
 const showProfileUpdate = ref(false);
 const isInLoginLoading = ref(true);
-// 存储用户信息
 const userInfo = ref<{ nickname?: string }>({});
-// 存储重定向路径
 const redirectPath = ref<string | null>(null);
 
 // --- 生命周期 ---
-/**
- * 页面加载时获取查询参数
- */
 onLoad((query) => {
-  // query 是一个包含所有查询参数的对象
-  // 例如，URL 是 /pages/index/index?redirect=/pages/target/target
-  // 那么 query.redirect 就是 "/pages/target/target"
   if (query && query.redirect) {
-    // decodeURIComponent 用于解码 URL 编码的字符，如 %2F -> /
     redirectPath.value = decodeURIComponent(query.redirect);
     console.log('Redirect path captured:', redirectPath.value);
   }
 });
 
-/**
- * 页面挂载后自动登录并检查用户信息
- */
 onMounted(async () => {
   try {
-    const token = await autoLogin();
+    const token = await autoLogin(null);
     if (token) {
       isInLoginLoading.value = false;
       const fetchedUserInfo = await apiTs.user.getInfo();
+
+      const registerTime = new Date(fetchedUserInfo.createTime)
+      const now = new Date();
+      const diffInMs = now.getTime() - registerTime.getTime(); // 毫秒差
+      const diffInDays = diffInMs / (1000 * 60 * 60 * 24); // 转换为天数
+
+      const N = 7;
       userInfo.value = fetchedUserInfo;
 
-      if (!fetchedUserInfo?.nickname) {
+      if (!fetchedUserInfo?.nickname && diffInDays > N) {
         showProfileUpdate.value = true;
       } else {
-        // 如果已有昵称，存储信息
         setStoredData(STORAGE_KEYS.USER_INFO, fetchedUserInfo);
-        // --- 跳转逻辑 ---
         performRedirect();
       }
     }
   } catch (err: any) {
     console.error('Index page - Auto login or fetch user info failed:', err);
-    // 即使出错，也应停止加载状态，或显示错误信息
     isInLoginLoading.value = false;
-    // 可以在这里添加错误提示
     uni.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
   }
 });
 
 // --- 方法 ---
-/**
- * 执行重定向跳转
- */
 const performRedirect = () => {
-  let targetUrl = '/pages/tabBar/schedule'; // 默认跳转地址
+  let targetUrl = '/pages/tabBar/schedule';
   if (redirectPath.value) {
-    // 如果存在捕获到的 redirect 参数，则使用它
     targetUrl = redirectPath.value.split('?')[0];
   }
   if (targetUrl.includes('tabBar')) {
     uni.switchTab({ url: targetUrl });
   } else {
     uni.redirectTo({ url: targetUrl });
-    // uni.navigateTo({ url: targetUrl }); // 如果需要保留当前页面栈
   }
 };
 
-/**
- * 更新用户昵称
- */
 const updateNickname = async () => {
   if (!userInfo.value.nickname?.trim()) {
     uni.showToast({ title: '请输入昵称', icon: 'none' });
@@ -125,17 +107,20 @@ const updateNickname = async () => {
     };
     const updatedUser = await apiTs.user.update(data);
     setStoredData(STORAGE_KEYS.USER_INFO, updatedUser);
-    // --- 成功后跳转 ---
-    performRedirect(); // 使用封装好的跳转逻辑
+    performRedirect();
   } catch (err: any) {
     console.error('Index page - Update nickname failed:', err);
     uni.showToast({ title: '更新昵称失败，请重试', icon: 'none' });
   }
 };
 
-/**
- * 监听输入框变化，实时更新 userInfo 中的昵称
- */
+const skipNicknameSetup = () => {
+  // 不保存昵称，直接跳转
+  // 可选：记录用户已跳过（用于后续提醒）
+  uni.setStorageSync('hasSkippedNickname', true);
+  performRedirect();
+};
+
 const setCustomNickname = (e: any) => {
   userInfo.value.nickname = e.detail.value;
 };
@@ -167,10 +152,10 @@ const setCustomNickname = (e: any) => {
   overflow: hidden;
   padding: 30px 25px;
   box-sizing: border-box;
-  display: flex; /* 添加 */
-  align-items: center; /* 添加 */
-  justify-content: center; /* 添加 */
-  min-height: 200px; /* 添加，防止卡片过小 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
 }
 
 /* --- 登录加载动画样式 --- */
@@ -182,15 +167,11 @@ const setCustomNickname = (e: any) => {
   color: #1d2129;
 }
 
-.loading-text {
-  margin-right: 5px; /* 文字和点之间的间距 */
-}
-
 .loading-dots {
   display: flex;
   align-items: center;
   color: #007aff;
-  height: 24px; /* 给容器一个固定高度，使点居中 */
+  height: 24px;
   font-weight: bold;
 }
 
@@ -234,7 +215,7 @@ const setCustomNickname = (e: any) => {
 .form-section {
   display: flex;
   flex-direction: column;
-  width: 100%; /* 确保表单占满卡片宽度 */
+  width: 100%;
 }
 
 .label {
@@ -245,7 +226,6 @@ const setCustomNickname = (e: any) => {
   display: block;
 }
 
-/* --- 表单控件样式 --- */
 .nickname-input {
   padding: 12px 15px;
   font-size: 16px;
@@ -271,26 +251,45 @@ const setCustomNickname = (e: any) => {
 }
 
 .submit-button {
-  margin: 10px 0px;
+  margin: 10px 0;
   font-size: 16px;
   font-weight: 500;
-  color: #ffffff;
-  background-color: #007aff;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
-  padding: 12px; /* 添加内边距 */
+  transition: all 0.2s;
+  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.submit-button:hover {
+.primary {
+  background-color: #007aff;
+  color: #ffffff;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
+}
+
+.primary:hover {
   background-color: #3399ff;
 }
 
-.submit-button:active {
+.primary:active {
   background-color: #006ae6;
   transform: translateY(1px);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.045);
+}
+
+.secondary {
+  background-color: #f5f5f5;
+  color: #666666;
+  border: 1px solid #ddd;
+}
+
+.secondary:hover {
+  background-color: #e9e9e9;
+}
+
+.secondary:active {
+  background-color: #dcdcdc;
 }
 </style>
