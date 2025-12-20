@@ -55,27 +55,27 @@
                     :key="hourIndex"
                     class="flex-item-V schedule-item"
                 >
-                  <view class="time-slot"></view>
+                  <view class="time-slot" @click.stop = "toggleGrid(date,hour)"></view>
                 </view>
 
                 <view class="events-layer">
                   <view
-                      v-for="(event, index) in getAllEventsForDate(date)"
-                      :key="getEventKey(event, date)"
-                      :class="['event-container', getEventColorClass(event)]"
-                      :style="getEventStyle(event)"
-                      @click.stop="toggleEventSelection(event, date)"
+                      v-for="(schedule, index) in getAllEventsForDate(date)"
+                      :key="getEventKey(schedule, date)"
+                      :class="['event-container', getEventColorClass(schedule)]"
+                      :style="getEventStyle(schedule)"
+                      @click.stop="toggleEventSelection(schedule, date)"
                   >
                     <!-- 仅在 shareMode 为 true 时显示选中框 -->
                     <view
                         v-if="shareMode"
                         class="event-checkbox"
-                        :class="{ 'checked': isSelected(event, date) }"
+                        :class="{ 'checked': isSelected(schedule, date) }"
                     >
-                      <text v-if="isSelected(event, date)">✓</text>
+                      <text v-if="isSelected(schedule, date)">✓</text>
                     </view>
 
-                    <view class="event-title">{{ event.title }}</view>
+                    <view class="event-title">{{ schedule.itemTitle }}</view>
                   </view>
                 </view>
               </view>
@@ -106,7 +106,7 @@ const props = defineProps({
     type: Array,
     default: () => [
       '8:00', '9:00', '10:00', '11:00', '12:00', '13:00',
-      '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
+      '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
     ]
   },
   shareMode: {
@@ -121,7 +121,7 @@ const dates = ref([]);
 const personColorMap = reactive({})
 const availableColors = ['blue', '1', '2', '3', '4', '5', '6']; // 定义可用的颜色类名
 
-const emit = defineEmits([ 'event-click'])
+const emit = defineEmits([ 'event-click','grid-click'])
 
 
 // Methods
@@ -130,15 +130,15 @@ const updateDatesFromEventList = (list) => {
   console.log("🗓️ Updated dates:", dates.value);
 };
 
-const getEventColorClass = (event) => {
-  if (props.currentUser !== 'ALL'){
+const getEventColorClass = (schedule) => {
+  if (props.currentUser){
     return `event-blue`;
   }
   // 假设 event 对象中有 personId 字段，如果没有，请替换为实际字段
-  const userId = event.userId || 'default_person'; // 提供默认值以防缺失
+  const userId = schedule.userId; // 提供默认值以防缺失
   if (!personColorMap[userId]) {
-    // 如果该 personId 还没有分配颜色，则分配一个
-    const colorIndex = Object.keys(personColorMap).length % availableColors.length;
+    // 如果该 userId 还没有分配颜色，则分配一个
+    const colorIndex = Object.keys(personColorMap).length;
     personColorMap[userId] = `event-${availableColors[colorIndex]}`;
   }
   return personColorMap[userId];
@@ -148,36 +148,26 @@ const getAllEventsForDate = (date) => {
   let schedules = [];
   props.eventList.forEach(event => {
     if (event.date === date) {
-      schedules = event.schedules;
+      schedules =   event.schedules;
     }
   });
-  let eventsForDate = [];
-  schedules.forEach(schedule => {
-    const startTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.startTime);
-    const endTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.endTime);
-
-    const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
-    const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
-    const durationMinutes = endMinutes - startMinutes;
-    const durationHours = durationMinutes / 60;
-
-    eventsForDate.push({
-      id: schedule.id,
-      title: schedule.itemTitle,
-      startHour: parseInt(startTime.split(':')[0]),
-      startMinute: parseInt(startTime.split(':')[1]),
-      durationHours: durationHours,
-      durationMinutes: durationMinutes,
-      userId:schedule.userId
-    });
-  });
-  return eventsForDate;
+  return schedules;
 };
 
-const getEventStyle = (event) => {
+const getEventStyle = (schedule) => {
+  const startTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.startTime);
+  const endTime = DateUtils.getHourAndMinFromDateTimeStr(schedule.endTime);
+  const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+  const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+  const durationMinutes = endMinutes - startMinutes;
+  const durationHours = durationMinutes / 60;
+
+  const startHour =  parseInt(startTime.split(':')[0]);
+  const startMinute = parseInt(startTime.split(':')[1]);
+
   const hourHeight = 60;
-  const topOffset = (event.startHour - 8) * hourHeight + (event.startMinute / 60) * hourHeight;
-  const eventHeight = event.durationHours * hourHeight;
+  const topOffset = (startHour - 8) * hourHeight + (startMinute / 60) * hourHeight;
+  const eventHeight = durationHours * hourHeight;
 
   return {
     position: 'absolute',
@@ -188,8 +178,13 @@ const getEventStyle = (event) => {
 };
 
 const getEventKey = (event, date) => {
-  return event.id != null ? String(event.id) : `${date}-${event.startHour}-${event.title}`;
+  return event.id != null ? String(event.id) : `${date}-${event.startTime}-${event.endTime}`;
 };
+
+const toggleGrid = (date,hour) =>{
+  console.log(date,hour)
+  emit('grid-click',date,hour)
+}
 
 const toggleEventSelection = (event, date) => {
   if (!props.shareMode) {
@@ -202,7 +197,6 @@ const toggleEventSelection = (event, date) => {
   } else {
     selectedEvents.value.add(key);
   }
-  // emit('selection-change', Array.from(selectedEvents.value));
 };
 
 const isSelected = (event, date) => {
@@ -345,6 +339,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   padding-top: 40px;
+  padding-bottom:60px;
 }
 /* 关键修改：让 flex-row 填充 content-wrapper */
 .content-wrapper > .flex-row { /* 使用子选择器更精确 */

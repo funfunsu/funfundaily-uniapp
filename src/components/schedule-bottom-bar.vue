@@ -37,14 +37,18 @@
         </view>
 
         <!-- 成员选择器 -->
-        <view class="member-switcher">
+        <view class="member-switcher" v-if="!showAllOfMine">
           <picker
               @change="handleMemberChange"
               :value="displayMemberIndex"
               :range="displayUserList.map(u => u.userInfo.nickname || '未知用户')"
           >
             <view class="member-selector">
-              <text class="member-name">
+              <text class="member-name" v-if="_loginUser?.id === displayMember?.userId">
+                {{ '我' }}
+                <text class="arrow-icon">›</text>
+              </text>
+              <text class="member-name" v-else>
                 {{ displayMember?.userInfo.nickname || '' }}
                 <text class="arrow-icon">›</text>
               </text>
@@ -89,6 +93,10 @@ const props = defineProps({
   allSelectAllMember: { type: Boolean, default: false }
 })
 
+const loadAllOfMine = 'ALL_OF_MINE'
+
+const showAllOfMine = ref(false);
+
 //topSideConfig = {left:{text:'',code:''},center:{text:'',code:''},right:{text:'',code:''}}
 
 // ===== Emits 定义 =====
@@ -101,6 +109,7 @@ const _currentMemberIndex = ref(0)
 const _currentGroupIndex = ref(0)
 const _currentMember = ref(null)
 const _currentGroup = ref(null)
+const _loginUser = ref(null)
 
 // ===== 计算属性 =====
 const displayUserList = computed(() => {
@@ -114,6 +123,9 @@ const displayUserList = computed(() => {
 })
 
 const displayGroupList = computed(() => {
+  if (_groupList.value.length >1 && props.allSelectAllMember){
+    return [ ..._groupList.value,{ id: loadAllOfMine, groupName: '我所有的日程' }]
+  }
   return _groupList.value
 })
 
@@ -143,6 +155,13 @@ const displayGroup = computed(() => {
 })
 
 const fetchMembers = async () => {
+  if (_currentGroup.value.id === loadAllOfMine){
+    emit('member-change', {
+      currentMember: _currentMember.value,
+      currentGroup: _currentGroup.value
+    })
+    return
+  }
   const res = await api.group.user.list({ groupId: _currentGroup.value.id })
   const members = res || []
 
@@ -208,12 +227,17 @@ const fetchGroupAndMembers = async () => {
 
 
 const handleGroupChange = async (e) => {
+
   const index = parseInt(e.detail.value, 10)
   const group = displayGroupList.value[index] || null
+  if (group.id === loadAllOfMine){
+    showAllOfMine.value = true;
+  }else{
+    showAllOfMine.value = false;
+  }
 
   _currentGroupIndex.value = index
   _currentGroup.value = group
-
 
   // 更新本地存储
   if(group) {
@@ -221,7 +245,6 @@ const handleGroupChange = async (e) => {
   } else {
     removeStoredData(STORAGE_KEYS.CURRENT_GROUP);
   }
-
   await fetchMembers();
 }
 
@@ -287,6 +310,7 @@ const handleButtonClick = (buttonCode) => emit('button-click', buttonCode)
  * 组件挂载时初始化数据
  */
 onMounted(() => {
+  _loginUser.value = getStoredData(STORAGE_KEYS.USER_INFO)
   if (props.autoLoadMembers && props.userList.length === 0) {
 
     // 1. 首先尝试从本地存储加载基础数据
@@ -318,13 +342,11 @@ onMounted(() => {
             _currentMemberIndex.value = -1;
             removeStoredData(STORAGE_KEYS.CURRENT_MEMBER);
           }
-
           // 触发一次初始的 member-change 事件，通知父组件当前状态
           emit('member-change', {
             currentMember: _currentMember.value,
             currentGroup: _currentGroup.value
           });
-          emit('members-loaded');
         }).catch(err => {
           console.error("[Component] 加载缓存群组的成员失败:", err);
           fetchGroupAndMembers();

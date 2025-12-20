@@ -217,9 +217,9 @@ async function fetchTaskList() {
       return;
     }
     const req = {
-      fromDate: DateUtils.getDateStr(currentDate.value),
-      toDate: DateUtils.getDateStr(DateUtils.getDayOff(currentDate.value,1)),
-      userId: currentMember.value.userId,
+      fromDate: DateUtils.getDayStartTimeStr(currentDate.value),
+      toDate: DateUtils.getDayEndTimeStr(currentDate.value),
+      targetUserId: currentMember.value.userId,
       groupId: currentGroup.value.id
     }
     const [taskListResp, recordResp] = await Promise.all([
@@ -227,7 +227,9 @@ async function fetchTaskList() {
       apiTs.checkin.list(req)
     ])
 
-    const tasks = taskListResp || []
+    const taskDateList = taskListResp || []
+
+    const tasks = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value)).schedules;
     const records = recordResp || []
 
     const recordMap = new Map()

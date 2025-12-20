@@ -41,7 +41,7 @@ const apiTs = {
     // 日程相关接口
     schedule: {
         // 获取日程列表
-        list: (data: ScheduleListRequest): Promise<ScheduleList[]> => api.get<ScheduleList[]>('/api/schedule/list', data),
+        list: (data: ScheduleListRequest): Promise<ScheduleList[]> => api.post<ScheduleList[]>('/api/schedule/list', data),
         // 获取日程详情
         info: (data: ScheduleInfoRequest): Promise<Schedule> => api.get<Schedule>('/api/schedule/' + data.id, data),
         // 添加日程
@@ -153,10 +153,10 @@ const apiTs = {
                 '/api/checkin/task/complete',
                 data
             ),
-            list: (data: any): Promise<any> => api.get<any>('/api/checkin/task/list', data)
+            list: (data: any): Promise<any> => api.post<any>('/api/checkin/task/list', data)
         },
         // 添加打卡
-        list: (data: any): Promise<any> => api.get<any>(
+        list: (data: any): Promise<any> => api.post<any>(
             '/api/checkin/list',
             data
         ),

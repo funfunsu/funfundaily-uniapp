@@ -21,7 +21,7 @@
             class="task-point"
             :class="{ 'task-point--completed': task.isCompleted }"
         >
-          +{{ task.extra.score || 0 }} 分
+          +{{ task.extra?.score || 0 }} 分
         </text>
       </view>
     </view>

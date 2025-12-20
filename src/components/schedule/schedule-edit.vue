@@ -9,7 +9,7 @@
           <text class="label">标题 *</text>
           <input class="input" v-model="schedule.itemTitle" placeholder="请输入日程标题"/>
         </view>
-        <view v-if="scheduleType === 'schedule'">
+        <view v-if="schedule.itemType === 'schedule'">
           <text class="label expand-trigger" @click="toggleDescription">
             更多信息
             <text class="expand-icon">{{ showDescription ? '收起' : '展开' }}</text>
@@ -30,7 +30,7 @@
             </view>
           </view>
         </view>
-        <view v-if="scheduleType === 'task'">
+        <view v-if="schedule.itemType === 'task'">
           <view class="form-item">
             <text class="label">描述</text>
             <view class="expand-container">
@@ -57,7 +57,7 @@
           <!-- 不重复：日期+时间 -->
           <view class="form-item  form-item-inline" v-if="schedule.repeatType === 'none'">
             <text class="label">事件日期 *</text>
-            <picker class="picker" mode="date" :value="formatDate(schedule.startTime)" start="2023-01-01"
+            <picker class="picker" mode="date" :value="formatDate(schedule.startTime)" start="2025-01-01"
                     end="2030-12-31" @change="(e) => handleEventDateChange(e)">
               <view class="picker-display">{{ formatDate(schedule.startTime) }}</view>
             </picker>
@@ -135,7 +135,7 @@
       </view>
 
       <!-- 类型设置 -->
-      <view class="form-section" v-if="scheduleType !== 'task'">
+      <view class="form-section" v-if="schedule.itemType !== 'task'">
         <text class="section-title">类型设置</text>
 
         <view class="form-item">
@@ -148,7 +148,7 @@
       </view>
 
       <!-- 积分设置 - 放在一行显示 -->
-      <view class="form-section" v-if="scheduleType == 'task'">
+      <view class="form-section" v-if="schedule.itemType === 'task'">
         <text class="section-title">积分设置</text>
 
         <view class="form-row">
@@ -172,8 +172,7 @@ import DateUtils from "../../utils/util";
 
 // --- Props 定义 ---
 const props = defineProps({
-  schedule: Object,
-  scheduleType: String
+  schedule: Object
 });
 
 // --- Refs for static-ish options (对应 Vue 2 data 中的静态选项) ---
@@ -238,20 +237,7 @@ const toggleDescription = () => {
 
 const formatDate = (dateTimeStr) => {
   if (dateTimeStr) {
-    const date = new Date(dateTimeStr);
-    return DateUtils.getDateStr(date);
-  }
-
-  if (!props.schedule.startTime) {
-    const today = new Date();
-    props.schedule.startTime = DateUtils.getDayStartTimeStr(today);
-    props.schedule.endTime = DateUtils.getDayEndTimeStr(today);
-  }
-  if (!props.schedule.itemType) {
-    props.schedule.itemType = props.scheduleType;
-  }
-  if (!props.schedule.extra) {
-    props.schedule.extra = {};
+    return DateUtils.getDateFromDateTimeStr(dateTimeStr);
   }
 };
 
@@ -332,12 +318,6 @@ const toggleWeekDay = (dayIndex) => {
 
 // --- Lifecycle Hooks ---
 onMounted(() => {
-  console.log('Component mounted');
-  if (props.scheduleType === 'task'){
-    if(!props.schedule.extra.score){
-      props.schedule.extra.score = 1
-    }
-  }
 });
 </script>
 

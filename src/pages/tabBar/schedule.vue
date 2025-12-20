@@ -4,8 +4,9 @@
       <!-- 引入schedule-content组件 -->
       <schedule-content ref="scheduleRef"
                         :event-list="events"
-                        :currentUser = "currentMember.userId"
+                        :currentUser = "currentMember?.userId"
                         :share-mode="shareMode"
+                        @grid-click="handleGridClick"
                         @eventClick="handleEventClick"
                         @selection-change="onSelectionChange"/>
     </view>
@@ -17,6 +18,7 @@
         :show-group-member="!shareMode"
         :top-side-config = "barTopSideConfig"
         @member-change="handleMemberChange"
+        @load-all-of-mine = "handleLoadAllOfMine"
         @buttonClick="handleButtonClick"/>
   </view>
 </template>
@@ -36,12 +38,6 @@ const events = ref([]);
 const shareMode = ref(false);
 const currentGroup = ref({});
 const currentMember = ref({});
-const newEventForm = ref({
-  title: '',
-  date: '',
-  time: '',
-  member: null
-});
 const selectedCount = ref(0);
 const totalEvents = ref(0);
 
@@ -94,9 +90,14 @@ onShow(() => {
 
 
 // =============== 方法 ===============
+const handleGridClick = (date,hour)=>{
+  uni.navigateTo({
+    url: `/pages/schedule/edit?date=${date}&hour=${hour}`
+  });
+}
 function handleEventClick(event) {
   uni.navigateTo({
-    url: `/pages/schedule/edit?id=${event.id}&title=${encodeURIComponent(event.itemTitle || '')}`
+    url: `/pages/schedule/edit?id=${event.id}`
   });
 }
 
@@ -146,10 +147,24 @@ function handleCurrentDateChange() {
 
 // 处理成员切换
 function handleMemberChange(e) {
-  currentMember.value = e.currentMember;
-  currentGroup.value = e.currentGroup;
+  if (e.currentGroup.id === 'ALL_OF_MINE'){
+    currentGroup.value = null;
+    currentMember.value = null;
+  }else{
+    currentGroup.value = e.currentGroup;
+    if (e.currentMember.userId === 'ALL'){
+      currentMember.value = null;
+    }else{
+      currentMember.value = e.currentMember;
+    }
+
+  }
   console.log(currentGroup.value, currentMember.value);
   fetchScheduleData();
+}
+
+const handleLoadAllOfMine = ()=>{
+
 }
 
 // 处理添加按钮点击
@@ -201,15 +216,18 @@ function toggleSelectAll() {
 // 获取日程数据
 async function fetchScheduleData() {
   try {
-    if (!currentMember.value || !currentMember.value.userId) {
-      return;
-    }
     const requestData = {
-      fromDate: DateUtils.getMondayStr(currentDate.value),
-      toDate: DateUtils.getSundayStr(currentDate.value),
-      userId: currentMember.value.userId,
-      groupId: currentGroup.value.id
+      fromDate: DateUtils.getDayStartTimeStr(DateUtils.getMonday(currentDate.value)),
+      toDate: DateUtils.getDayStartTimeStr(DateUtils.getSunday(currentDate.value)),
     };
+
+    if (currentGroup.value && currentGroup.value.id){
+      requestData.groupId = currentGroup.value.id;
+    }
+
+    if (currentMember.value && currentMember.value.userId){
+      requestData.targetUserId = currentMember.value.userId;
+    }
 
     const res = await apiTs.schedule.list(requestData);
     events.value = res || [];

@@ -98,10 +98,9 @@ onMounted(async () => {
  */
 const performRedirect = () => {
   let targetUrl = '/pages/tabBar/schedule'; // 默认跳转地址
-
   if (redirectPath.value) {
     // 如果存在捕获到的 redirect 参数，则使用它
-    targetUrl = redirectPath.value;
+    targetUrl = redirectPath.value.split('?')[0];
   }
   if (targetUrl.includes('tabBar')) {
     uni.switchTab({ url: targetUrl });

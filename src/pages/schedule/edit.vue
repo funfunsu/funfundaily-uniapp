@@ -2,7 +2,7 @@
   <view class="page-container">
     <view class="page-content-container">
       <!-- 引入schedule-content组件 -->
-      <schedule-edit :schedule="editingSchedule" :schedule-type="'schedule'" />
+      <schedule-edit :schedule="editingSchedule" />
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
@@ -18,7 +18,8 @@ import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import scheduleEdit from '../../components/schedule/schedule-edit.vue'
 import apiTs from '../../utils/apiTs'
 import { onLoad } from '@dcloudio/uni-app';
-import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager"; // 导入 onLoad 生命周期
+import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
+import DateUtils from "../../utils/util"; // 导入 onLoad 生命周期
 
 // =============== 响应式数据 (使用 ref) ===============
 const editingSchedule = ref({ itemType: 'schedule' }); // 初始化为一个带有 itemType 的对象
@@ -32,6 +33,20 @@ onLoad((query) => {
   if (query.id) {
     buttons.value =  [{ code: 'delete', text: '删除' },{ code: 'save', text: '保存' }]
     loadSchedule(query.id);
+  }else{
+    let startTime;
+    if (query.date && query.hour){
+      startTime = DateUtils.getDateTime(query.date,query.hour);
+    }else {
+      startTime = new Date()
+    }
+    const date = new Date(startTime);
+    date.setMinutes(date.getMinutes() + 45);
+    editingSchedule.value.startTime = DateUtils.formatDateTime(startTime);
+    editingSchedule.value.endTime = DateUtils.formatDateTime(date);
+
+    editingSchedule.value.itemType = 'schedule';
+    editingSchedule.value.extra = {};
   }
 });
 

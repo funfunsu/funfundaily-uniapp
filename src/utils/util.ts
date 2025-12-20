@@ -9,22 +9,6 @@ function padZero(num) {
 }
 export default class DateUtils {
 	static splitStr = 'T'; // 移动到类内部
-
-	// static splitStr = 'T'
-	static getScheduleDates(date : Date = new Date()) : Array<string> {
-		const monday = this.getMonday(date);
-		const dates = [];
-		for (let i = 0; i < 7; i++) {
-			// 创建一个基于 monday 的新 Date 对象副本
-			const currentDate = new Date(monday.getTime());
-			// 在副本上增加 i 天
-			currentDate.setDate(monday.getDate() + i);
-			// 格式化并添加到数组
-			dates.push(this.formatDate(currentDate)); // 使用类里的 formatDate 更一致
-			// 或者 dates.push(currentDate.toISOString().split('T')[0]); // 如果你坚持用 toISOString
-		}
-		return dates;
-	}
 	/**
 	 * 获取指定日期所属周的周一（Date 类型）
 	 * @param date 输入日期（默认当前日期）
@@ -47,6 +31,29 @@ export default class DateUtils {
 		const mondayDate = this.getMonday(date);
 		return this.formatDate(mondayDate);
 	}
+	static getSunday(date : Date = new Date()) : string {
+		const mondayDate = this.getMonday(date);
+		// 创建一个副本以避免修改原始 mondayDate 对象
+		const sundayDate = new Date(mondayDate.getTime());
+		sundayDate.setDate(mondayDate.getDate() + 6);
+		return sundayDate;
+	}
+	/**
+	 * 获取指定日期所属周的周一（yyyy-MM-dd 字符串格式）
+	 * @param date 输入日期（默认当前日期）
+	 * @returns 格式化后的本周一字符串（如：2025-11-17）
+	 */
+	static getMondayDateTimeStr(date : Date = new Date()) : string {
+		const mondayDate = this.getMonday(date);
+		return this.formatDateTime(mondayDate);
+	}
+	static getSundayDateTimeStr(date : Date = new Date()) : string {
+		const mondayDate = this.getMonday(date);
+		// 创建一个副本以避免修改原始 mondayDate 对象
+		const sundayDate = new Date(mondayDate.getTime());
+		sundayDate.setDate(mondayDate.getDate() + 6); // 在副本上操作
+		return this.formatDateTime(sundayDate);
+	}
 
 	static getTodayStr(date : Date = new Date()) : string {
 		return this.formatDate(date);
@@ -68,6 +75,9 @@ export default class DateUtils {
 	static combineDateAndHourMin(dateStr:string,timeHourStr:string) : string {
 		return dateStr+splitStr+timeHourStr;
 	}
+	static combineDateTime(dateStr:string,timeStr:string) : string {
+		return dateStr+splitStr+timeStr;
+	}
 	static replaceTimePart(dateTimeStr:string,timeStr:string) : string {
 		return dateTimeStr.split(splitStr)[0]+splitStr+timeStr;
 	}
@@ -86,6 +96,12 @@ export default class DateUtils {
 	}
 	static getDayEndTimeStr(date : Date = new Date()) : string {
 		return this.formatDate(date)+splitStr+'23:59:59';
+	}
+
+	static getDateTime(dateStr:string,hourMinStr:string):Date{
+		const [year, month, day] = dateStr.split('-').map(Number);
+		const [hour, minute, second = 0] = hourMinStr.split(':').map(Number); // 默认秒为0
+		return new Date(year, month - 1, day, hour, minute, second);
 	}
 
 

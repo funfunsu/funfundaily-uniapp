@@ -2,7 +2,7 @@
   <view class="page-container">
     <view class="page-content-container">
       <!-- 引入schedule-content组件 -->
-      <schedule-edit :schedule="editingSchedule" :schedule-type="'task'" />
+      <schedule-edit :schedule="editingSchedule" />
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
@@ -18,6 +18,7 @@ import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
 import scheduleEdit from '../../components/schedule/schedule-edit.vue';
 import apiTs from '../../utils/apiTs';
 import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
+import DateUtils from "../../utils/util";
 
 // --- 数据定义 (使用 ref) ---
 const editingSchedule = ref({ itemType: 'task' }); // 使用 ref 包裹对象使其具有响应性
@@ -31,6 +32,12 @@ onLoad((query) => {
   if (query && query.id) {
     buttons.value =  [{ code: 'delete', text: '删除' },{ code: 'save', text: '保存' }]
     loadSchedule(query.id);
+  }else{
+    const date= new Date();
+    editingSchedule.value.startTime = DateUtils.getDayStartTimeStr(date);
+    editingSchedule.value.endTime = DateUtils.getDayEndTimeStr(date);
+    editingSchedule.value.itemType = 'task';
+    editingSchedule.value.extra = {score:1};
   }
 });
 
