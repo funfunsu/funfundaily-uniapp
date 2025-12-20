@@ -75,6 +75,21 @@
       }
     }
   ],
+  "subPackages": [
+    {
+      "root": "subPackages/study-tools",
+      // ← 子包根路径
+      "pages": [
+        {
+          "path": "pages/writing/stroke-order",
+          // ← 页面路径（相对于 root）
+          "style": {
+            "navigationBarTitleText": "笔顺学习"
+          }
+        }
+      ]
+    }
+  ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "funfun日程",
