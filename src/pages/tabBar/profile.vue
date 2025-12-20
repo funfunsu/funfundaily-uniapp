@@ -2,16 +2,17 @@
 <template>
   <view class="profile-container">
     <!-- 用户信息区域 -->
-    <view class="user-info-section">
+    <view class="user-info-section" @click="editNickname">
       <view class="avatar">
         <text class="avatar-text">{{ userInfo.nickname?.charAt(0) || '?' }}</text>
       </view>
       <view class="user-details">
         <text class="user-name">{{ userInfo.nickname || '还没有设置昵称' }}</text>
+        <text class="edit-hint">修改</text>
       </view>
     </view>
 
-    <!-- 功能菜单区域 -->
+    <!-- 功能菜单区域（保持不变） -->
     <view>
       <view class="menu-section group-section" v-for="(group, index) in groupList" :key="group.id">
         <view class="menu-item" @click="handleGroupMembersClick(group)">
@@ -24,7 +25,7 @@
       </view>
     </view>
 
-    <!-- 创建群组表单弹窗 -->
+    <!-- 创建群组表单弹窗（保持不变） -->
     <view v-if="showGroupForm" class="group-form-modal" @click="cancelCreateGroup">
       <view class="group-form-container" @click.stop>
         <view class="group-form-header">
@@ -35,12 +36,12 @@
             <text class="form-label">群组名称 *</text>
             <input
                 ref="groupNameInputRef"
-            class="form-input"
-            v-model="newGroupName"
-            placeholder="请输入群组名称"
-            placeholder-class="placeholder-text"
-            @focus="inputFocus = true"
-            @blur="inputFocus = false"
+                class="form-input"
+                v-model="newGroupName"
+                placeholder="请输入群组名称"
+                placeholder-class="placeholder-text"
+                @focus="inputFocus = true"
+                @blur="inputFocus = false"
             />
           </view>
         </view>
@@ -57,15 +58,16 @@
         </view>
       </view>
     </view>
+
     <view class="contact-service-section">
       <button class="create-btn" @click="showCreateGroupForm">
-        <text class="contact-icon">+</text> <!-- 可选：添加一个聊天气泡图标 -->
+        <text class="contact-icon">+</text>
         <text>创建群组</text>
       </button>
     </view>
     <view class="contact-service-section">
       <button class="contact-service-btn" open-type="contact">
-        <text class="contact-icon">&#x1F4AC;</text> <!-- 可选：添加一个聊天气泡图标 -->
+        <text class="contact-icon">&#x1F4AC;</text>
         <text>联系客服</text>
       </button>
     </view>
@@ -92,6 +94,7 @@ const groupNameInputRef = ref(null)
 // --- 导入工具和组件 ---
 import api from '../../utils/apiTs'
 import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../utils/storageManager'
+import apiTs from "../../utils/apiTs";
 // import scheduleBottomBar from "../../components/schedule-bottom-bar.vue"; // 如果需要底部栏组件，可以在这里导入并使用
 
 // --- 方法定义 ---
@@ -104,6 +107,40 @@ const fetchUserInfo = async () => {
     console.error('获取用户信息失败', err)
     uni.showToast({ title: '获取用户信息失败', icon: 'none' })
   }
+}
+
+const editNickname = () => {
+  const currentNickname = userInfo.value.nickname || ''
+
+  uni.showModal({
+    title: '设置昵称',
+    placeholderText: currentNickname,
+    editable: true,
+    confirmText: '保存',
+    cancelText: '取消',
+    success: async (res) => {
+      if (res.confirm) {
+        const newNick = (res.content || '').trim()
+        if (!newNick) {
+          await uni.showToast({title: '昵称不能为空', icon: 'none'})
+          return
+        }
+        if (newNick === currentNickname) {
+          return // 未修改，不请求
+        }
+
+        const data = {
+          nickname: newNick,
+        };
+        const updatedUser = await apiTs.user.update(data);
+        setStoredData(STORAGE_KEYS.USER_INFO, updatedUser);
+        userInfo.value.nickname = newNick;
+      }
+    },
+    fail: () => {
+      console.log('昵称修改取消')
+    }
+  })
 }
 
 const editGroup = async (group) => {
@@ -253,16 +290,6 @@ onShow(() => {
   box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
 }
 
-.avatar {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #007aff, #00bfff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24rpx;
-}
 
 .avatar-text {
   color: white;
@@ -530,5 +557,61 @@ onShow(() => {
 
 .contact-icon {
   font-size: 36rpx; /* 稍大一点的图标 */
+}
+
+
+.user-info-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 40rpx 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+  position: relative;
+}
+
+.user-info-section::after {
+  content: '';
+  position: absolute;
+  bottom: 20rpx;
+  width: 60rpx;
+  height: 6rpx;
+  background-color: #007aff;
+  border-radius: 3rpx;
+  opacity: 0.6;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12rpx; /* 减小间距，为提示文字留空间 */
+  text-align: center;
+  max-width: 80%;
+  word-break: break-all;
+}
+
+.edit-hint {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007aff, #00bfff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+  transition: transform 0.2s;
+}
+
+.user-info-section:active .avatar {
+  transform: scale(0.95);
 }
 </style>
