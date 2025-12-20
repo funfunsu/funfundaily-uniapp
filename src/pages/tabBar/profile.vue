@@ -7,7 +7,7 @@
         <text class="avatar-text">{{ userInfo.nickname?.charAt(0) || '?' }}</text>
       </view>
       <view class="user-details">
-        <text class="user-name">{{ userInfo.nickname || '未知用户' }}</text>
+        <text class="user-name">{{ userInfo.nickname || '还没有设置昵称' }}</text>
       </view>
     </view>
 

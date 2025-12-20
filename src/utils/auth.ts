@@ -3,7 +3,8 @@
 import apiTs from './apiTs'
 import config from '../config/env'
 import { setToken, getToken } from './token'
-import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from './storageManager'; // 路径请根据实际情况调整
+import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from './storageManager';
+import DateUtils from "./util"; // 路径请根据实际情况调整
 
 
 // 原有的 autoLogin，只使用 code 登录 (可选)
@@ -42,6 +43,7 @@ export async function autoLogin(shareToken): Promise<String> {
 	// #ifndef MP-WEIXIN
 	if (config.env === 'dev') {
 		const data = { 'code': "Test3", 'shareToken': shareToken };
+		data.code = DateUtils.getDayStartTimeStr(new Date())+'111';
 		const token = await apiTs.user.login(data);
 		console.log('Dev Auto login success', token);
 		setToken(token);

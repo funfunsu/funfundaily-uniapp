@@ -41,7 +41,7 @@
           <picker
               @change="handleMemberChange"
               :value="displayMemberIndex"
-              :range="displayUserList.map(u => u.userInfo.nickname || '未知用户')"
+              :range="displayUserList.map(u => u.userInfo.nickname || '还没有设置昵称')"
           >
             <view class="member-selector">
               <text class="member-name" v-if="_loginUser?.id === displayMember?.userId">
@@ -49,7 +49,7 @@
                 <text class="arrow-icon">›</text>
               </text>
               <text class="member-name" v-else>
-                {{ displayMember?.userInfo.nickname || '' }}
+                {{ displayMember?.userInfo.nickname || '还没有设置昵称' }}
                 <text class="arrow-icon">›</text>
               </text>
             </view>
