@@ -34,6 +34,11 @@
         查看笔顺
       </button>
 
+      <!-- 重写按钮（仅在有内容时显示） -->
+<!--      <button v-if="displayChar" @click="handleResetWrite" class="reset-btn">-->
+<!--        ↺ 重新书写-->
+<!--      </button>-->
+
       <text v-if="error" class="error-tip">{{ error }}</text>
     </view>
 
@@ -48,10 +53,6 @@
           class="stroke-component"
       />
 
-      <!-- 重写按钮（仅在有内容时显示） -->
-      <button v-if="displayChar" @click="handleResetWrite" class="reset-btn">
-        ↺ 重新书写
-      </button>
     </view>
   </view>
 </template>

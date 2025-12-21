@@ -31,7 +31,7 @@ export default class DateUtils {
 		const mondayDate = this.getMonday(date);
 		return this.formatDate(mondayDate);
 	}
-	static getSunday(date : Date = new Date()) : string {
+	static getSunday(date : Date = new Date()) : Date {
 		const mondayDate = this.getMonday(date);
 		// 创建一个副本以避免修改原始 mondayDate 对象
 		const sundayDate = new Date(mondayDate.getTime());
@@ -129,7 +129,7 @@ export default class DateUtils {
 	}
 
 
-	static getDayOff(date : Date = new Date(),dayOff: int) : Date {
+	static getDayOff(date : Date = new Date(),dayOff: number) : Date {
 		// 创建一个新的 Date 对象，避免修改原始传入的 date 对象
 		const nextDay = new Date(date.getTime());
 		nextDay.setDate(nextDay.getDate() + dayOff);

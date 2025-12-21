@@ -2,20 +2,43 @@
   <view class="hanzi-stroke-container">
     <button v-if="!char" @click="handleInputConfirm" class="load-btn">加载笔顺</button>
 
-    <!-- H5保留type="2d"，小程序仅保留canvas-id -->
-    <canvas
-        v-if="strokes.length > 0"
-        :canvas-id="isMiniProgram ? 'strokeCanvas' : undefined"
-        :id="isH5 ? 'strokeCanvas' : undefined"
-        :type="isH5 ? '2d' : ''"
-        ref="canvasRef"
-        class="stroke-canvas"
-    ></canvas>
-
-    <view v-if="strokes.length > 0" class="step-info">
-      第 {{ currentStep + 1 }} / {{ strokes.length }} 步
+    <!-- 主画布：动态书写区域 -->
+    <view v-if="strokes.length > 0" class="main-canvas-wrapper">
+      <canvas
+          :canvas-id="isMiniProgram ? `strokeCanvas-main` : undefined"
+          :id="isH5 ? `strokeCanvas-main` : undefined"
+          :type="isH5 ? '2d' : ''"
+          ref="mainCanvasRef"
+          class="stroke-canvas main-canvas"
+      ></canvas>
+      <view class="step-info">
+        第 {{ currentStep + 1 }} / {{ strokes.length }} 步
+      </view>
     </view>
 
+    <!-- 平铺展示所有笔画阶段（无滚动，自动换行） -->
+    <view v-if="strokes.length > 0" class="stroke-tile-wrapper">
+      <text class="tile-title">书写步骤预览：</text>
+      <view class="tile-list">
+        <view
+            v-for="(step, index) in strokes.length"
+            :key="index"
+            class="tile-item"
+        >
+          <canvas
+              :canvas-id="isMiniProgram ? `strokeCanvas-tile-${index}` : undefined"
+              :id="isH5 ? `strokeCanvas-tile-${index}` : undefined"
+              :type="isH5 ? '2d' : ''"
+              ref="tileCanvasRefs"
+              data-step="index"
+              class="stroke-canvas tile-canvas"
+          ></canvas>
+          <text class="tile-step-text">第{{ index + 1 }}笔</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 控制按钮 -->
     <view v-if="strokes.length > 0 && !autoWrite" class="controls">
       <button @click="prev" :disabled="currentStep === 0" class="control-btn">上一步</button>
       <button @click="next" :disabled="currentStep >= strokes.length - 1" class="control-btn">下一步</button>
@@ -26,6 +49,7 @@
 <script setup>
 import { nextTick, onMounted, ref, watch, onUnmounted, getCurrentInstance } from 'vue';
 import { getCharData } from '../stroke-data/index';
+import apiTs from "../../../utils/apiTs";
 
 const instance = getCurrentInstance();
 const proxy = instance?.proxy;
@@ -51,17 +75,22 @@ const props = defineProps({
 const inputChar = ref(props.char);
 const strokes = ref([]);
 const currentStep = ref(0);
-const canvasRef = ref(null);
 const wholeCharBounds = ref({ minX: 0, maxX: 1024, minY: 0, maxY: 1024 });
+
+// Canvas相关：主画布 + 平铺画布
+const mainCanvasRef = ref(null); // 主画布Ref
+const tileCanvasRefs = ref([]); // 平铺画布Ref列表
+const mainCtx = ref(null); // 主画布上下文
+const tileCtxMap = ref({}); // 平铺画布上下文映射 { index: ctx }
 
 // 平台判断
 const isH5 = process.env.UNI_PLATFORM === 'h5';
 const isMiniProgram = !isH5 && process.env.UNI_PLATFORM !== 'app-plus';
 
-// Canvas上下文
-let ctx = null; // 小程序旧版/H5 2D
+// 常量
+const canvasSize = 300; // 主画布尺寸
+const tileCanvasSize = 80; // 平铺画布尺寸
 let autoWriteTimer = null;
-const canvasSize = 300; // 逻辑像素
 
 // 监听char变化
 watch(
@@ -89,7 +118,8 @@ watch(
 );
 
 onMounted(() => {
-  setTimeout(initCanvas, 200);
+  // 初始化主画布
+  setTimeout(() => initMainCanvas(), 200);
 });
 
 onUnmounted(() => {
@@ -97,26 +127,60 @@ onUnmounted(() => {
 });
 
 /**
- * 初始化Canvas上下文
+ * 初始化主画布上下文
  */
-function initCanvas() {
+function initMainCanvas() {
   if (isH5) {
     nextTick(() => {
-      const uniCanvasEl = canvasRef.value?.$el;
+      const uniCanvasEl = mainCanvasRef.value?.$el;
       if (!uniCanvasEl) return;
       const realCanvas = uniCanvasEl.querySelector('canvas');
       if (realCanvas) {
         const dpr = window.devicePixelRatio || 1;
         realCanvas.width = canvasSize * dpr;
         realCanvas.height = canvasSize * dpr;
-        ctx = realCanvas.getContext('2d');
-        console.log('✅ H5 Canvas 2D初始化成功');
+        mainCtx.value = realCanvas.getContext('2d');
+        console.log('✅ 主画布(H5)初始化成功');
       }
     });
   } else if (isMiniProgram) {
-    // 小程序旧版上下文
-    ctx = uni.createCanvasContext('strokeCanvas', proxy);
-    console.log('✅ 小程序旧版Canvas初始化成功');
+    mainCtx.value = uni.createCanvasContext('strokeCanvas-main', proxy);
+    console.log('✅ 主画布(小程序)初始化成功');
+  }
+}
+
+/**
+ * 初始化平铺画布上下文（批量）
+ */
+function initTileCanvases() {
+  if (isH5) {
+    nextTick(() => {
+      const tileRefs = tileCanvasRefs.value;
+      if (!tileRefs.length) return;
+
+      tileRefs.forEach((refEl, index) => {
+        const uniCanvasEl = refEl?.$el;
+        if (!uniCanvasEl) return;
+        const realCanvas = uniCanvasEl.querySelector('canvas');
+        if (realCanvas) {
+          const dpr = window.devicePixelRatio || 1;
+          realCanvas.width = tileCanvasSize * dpr;
+          realCanvas.height = tileCanvasSize * dpr;
+          tileCtxMap.value[index] = realCanvas.getContext('2d');
+        }
+      });
+      console.log('✅ 平铺画布(H5)初始化成功');
+      // 初始化后立即绘制所有平铺步骤
+      drawAllTileStrokes();
+    });
+  } else if (isMiniProgram) {
+    // 小程序初始化平铺画布上下文
+    strokes.value.forEach((_, index) => {
+      tileCtxMap.value[index] = uni.createCanvasContext(`strokeCanvas-tile-${index}`, proxy);
+    });
+    console.log('✅ 平铺画布(小程序)初始化成功');
+    // 初始化后立即绘制所有平铺步骤
+    drawAllTileStrokes();
   }
 }
 
@@ -204,23 +268,31 @@ async function loadStrokes() {
   stopAutoWrite();
 
   try {
-    const data = getCharData(targetChar);
+    let data = getCharData(targetChar);
+    if (!data){
+      const req ={key:targetChar}
+      data = await apiTs.json.get(req);
+    }
     if (data && Array.isArray(data?.strokes)) {
       strokes.value = data.strokes.map(removeTrailingZ);
       wholeCharBounds.value = getWholeCharBounds(strokes.value);
 
       setTimeout(() => {
+        // 初始化主画布并绘制当前步骤
         drawCurrentStroke();
+        // 初始化平铺画布
+        initTileCanvases();
+        // 启动自动书写
         if (props.autoWrite) {
           startAutoWrite();
         }
       }, 300);
     } else {
-      uni.showToast({ title: '该字暂不支持', icon: 'none' });
+      await uni.showToast({title: '该字暂不支持', icon: 'none'});
     }
   } catch (e) {
     console.error('加载笔顺失败:', e);
-    uni.showToast({ title: '字库无此字', icon: 'none' });
+    await uni.showToast({title: '字库无此字', icon: 'none'});
   }
 }
 
@@ -232,202 +304,140 @@ function handleInputConfirm() {
 }
 
 /**
- * 小程序旧版Canvas绘制实心笔画（核心：双线填充法）
+ * 通用绘制方法：绘制指定步骤的笔画（适配不同画布/尺寸）
+ * @param {CanvasRenderingContext2D/uni.CanvasContext} ctx 画布上下文
+ * @param {Number} targetStep 目标步骤（绘制到第N笔）
+ * @param {Number} canvasSize 画布尺寸
+ * @param {Boolean} isTile 是否为平铺画布
  */
-function drawSolidPathForMiniProgram(ctx, pathData, globalBounds) {
-  const logicalW = canvasSize;
-  const logicalH = canvasSize;
-  const pad = 16;
+function drawStrokeStep(ctx, targetStep, canvasSize, isTile = false) {
+  if (!ctx || !strokes.value.length || targetStep >= strokes.value.length) return;
+
+  // 清空画布
+  ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+  const pad = isTile ? 4 : 16; // 平铺画布内边距更小
   const actualPad = pad * 0.6;
-  const lineWidth = 8; // 笔画宽度
+  const lineWidth = isTile ? 2 : 8; // 平铺画布笔画更细
+  const dpr = isH5 ? (window.devicePixelRatio || 1) : 1;
 
   // 计算缩放和偏移
+  const globalBounds = wholeCharBounds.value;
   const contentW = globalBounds.maxX - globalBounds.minX;
   const contentH = globalBounds.maxY - globalBounds.minY;
   if (contentW <= 0 || contentH <= 0) return;
 
-  const scaleX = (logicalW - actualPad * 2) / contentW;
-  const scaleY = (logicalH - actualPad * 2) / contentH;
-  const scale = Math.min(scaleX, scaleY) * 0.8;
+  const scaleX = (canvasSize - actualPad * 2) / contentW;
+  const scaleY = (canvasSize - actualPad * 2) / contentH;
+  const scale = Math.min(scaleX, scaleY) * (isTile ? 0.9 : 0.8);
 
-  const offsetX = (logicalW - contentW * scale) / 2;
-  const offsetY = (logicalH - contentH * scale) / 2;
+  const offsetX = (canvasSize - contentW * scale) / 2;
+  const offsetY = (canvasSize - contentH * scale) / 2;
 
-  // 解析路径并存储所有点（用于生成填充轮廓）
-  const pathPoints = [];
-  const tokens = pathData.trim().split(/\s+/);
-  let i = 0;
-  let lastX = 0, lastY = 0;
+  // 绘制到目标步骤的所有笔画
+  for (let i = 0; i <= targetStep; i++) {
+    const pathData = strokes.value[i];
+    const tokens = pathData.trim().split(/\s+/);
+    let iToken = 0;
+    let lastX = 0, lastY = 0;
 
-  // 第一步：解析路径，转换坐标并存储点
-  while (i < tokens.length) {
-    const token = tokens[i];
-    if (token === 'M') {
-      const x = parseFloat(tokens[i + 1]);
-      const y = parseFloat(tokens[i + 2]);
-      if (!isNaN(x) && !isNaN(y)) {
-        const newX = (x - globalBounds.minX) * scale + offsetX;
-        const newY = logicalH - ((y - globalBounds.minY) * scale + offsetY);
-        lastX = newX;
-        lastY = newY;
-        pathPoints.push({ type: 'M', x: newX, y: newY });
+    ctx.beginPath();
+    while (iToken < tokens.length) {
+      const token = tokens[iToken];
+      if (token === 'M') {
+        const x = parseFloat(tokens[iToken + 1]);
+        const y = parseFloat(tokens[iToken + 2]);
+        if (!isNaN(x) && !isNaN(y)) {
+          const newX = (x - globalBounds.minX) * scale + offsetX;
+          const newY = canvasSize - ((y - globalBounds.minY) * scale + offsetY);
+          lastX = newX;
+          lastY = newY;
+          ctx.moveTo(newX, newY);
+        }
+        iToken += 3;
+      } else if (token === 'L') {
+        const x = parseFloat(tokens[iToken + 1]);
+        const y = parseFloat(tokens[iToken + 2]);
+        if (!isNaN(x) && !isNaN(y)) {
+          const newX = (x - globalBounds.minX) * scale + offsetX;
+          const newY = canvasSize - ((y - globalBounds.minY) * scale + offsetY);
+          ctx.lineTo(newX, newY);
+          lastX = newX;
+          lastY = newY;
+        }
+        iToken += 3;
+      } else if (token === 'Q') {
+        const x1 = parseFloat(tokens[iToken + 1]);
+        const y1 = parseFloat(tokens[iToken + 2]);
+        const x = parseFloat(tokens[iToken + 3]);
+        const y = parseFloat(tokens[iToken + 4]);
+        if (!isNaN(x1) && !isNaN(y1) && !isNaN(x) && !isNaN(y)) {
+          const cx1 = (x1 - globalBounds.minX) * scale + offsetX;
+          const cy1 = canvasSize - ((y1 - globalBounds.minY) * scale + offsetY);
+          const cx = (x - globalBounds.minX) * scale + offsetX;
+          const cy = canvasSize - ((y - globalBounds.minY) * scale + offsetY);
+          ctx.quadraticCurveTo(cx1, cy1, cx, cy);
+          lastX = cx;
+          lastY = cy;
+        }
+        iToken += 5;
+      } else {
+        iToken++;
       }
-      i += 3;
-    } else if (token === 'L') {
-      const x = parseFloat(tokens[i + 1]);
-      const y = parseFloat(tokens[i + 2]);
-      if (!isNaN(x) && !isNaN(y)) {
-        const newX = (x - globalBounds.minX) * scale + offsetX;
-        const newY = logicalH - ((y - globalBounds.minY) * scale + offsetY);
-        pathPoints.push({ type: 'L', x: newX, y: newY });
-        lastX = newX;
-        lastY = newY;
-      }
-      i += 3;
-    } else if (token === 'Q') {
-      const x1 = parseFloat(tokens[i + 1]);
-      const y1 = parseFloat(tokens[i + 2]);
-      const x = parseFloat(tokens[i + 3]);
-      const y = parseFloat(tokens[i + 4]);
-      if (!isNaN(x1) && !isNaN(y1) && !isNaN(x) && !isNaN(y)) {
-        const cx1 = (x1 - globalBounds.minX) * scale + offsetX;
-        const cy1 = logicalH - ((y1 - globalBounds.minY) * scale + offsetY);
-        const cx = (x - globalBounds.minX) * scale + offsetX;
-        const cy = logicalH - ((y - globalBounds.minY) * scale + offsetY);
-        pathPoints.push({ type: 'Q', x1: cx1, y1: cy1, x: cx, y: cy });
-        lastX = cx;
-        lastY = cy;
-      }
-      i += 5;
+    }
+
+    // 设置样式并绘制
+    const strokeStyle = '#1E88E5';
+    if (isH5) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.fillStyle = strokeStyle;
+      ctx.lineWidth = lineWidth * dpr;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.fill();
     } else {
-      i++;
+      ctx.setStrokeStyle(strokeStyle);
+      ctx.setFillStyle(strokeStyle);
+      ctx.setLineWidth(lineWidth);
+      ctx.setLineCap('round');
+      ctx.setLineJoin('round');
+      ctx.stroke();
+      ctx.setLineWidth(1);
+      ctx.fill();
     }
+    ctx.closePath();
   }
 
-  // 第二步：绘制实心笔画（双线填充法）
-  ctx.beginPath();
-
-  // 绘制主路径（粗描边）
-  for (let p = 0; p < pathPoints.length; p++) {
-    const point = pathPoints[p];
-    if (point.type === 'M') {
-      ctx.moveTo(point.x, point.y);
-    } else if (point.type === 'L') {
-      ctx.lineTo(point.x, point.y);
-    } else if (point.type === 'Q') {
-      ctx.quadraticCurveTo(point.x1, point.y1, point.x, point.y);
-    }
-  }
-
-  // 核心：设置粗线宽 + 填充色 = 实心效果
-  ctx.setStrokeStyle('#1E88E5');
-  ctx.setFillStyle('#1E88E5');
-  ctx.setLineWidth(lineWidth);
-  ctx.setLineCap('round');
-  ctx.setLineJoin('round');
-
-  // 先描边（粗线），再填充路径内部（模拟实心）
-  ctx.stroke();
-  // 额外绘制一个细线填充层，确保实心
-  ctx.setLineWidth(1);
-  ctx.fill();
-
-  ctx.closePath();
-}
-
-/**
- * H5 Canvas 2D绘制实心笔画
- */
-function drawSolidPathForH5(ctx, pathData, globalBounds) {
-  const dpr = window.devicePixelRatio || 1;
-  const logicalW = canvasSize;
-  const logicalH = canvasSize;
-  const pad = 16;
-  const actualPad = pad * 0.6;
-  const lineWidth = 8 * dpr;
-
-  const contentW = globalBounds.maxX - globalBounds.minX;
-  const contentH = globalBounds.maxY - globalBounds.minY;
-  if (contentW <= 0 || contentH <= 0) return;
-
-  const scaleX = (logicalW - actualPad * 2) / contentW;
-  const scaleY = (logicalH - actualPad * 2) / contentH;
-  const scale = Math.min(scaleX, scaleY);
-
-  const offsetX = (logicalW - contentW * scale) / 2;
-  const offsetY = (logicalH - contentH * scale) / 2;
-
-  const tokens = pathData.trim().split(/\s+/);
-  const newTokens = [];
-  let i = 0;
-
-  while (i < tokens.length) {
-    const token = tokens[i];
-    if (token === 'M' || token === 'L' || token === 'Q') {
-      newTokens.push(token);
-      let valCount = token === 'M' || token === 'L' ? 2 : 4;
-      for (let j = 1; j <= valCount; j++) {
-        const val = parseFloat(tokens[i + j]);
-        if (isNaN(val)) break;
-        const isX = j % 2 === 1;
-        const originalY = isX ? val : globalBounds.maxY - (val - globalBounds.minY);
-        const logicVal = isX
-            ? (val - globalBounds.minX) * scale + offsetX
-            : (originalY - globalBounds.minY) * scale + offsetY;
-        newTokens.push((logicVal * dpr).toString());
-      }
-      i += token === 'M' || token === 'L' ? 3 : 5;
-    } else {
-      i++;
-    }
-  }
-
-  const finalPath = newTokens.join(' ');
-  const path = new Path2D(finalPath);
-
-  // H5正常填充+描边
-  ctx.fillStyle = '#1E88E5';
-  ctx.strokeStyle = '#1E88E5';
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  ctx.fill(path);
-  ctx.stroke(path);
-}
-
-/**
- * 绘制当前步骤的笔画
- */
-function drawCurrentStroke() {
-  if (!strokes.value.length || currentStep.value >= strokes.value.length || !ctx) {
-    return;
-  }
-
-  if (isH5) {
-    // H5绘制
-    const canvas = ctx.canvas;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasSize * dpr;
-    canvas.height = canvasSize * dpr;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (let i = 0; i <= currentStep.value; i++) {
-      drawSolidPathForH5(ctx, strokes.value[i], wholeCharBounds.value);
-    }
-  } else if (isMiniProgram) {
-    // 小程序绘制实心笔画
-    ctx.clearRect(0, 0, canvasSize, canvasSize);
-
-    for (let i = 0; i <= currentStep.value; i++) {
-      drawSolidPathForMiniProgram(ctx, strokes.value[i], wholeCharBounds.value);
-    }
-
-    // 强制绘制
+  // 小程序需要手动调用draw
+  if (isMiniProgram && !isH5) {
     ctx.draw(false, () => {
-      console.log('✅ 小程序实心笔画绘制完成');
+      if (isTile) {
+        console.log(`✅ 平铺画布第${targetStep + 1}笔绘制完成`);
+      } else {
+        console.log(`✅ 主画布第${targetStep + 1}笔绘制完成`);
+      }
     });
   }
+}
+
+/**
+ * 绘制主画布当前步骤
+ */
+function drawCurrentStroke() {
+  if (!mainCtx.value) return;
+  drawStrokeStep(mainCtx.value, currentStep.value, canvasSize);
+}
+
+/**
+ * 绘制所有平铺画布的步骤
+ */
+function drawAllTileStrokes() {
+  Object.keys(tileCtxMap.value).forEach((index) => {
+    const ctx = tileCtxMap.value[index];
+    const step = parseInt(index);
+    drawStrokeStep(ctx, step, tileCanvasSize, true);
+  });
 }
 
 /**
@@ -473,6 +483,7 @@ function stopAutoWrite() {
     autoWriteTimer = null;
   }
 }
+
 /**
  * 重置书写（核心：重新从第一笔开始书写）
  */
@@ -481,7 +492,7 @@ function resetWrite() {
   stopAutoWrite();
   // 2. 重置到第一步
   currentStep.value = 0;
-  // 3. 重新绘制第一步
+  // 3. 重新绘制主画布第一步
   drawCurrentStroke();
   // 4. 如果开启自动书写，重新启动
   if (props.autoWrite) {
@@ -502,7 +513,10 @@ defineExpose({
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
 }
+
 .load-btn {
   width: 200px;
   height: 80rpx;
@@ -514,21 +528,72 @@ defineExpose({
   font-size: 32rpx;
   margin-bottom: 40rpx;
 }
-.stroke-canvas {
+
+/* 主画布样式 */
+.main-canvas-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.main-canvas {
   width: 300px;
   height: 300px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  margin: 20rpx 0;
-  display: block;
-  border: 1px solid #eee;
 }
+
 .step-info {
   text-align: center;
   margin: 20rpx 0;
   font-size: 32rpx;
   color: #333;
 }
+
+/* 平铺展示区域样式（一行4个，无滚动） */
+.stroke-tile-wrapper {
+  width: 100%;
+  margin: 20rpx 0 40rpx;
+}
+
+.tile-title {
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 15rpx;
+  display: block;
+  padding-left: 0rpx;
+}
+
+.tile-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 15rpx;
+}
+
+/* 核心：一行显示4个步骤 */
+.tile-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(25% - 15rpx);
+}
+
+.tile-canvas {
+  width: 80px;
+  height: 80px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.tile-step-text {
+  font-size: 22rpx;
+  color: #666;
+  margin-top: 8rpx;
+  text-align: center;
+}
+
+/* 控制按钮样式 */
 .controls {
   display: flex;
   justify-content: space-around;
@@ -536,6 +601,7 @@ defineExpose({
   max-width: 300px;
   margin-top: 20rpx;
 }
+
 .control-btn {
   width: 120px;
   height: 70rpx;
@@ -545,8 +611,17 @@ defineExpose({
   border-radius: 8rpx;
   font-size: 28rpx;
 }
+
 .control-btn:disabled {
   background: #eee;
   color: #999;
+}
+
+/* 通用画布样式 */
+.stroke-canvas {
+  background: #f9f9f9;
+  border-radius: 8px;
+  display: block;
+  border: 1px solid #eee;
 }
 </style>

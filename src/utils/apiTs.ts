@@ -165,7 +165,26 @@ const apiTs = {
         create: (data: any): Promise<Share> => api.post<Share>('/api/share/create', data),
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
         accept: (token: string): Promise<any> => api.post(`/api/share/accept/${token}`),
+    },
+    universal_records:{
+        // 添加打卡
+        list: (data: any): Promise<any> => api.post<any>(
+            '/api/universal-records/list',
+            data
+        ),
+        get: (data: any): Promise<any> => api.post<any>(
+            '/api/universal-records/get',
+            data
+        ),
+    },
+    json:{
+        get: (data: any): Promise<any> => api.post<any>(
+            '/api/json-data/hanzi-writer/get',
+            data
+        ),
     }
+
+
 }
 
 export default apiTs
