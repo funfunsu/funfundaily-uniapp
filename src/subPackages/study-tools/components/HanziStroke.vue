@@ -92,6 +92,9 @@ const canvasSize = 300; // 主画布尺寸
 const tileCanvasSize = 80; // 平铺画布尺寸
 let autoWriteTimer = null;
 
+const emit = defineEmits(['edit-complete'])
+
+
 // 监听char变化
 watch(
     () => props.char,
@@ -255,6 +258,85 @@ function getWholeCharBounds(strokeList) {
 }
 
 /**
+ * 绘制米字格（通用方法）
+ * @param {CanvasRenderingContext2D/uni.CanvasContext} ctx 画布上下文
+ * @param {Number} size 画布尺寸
+ * @param {Boolean} isTile 是否为平铺画布
+ */
+function drawGrid(ctx, size, isTile = false) {
+  if (!ctx) return;
+
+  // 米字格样式配置
+  const gridColor = '#e0e0e0'; // 米字格颜色（浅灰色，不干扰笔画）
+  const mainLineWidth = isTile ? 0.5 : 1; // 横竖中线宽度
+  const diagLineWidth = isTile ? 0.3 : 0.8; // 对角线宽度
+  const padding = isTile ? 5 : 15; // 内边距
+  const dpr = isH5 ? (window.devicePixelRatio || 1) : 1;
+
+  // 计算米字格实际绘制区域
+  const startX = padding;
+  const startY = padding;
+  const endX = size - padding;
+  const endY = size - padding;
+  const centerX = size / 2;
+  const centerY = size / 2;
+
+  // 开始绘制米字格
+  ctx.beginPath();
+
+  // 适配H5和小程序的画布API
+  if (isH5) {
+    // H5 2D画布
+    ctx.strokeStyle = gridColor;
+
+    // 绘制竖中线
+    ctx.lineWidth = mainLineWidth * dpr;
+    ctx.moveTo(centerX, startY);
+    ctx.lineTo(centerX, endY);
+
+    // 绘制横中线
+    ctx.moveTo(startX, centerY);
+    ctx.lineTo(endX, centerY);
+
+    // 绘制对角线1（左上到右下）
+    ctx.lineWidth = diagLineWidth * dpr;
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+
+    // 绘制对角线2（右上到左下）
+    ctx.moveTo(endX, startY);
+    ctx.lineTo(startX, endY);
+
+    ctx.stroke();
+  } else {
+    // 小程序画布
+    ctx.setStrokeStyle(gridColor);
+
+    // 绘制竖中线
+    ctx.setLineWidth(mainLineWidth);
+    ctx.moveTo(centerX, startY);
+    ctx.lineTo(centerX, endY);
+
+    // 绘制横中线
+    ctx.moveTo(startX, centerY);
+    ctx.lineTo(endX, centerY);
+
+    // 绘制对角线1（左上到右下）
+    ctx.setLineWidth(diagLineWidth);
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+
+    // 绘制对角线2（右上到左下）
+    ctx.moveTo(endX, startY);
+    ctx.lineTo(startX, endY);
+
+    ctx.stroke();
+  }
+
+  ctx.closePath();
+}
+
+/**
  * 加载汉字笔顺数据
  */
 async function loadStrokes() {
@@ -316,9 +398,12 @@ function drawStrokeStep(ctx, targetStep, canvasSize, isTile = false) {
   // 清空画布
   ctx.clearRect(0, 0, canvasSize, canvasSize);
 
-  const pad = isTile ? 4 : 16; // 平铺画布内边距更小
+  // 第一步：绘制米字格背景
+  drawGrid(ctx, canvasSize, isTile);
+
+  const pad = isTile ? 2 : 8; // 平铺画布内边距更小
   const actualPad = pad * 0.6;
-  const lineWidth = isTile ? 2 : 8; // 平铺画布笔画更细
+  const lineWidth = isTile ? 1 : 5; // 平铺画布笔画更细
   const dpr = isH5 ? (window.devicePixelRatio || 1) : 1;
 
   // 计算缩放和偏移
@@ -460,6 +545,7 @@ function next() {
 
     if (props.autoWrite && currentStep.value >= strokes.value.length - 1) {
       stopAutoWrite();
+      emit('edit-complete')
     }
   }
 }

@@ -157,7 +157,7 @@ const getMyRole = ()=>{
 
   // 如果找到了该成员，则返回其角色；否则返回默认值（例如 'guest' 或 undefined）
   // 这里假设 '成员' 是找不到时的默认角色，你可以根据需要更改
-  return myMemberInfo ? myMemberInfo.role : 'member';
+  return myMemberInfo ? myMemberInfo.role : 'Member';
 }
 
 const  editGroup = async (group) =>{

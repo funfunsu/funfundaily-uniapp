@@ -2,13 +2,13 @@
   <view class="parent-page">
     <!-- 汉字输入区 -->
     <view class="input-section">
-      <text class="input-label">输入汉字或拼音</text>
+      <text class="input-label">输入多个汉字</text> <!-- 修改提示 -->
       <view class="input-wrapper">
         <input
             v-model.trim="inputValue"
             @confirm="handleSubmit"
             @input="handleInputChange"
-            placeholder="如：五 / 国"
+            placeholder="如：你好世界"
             class="char-input"
             maxlength="10"
             confirm-type="search"
@@ -26,54 +26,70 @@
       </view>
 
       <button
-          :disabled="!isValidInput"
+          :disabled="!isValidMultiInput"
           @click="handleSubmit"
           class="submit-btn"
-          :class="{ disabled: !isValidInput }"
+          :class="{ disabled: !isValidMultiInput }"
       >
-        查看笔顺
+        添加汉字
       </button>
 
-      <!-- 重写按钮（仅在有内容时显示） -->
-<!--      <button v-if="displayChar" @click="handleResetWrite" class="reset-btn">-->
-<!--        ↺ 重新书写-->
-<!--      </button>-->
+      <!-- 历史字符列表 (仅在有内容时显示) -->
+      <scroll-view v-if="historyChars.length > 0" class="history-scroll" scroll-x>
+        <view class="history-chars">
+          <button
+              v-for="(char, index) in historyChars"
+              :key="index"
+              @click="selectChar(char)"
+              class="history-char-btn"
+              :class="{ active: selectedChar === char }"
+          >
+            {{ char }}
+          </button>
+        </view>
+      </scroll-view>
+
+      <!-- 重写按钮（仅在有选中字符时显示） -->
+      <button v-if="selectedChar" @click="handleResetWrite" class="reset-btn">
+        ↺ {{ countdownSeconds > 0 ? `重新书写"${selectedChar}" (${countdownSeconds}s)` : `重新书写 "${selectedChar}"` }}
+      </button>
 
       <text v-if="error" class="error-tip">{{ error }}</text>
     </view>
 
     <!-- 笔顺展示区 -->
-    <view class="stroke-section" :class="{ 'has-content': displayChar }">
+    <view class="stroke-section" :class="{ 'has-content': selectedChar }">
       <HanziStroke
-          v-if="displayChar"
+          v-if="selectedChar"
           ref="hanziStrokeRef"
-          :char="displayChar"
+          :char="selectedChar"
           :autoWrite="true"
-          :autoWriteInterval="800"
+          :autoWriteInterval="1200"
           class="stroke-component"
+          @edit-complete="OnEditComplete"
       />
-
     </view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed,onMounted } from 'vue';
-import HanziStroke from '../../components/HanziStroke.vue';
+import { ref, computed, onMounted,onUnmounted } from 'vue';
+import HanziStroke from '../../components/HanziStroke.vue'; // 确保路径正确
 import { onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app';
 
-
 const inputValue = ref('');
-const displayChar = ref('');
+const historyChars = ref([]); // 存储历史输入的单个汉字
+const selectedChar = ref(''); // 当前选中并展示笔顺的字符
 const error = ref('');
 const hanziStrokeRef = ref(null);
 const isWechatMiniProgram = ref(false);
+const autoRewriteTimer = ref(null); // 用于存储倒计时定时器
+const countdownSeconds = ref(0); // 新增：用于存储倒计时秒数
 
 
 onMounted(() => {
   // 检测运行环境
   const platform = uni.getSystemInfoSync().platform;
-  // 微信小程序的 envVersion 包含 develop/trial/release
   const miniProgramEnv = uni.getAccountInfoSync()?.miniProgram?.envVersion;
   isWechatMiniProgram.value = platform === 'devtools' || !!miniProgramEnv;
 
@@ -85,8 +101,8 @@ onMounted(() => {
   // 监听朋友圈分享（可选）
   onShareTimeline(() => {
     return {
-      title: `${displayChar.value || '汉字'}笔顺学习 - funfun日程`,
-      imageUrl: '/static/share-stroke.png' // 建议提前准备分享图片
+      title: `${selectedChar.value || '汉字'}笔顺学习 - funfun日程`,
+      imageUrl: '/static/share-stroke.png'
     };
   });
 });
@@ -95,25 +111,21 @@ onMounted(() => {
  * 生成分享配置（核心）
  */
 function getShareConfig() {
-  const shareTitle = displayChar.value
-      ? `${displayChar.value}字笔顺学习 | fungrowth日程`
+  const shareTitle = selectedChar.value
+      ? `${selectedChar.value}字笔顺学习 | fungrowth日程`
       : '汉字笔顺学习 | fungrowth日程';
-  // 分享路径：携带当前汉字参数，分享后打开页面可直接显示该字笔顺
-  const sharePath = `/subPackages/study-tools/pages/writing/stroke-order?char=${displayChar.value || ''}`;
+  // 分享路径：携带当前汉字参数
+  const sharePath = `/subPackages/study-tools/pages/writing/stroke-order?char=${selectedChar.value || ''}`;
 
   return {
     title: shareTitle,
     path: sharePath,
-    // 可选：自定义分享图片（建议放在static目录）
-    // imageUrl: '/static/share-stroke.png',
-    // 分享成功回调
     success: (res) => {
       uni.showToast({
         title: '分享成功',
         icon: 'success'
       });
     },
-    // 分享失败/取消回调
     fail: (err) => {
       console.log('分享失败', err);
       uni.showToast({
@@ -123,45 +135,121 @@ function getShareConfig() {
     }
   };
 }
+
 function handleInputChange() {
   error.value = '';
 }
 
-const isValidInput = computed(() => {
+// 验证输入是否包含至少一个有效汉字
+const isValidMultiInput = computed(() => {
   const val = inputValue.value.trim();
   if (!val) return false;
-  return val.length === 1 && /^[\u4e00-\u9fa5]$/.test(val);
-
+  // 检查是否有至少一个汉字
+  return /[\u4e00-\u9fa5]/.test(val);
 });
 
-function validateAndSetError() {
+// 验证并返回有效的汉字数组
+function validateAndGetChars() {
   const val = inputValue.value.trim();
   if (!val) {
-    error.value = '请输入一个汉字或有效拼音';
-    return false;
+    error.value = '请输入至少一个汉字';
+    return [];
+  }
+
+  // 提取所有汉字字符
+  const chars = val.match(/[\u4e00-\u9fa5]/g) || [];
+
+  if (chars.length === 0) {
+    error.value = '请输入至少一个汉字';
+    return [];
   }
 
   error.value = '';
-  return val;
+  // 返回去重后的数组，保持顺序
+  return [...new Set(chars)];
 }
 
+
 function handleSubmit() {
-  const targetChar = validateAndSetError();
-  if (targetChar) {
-    displayChar.value = targetChar;
-    inputValue.value = targetChar; // 输入框显示最终汉字，更直观
+  const newChars = validateAndGetChars(); // 获取本次输入的有效汉字
+  if (newChars.length > 0) {
+    // 更新历史记录：将新字符添加到开头，如果已存在则移除旧的
+    let updatedHistory = [...historyChars.value];
+    for (let i = newChars.length - 1; i >= 0; i--) { // 逆序添加以保证顺序
+      const char = newChars[i];
+      const existingIndex = updatedHistory.indexOf(char);
+      if (existingIndex !== -1) {
+        updatedHistory.splice(existingIndex, 1); // 移除旧位置
+      }
+      updatedHistory.unshift(char); // 添加到开头
+    }
+    historyChars.value = updatedHistory.slice(0, 20); // 限制历史记录数量，例如最多20个
+
+    // 默认选中第一个新加入的字符（或者你可以选择不自动选中，让用户手动点）
+    // 这里我们选择自动选中第一个新字符
+    selectChar(newChars[0]);
+
+    // 清空输入框
+    inputValue.value = '';
   }
 }
 
 function clearInput() {
   inputValue.value = '';
-  displayChar.value = '';
+  historyChars.value = []; // 清空历史记录
+  selectedChar.value = ''; // 清空选中字符
   error.value = '';
 }
 
-function handleResetWrite() {
-  hanziStrokeRef.value?.resetWrite?.();
+// 选择一个字符进行展示
+function selectChar(char) {
+  selectedChar.value = char;
+  clearAutoRewriteTimer()
+  // 如果需要每次切换都重置动画，可以调用 resetWrite
+  // hanziStrokeRef.value?.resetWrite?.();
 }
+
+function handleResetWrite() {
+  if (selectedChar.value) {
+    hanziStrokeRef.value?.resetWrite?.();
+  }
+}
+
+function clearAutoRewriteTimer() {
+  if (autoRewriteTimer.value) {
+    clearInterval(autoRewriteTimer.value); // 使用 clearInterval
+    autoRewriteTimer.value = null;
+  }
+  countdownSeconds.value = 0; // 重置倒计时显示
+}
+// 启动倒计时的函数
+function startCountdown() {
+  clearAutoRewriteTimer(); // 确保没有其他计时器在运行
+  countdownSeconds.value = 5; // 初始化为5秒
+
+  autoRewriteTimer.value = setInterval(() => {
+    countdownSeconds.value--;
+    if (countdownSeconds.value <= 0) {
+      clearAutoRewriteTimer(); // 清理定时器
+      // 时间到，执行自动重写
+      if (selectedChar.value && hanziStrokeRef.value?.resetWrite) {
+        hanziStrokeRef.value.resetWrite();
+      }
+    }
+  }, 1000); // 每秒更新一次
+}
+
+
+
+function OnEditComplete(){
+  console.log("OnEditComplete");
+  // 启动5秒倒计时
+  startCountdown();
+}
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearAutoRewriteTimer();
+});
 </script>
 
 <style scoped>
@@ -179,7 +267,7 @@ function handleResetWrite() {
 .input-section {
   width: 100%;
   max-width: 640rpx;
-  margin-bottom: 70rpx;
+  margin-bottom: 30rpx; /* 调整间距 */
   text-align: center;
 }
 
@@ -214,7 +302,7 @@ function handleResetWrite() {
 }
 
 .char-input:focus {
-  border-color: #1E88E5;
+  border-color: #1e88e5;
   box-shadow: 0 6rpx 20rpx rgba(30, 136, 229, 0.15);
 }
 
@@ -239,7 +327,7 @@ function handleResetWrite() {
 .submit-btn {
   width: 100%;
   height: 100rpx;
-  background: #1E88E5;
+  background: #1e88e5;
   color: white;
   border: none;
   border-radius: 60rpx;
@@ -247,6 +335,7 @@ function handleResetWrite() {
   font-weight: 600;
   box-shadow: 0 8rpx 24rpx rgba(30, 136, 229, 0.3);
   transition: all 0.2s ease;
+  margin-bottom: 20rpx; /* 与下方列表间隔 */
 }
 
 .submit-btn:not(.disabled):active {
@@ -259,6 +348,51 @@ function handleResetWrite() {
   color: #ffffff;
   box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
   transform: none;
+}
+
+/* === 历史字符列表 === */
+.history-scroll {
+  width: 100%;
+  margin-bottom: 20rpx; /* 与重写按钮间隔 */
+  white-space: nowrap; /* 强制子元素在同一行 */
+}
+
+.history-chars {
+  display: inline-block; /* 让容器宽度适应内容 */
+  padding: 10rpx 0; /* 上下留白 */
+}
+
+.history-char-btn {
+  display: inline-block; /* 行内块显示 */
+  min-width: 80rpx; /* 最小宽度 */
+  height: 80rpx;
+  margin-right: 20rpx; /* 按钮间水平间距 */
+  background: #e3f2fd;
+  color: #1e88e5;
+  border: 2rpx solid #bbdefb;
+  border-radius: 50%; /* 圆形按钮 */
+  font-size: 32rpx;
+  font-weight: 500;
+  box-shadow: 0 2rpx 6rpx rgba(30, 136, 229, 0.1);
+  transition: all 0.2s;
+  vertical-align: top; /* 顶部对齐 */
+}
+
+.history-char-btn:last-child {
+  margin-right: 0; /* 最后一个按钮无右边距 */
+}
+
+.history-char-btn.active {
+  background: #1e88e5;
+  color: white;
+  border-color: #1e88e5;
+  transform: scale(1.1); /* 选中时稍大一点 */
+  box-shadow: 0 4rpx 10rpx rgba(30, 136, 229, 0.2);
+}
+
+.history-char-btn:active {
+  background: #bbdefb;
+  transform: scale(0.95); /* 点击时缩小 */
 }
 
 .error-tip {
@@ -293,11 +427,12 @@ function handleResetWrite() {
 }
 
 .reset-btn {
-  width: 280rpx;
+  width: auto; /* 宽度自适应内容 */
+  padding: 0 40rpx; /* 左右内边距 */
   height: 80rpx;
   background: white;
-  color: #1E88E5;
-  border: 2rpx solid #1E88E5;
+  color: #1e88e5;
+  border: 2rpx solid #1e88e5;
   border-radius: 50rpx;
   font-size: 32rpx;
   font-weight: 500;
