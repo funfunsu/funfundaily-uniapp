@@ -90,6 +90,12 @@
       ]
     }
   ],
+  "preloadRule": {
+    "pages/tabBar/more": {
+      "network": "all",
+      "packages": ["subPackages/study-tools"]
+    }
+  },
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "funfun日程",

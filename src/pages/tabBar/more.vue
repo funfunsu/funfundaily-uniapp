@@ -63,6 +63,7 @@ onMounted(() => {
 .grid-item {
 	flex: 0 0 calc(50% - 10rpx); /* 2列，减去 gap 的一半 */
 	box-sizing: border-box;
+  margin-top: 30px;
 }
 
 .card {

@@ -167,9 +167,9 @@ const onEditTask = (task) => {
 }
 
 const onTaskDelay = async (task) => {
-  const startDate = DateUtils.getDateFromDateTimeStr(task.startTime);
+  const startDate = DateUtils.getDateFromDateTimeStr(task.startTime,null);
   task.startTime = DateUtils.replaceDatePart(task.startTime,DateUtils.getDateStr(DateUtils.getDayOff(new Date(startDate),1)))
-  const endDate = DateUtils.getDateFromDateTimeStr(task.endTime);
+  const endDate = DateUtils.getDateFromDateTimeStr(task.endTime,null);
   task.endTime = DateUtils.replaceDatePart(task.endTime,DateUtils.getDateStr(DateUtils.getDayOff(new Date(endDate),1)))
 
   try {
@@ -193,11 +193,7 @@ const onTaskCheck = ({ task, completed }) => {
     completedTime: Date.now()
   }
 
-  // 替换数组项（响应式安全）
-  const index = taskList.value.findIndex(t => t.id === task.id)
-  if (index !== -1) {
-    taskList.value.splice(index, 1, updatedTask)
-  }
+
 
   const  data = {
     taskId:task.id,
@@ -207,6 +203,14 @@ const onTaskCheck = ({ task, completed }) => {
   }
 
   apiTs.checkin.task.complete(data)
+  // 替换数组项（响应式安全）
+  const index = taskList.value.findIndex(t => t.id === task.id)
+  if (index !== -1) {
+    taskList.value.splice(index, 1, updatedTask)
+  }
+  point.value = {
+    count:point.value.count+task.extra.score
+  }
 }
 
 
@@ -262,7 +266,7 @@ function handleLastDayClick() {
 async function updateDate(days: number) {
   currentDate.value = DateUtils.getDayOff(currentDate.value,days)
   barTopSideConfig.value.center.text = DateUtils.getDateStr(currentDate.value);
-  await fetchTaskList()
+  await fetchAllData()
 }
 
 
@@ -329,8 +333,9 @@ onShow(() => {
   if (!refreshUri){
     return
   }
+  debugger
   if (refreshUri === currentTab){
-    fetchTaskList()
+    fetchAllData()
     removeStoredData(STORAGE_KEYS.REFRESH_TAB)
   }
 });
