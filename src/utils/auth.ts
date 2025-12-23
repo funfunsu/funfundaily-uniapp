@@ -2,7 +2,7 @@
 
 import apiTs from './apiTs'
 import config from '../config/env'
-import { setToken, getToken } from './token'
+import {setToken, getToken, getShareToken} from './token'
 import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from './storageManager';
 import DateUtils from "./util"; // 路径请根据实际情况调整
 
@@ -12,6 +12,9 @@ export async function autoLogin(shareToken): Promise<String> {
 	const existingToken = getToken()
 	if (existingToken) {
 		return existingToken // 已登录，直接返回
+	}
+	if (!shareToken){
+		shareToken = getShareToken();
 	}
 	// #ifdef MP-WEIXIN
 	try {

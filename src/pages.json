@@ -86,6 +86,13 @@
           "style": {
             "navigationBarTitleText": "笔顺学习"
           }
+        },
+        {
+          "path": "pages/writing/pinyin-converter",
+          "style": {
+            "navigationBarTitleText": "拼音",
+            "enablePullDownRefresh": false
+          }
         }
       ]
     }
@@ -93,7 +100,9 @@
   "preloadRule": {
     "pages/tabBar/more": {
       "network": "all",
-      "packages": ["subPackages/study-tools"]
+      "packages": [
+        "subPackages/study-tools"
+      ]
     }
   },
   "globalStyle": {

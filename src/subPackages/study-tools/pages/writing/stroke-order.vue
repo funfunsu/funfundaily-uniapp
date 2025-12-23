@@ -34,6 +34,7 @@
         添加汉字
       </button>
 
+
       <!-- 历史字符列表 (仅在有内容时显示) -->
       <scroll-view v-if="historyChars.length > 0" class="history-scroll" scroll-x>
         <view class="history-chars">
@@ -56,6 +57,7 @@
 
       <text v-if="error" class="error-tip">{{ error }}</text>
     </view>
+    <view class="pinyin-text">{{pinyinResultRef}}</view>
 
     <!-- 笔顺展示区 -->
     <view class="stroke-section" :class="{ 'has-content': selectedChar }">
@@ -75,7 +77,8 @@
 <script setup>
 import { ref, computed, onMounted,onUnmounted } from 'vue';
 import HanziStroke from '../../components/HanziStroke.vue'; // 确保路径正确
-import { onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app';
+import { onLoad,onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app';
+import { pinyin } from 'pinyin-pro';
 
 const inputValue = ref('');
 const historyChars = ref([]); // 存储历史输入的单个汉字
@@ -85,6 +88,8 @@ const hanziStrokeRef = ref(null);
 const isWechatMiniProgram = ref(false);
 const autoRewriteTimer = ref(null); // 用于存储倒计时定时器
 const countdownSeconds = ref(0); // 新增：用于存储倒计时秒数
+const pinyinResultRef = ref(''); // 存储转换后的拼音
+
 
 
 onMounted(() => {
@@ -107,16 +112,74 @@ onMounted(() => {
   });
 });
 
+
+// 页面加载时的处理逻辑
+onLoad((options) => {
+  console.log("Page loaded with options:", options);
+
+  // --- 关键修改开始 ---
+  // 1. 处理传入的历史记录
+  if (options.history) {
+    try {
+      // 解码并反序列化 historyChars
+      const decodedHistory = decodeURIComponent(options.history);
+      const parsedHistory = JSON.parse(decodedHistory);
+
+      // 简单验证一下格式 (可选)
+      if (Array.isArray(parsedHistory) && parsedHistory.every(item => typeof item === 'string')) {
+        historyChars.value = parsedHistory.filter(char => /[\u4e00-\u9fa5]/.test(char)); // 再次过滤确保是汉字
+
+        console.log("Restored historyChars from share:", historyChars.value);
+
+        // 2. 如果历史记录非空且当前没有选中字符，可以默认选中第一个
+        //    或者根据 options.char 来决定选中哪个
+        if (historyChars.value.length > 0 && !selectedChar.value) {
+          // 可以选择不立即选中，让用户自己点，或者默认选中第一个
+          // selectChar(historyChars.value[0]);
+        }
+      } else {
+        console.warn("Parsed history is not a valid array of strings:", parsedHistory);
+      }
+    } catch (e) {
+      console.error("Failed to parse shared historyChars:", e);
+      // 可以选择显示错误提示给用户
+    }
+  }
+
+  // 3. 处理可能直接传入的特定字符 (优先级高于默认选中历史第一个)
+  if (options.char && /[\u4e00-\u9fa5]/.test(options.char)) {
+    const charToSelect = options.char;
+
+    // 如果这个字符不在恢复的历史记录里，可以考虑添加进去，或者直接选中它
+    if (!historyChars.value.includes(charToSelect)) {
+      // 例如：将它添加到历史记录开头
+      historyChars.value = [charToSelect, ...historyChars.value].slice(0, 20);
+    }
+    selectedChar.value = charToSelect;
+    console.log(`Selected character from URL param: ${charToSelect}`);
+  } else if (options.char) {
+    console.warn("Invalid character provided in URL:", options.char);
+  }
+  // --- 关键修改结束 ---
+});
+
 /**
  * 生成分享配置（核心）
  */
 function getShareConfig() {
-  const shareTitle = selectedChar.value
-      ? `${selectedChar.value}字笔顺学习 | fungrowth日程`
-      : '汉字笔顺学习 | fungrowth日程';
+  const shareTitle =  '汉字笔顺学习 | fungrowth日程';
   // 分享路径：携带当前汉字参数
-  const sharePath = `/subPackages/study-tools/pages/writing/stroke-order?char=${selectedChar.value || ''}`;
+  const encodedHistory = encodeURIComponent(JSON.stringify(historyChars.value));
 
+  // 分享路径：携带当前汉字和历史记录
+  // 注意：URL 长度有限制，如果 historyChars 很多可能会超出限制，需要考虑截断或其他策略
+  let sharePath = `/subPackages/study-tools/pages/writing/stroke-order?history=${encodedHistory}`;
+
+  // 如果有选中的字符，也可以加上，方便直接定位
+  if (selectedChar.value) {
+    sharePath += `&char=${selectedChar.value}`;
+  }
+  console.log(sharePath)
   return {
     title: shareTitle,
     path: sharePath,
@@ -204,6 +267,8 @@ function clearInput() {
 // 选择一个字符进行展示
 function selectChar(char) {
   selectedChar.value = char;
+  pinyinResultRef.value  = pinyin(char);
+
   clearAutoRewriteTimer()
   // 如果需要每次切换都重置动画，可以调用 resetWrite
   // hanziStrokeRef.value?.resetWrite?.();
@@ -361,7 +426,11 @@ onUnmounted(() => {
   display: inline-block; /* 让容器宽度适应内容 */
   padding: 10rpx 0; /* 上下留白 */
 }
-
+.pinyin-text{
+  font-size: 40rpx;
+  font-weight: 500;
+  color: #1e88e5;
+}
 .history-char-btn {
   display: inline-block; /* 行内块显示 */
   min-width: 80rpx; /* 最小宽度 */

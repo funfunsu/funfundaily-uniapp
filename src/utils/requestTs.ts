@@ -17,7 +17,7 @@ let isRedirectingToLogin = false; // 防重
 // 创建请求实例的配置
 const requestConfig : RequestConfig = {
 	// 请求拦截器
-	requestInterceptor: (options : RequestOptions) : RequestOptions => {
+	requestInterceptor: (options: RequestOptions): RequestOptions => {
 		console.log('请求拦截器:', options)
 
 		// 1. 可以在这里统一添加 Token
@@ -29,7 +29,7 @@ const requestConfig : RequestConfig = {
 
 		const shareToken = getShareToken();
 		console.log('请求拦截器shareToken:', shareToken)
-		if (shareToken){
+		if (shareToken) {
 			options.header = options.header || {}
 			options.header['x-fun-sharetoken'] = `${token}`
 		}
@@ -44,7 +44,7 @@ const requestConfig : RequestConfig = {
 	},
 
 	// 响应拦截器
-	responseInterceptor: <T = any>(response : ApiResponse<T>) : ApiResponse<T> => {
+	responseInterceptor: <T = any>(response: ApiResponse<T>): ApiResponse<T> => {
 		console.log('响应拦截器:', response)
 
 		// 1. 统一处理错误码
@@ -86,26 +86,27 @@ const requestConfig : RequestConfig = {
 						uni.reLaunch({url: '/pages/index/index'});
 					}
 				}
+			} else {
+				// 使用 .catch 捕获潜在错误
+				uni.showToast({
+					title: `${response.code}:${response.message}`, // 加前缀方便识别
+					icon: 'none',
+					duration: 3000
+				}).then(() => {
+				}).catch((err) => {
+					console.error('uni.showToast 调用失败:', err); // *** 非常重要的日志 ***
+				});
+
+				// 2. 统一抛出错误信息
+				const error = new Error(response.message || '请求失败') as Error & { response?: ApiResponse<T> }
+				error.response = response
+				throw err
 			}
-			// 使用 .catch 捕获潜在错误
-			uni.showToast({
-				title: `${response.code}:${response.message}`, // 加前缀方便识别
-				icon: 'none',
-				duration: 3000
-			}).then(() => {
-			}).catch((err) => {
-				console.error('uni.showToast 调用失败:', err); // *** 非常重要的日志 ***
-			});
-
-			// 2. 统一抛出错误信息
-			const error = new Error(response.message || '请求失败') as Error & { response ?: ApiResponse<T> }
-			error.response = response
-			throw error
 		}
-
 		return response
 	}
 }
+
 
 
 

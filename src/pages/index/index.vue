@@ -55,7 +55,7 @@ onLoad((query) => {
 
 onMounted(async () => {
   try {
-    const token = await autoLogin(null);
+    const token = await autoLogin();
     if (token) {
       isInLoginLoading.value = false;
       const fetchedUserInfo = await apiTs.user.getInfo();

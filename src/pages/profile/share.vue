@@ -28,6 +28,7 @@ import { ref, onMounted } from 'vue';
 import { onLoad } from '@dcloudio/uni-app'; // 确保路径正确，根据你的项目配置
 import { autoLogin } from '../../utils/auth';
 import apiTs from '../../utils/apiTs';
+import {setShareToken} from "../../utils/token";
 
 // 存储用户信息
 const userInfo = ref<{ nickname?: string }>({});
@@ -46,6 +47,7 @@ const hasJoinedGroup =  ref(false);
 onLoad(async (query) => {
   if (query.token) {
     shareToken.value = query.token;
+    setShareToken(query.token);
 
     const shareInfo = await apiTs.share.getContent(shareToken.value);
     shareFrom.value = {
@@ -57,7 +59,6 @@ onLoad(async (query) => {
     hasJoinedGroup.value = groupList.some(group => group.id === shareGroup.value.groupId);
 
   } else {
-    console.warn("⚠️ 缺少分享令牌");
     await uni.showToast({title: "缺少分享令牌", icon: "none"});
   }
 });
