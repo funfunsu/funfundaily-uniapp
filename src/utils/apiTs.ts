@@ -161,6 +161,24 @@ const apiTs = {
             data
         ),
     },
+    flow:{
+        list: (data: any): Promise<any> => api.post<any>(
+            '/api/transaction-flows/list',
+            data
+        ),
+        balance: (data: any): Promise<any> => api.post<any>(
+            '/api/transaction-flows/balance',
+            data
+        ),
+        add: (data: any): Promise<any> => api.post<any>(
+            '/api/transaction-flows/add',
+            data
+        ),
+        subtract: (data: any): Promise<any> => api.post<any>(
+            '/api/transaction-flows/subtract',
+            data
+        ),
+    },
     share: {
         create: (data: any): Promise<Share> => api.post<Share>('/api/share/create', data),
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
@@ -174,6 +192,14 @@ const apiTs = {
         ),
         get: (data: any): Promise<any> => api.post<any>(
             '/api/universal-records/get',
+            data
+        ),
+        getForGroup: (data: any): Promise<any> => api.post<any>(
+            '/api/universal-records/group/get',
+            data
+        ),
+        saveForGroup:(data: any): Promise<any> => api.post<any>(
+            '/api/universal-records/group/save',
             data
         ),
     },

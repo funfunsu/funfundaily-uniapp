@@ -1,19 +1,18 @@
 <template>
-  <view class="bottom-bar">
-    <view class="bottom-bar-content">
-      <!-- 左侧：群组信息 + 成员选择器 -->
-      <view class="left-section">
-      </view>
-
-      <!-- 右侧：两个按钮（靠右） -->
-      <view class="right-section">
-        <view v-for="item in buttons" >
-          <button v-if="item.type === 'share'" open-type="share" class="bottom-add-btn">
-            <text class="add-text" >{{ item.text || '-' }}</text>
-          </button>
-          <button v-if="item.type !== 'share'" class="bottom-add-btn" @click="handleButtonClick(item.code)">
-            <text class="add-text" >{{ item.text || '-' }}</text>
-          </button>
+  <view class="bottom-bar-wrapper" :style="getBarStyle()">
+    <view class="bottom-bar-inner" >
+      <view class="bottom-bar-content">
+        <!-- 左侧：群组信息 + 成员选择器 -->
+        <!-- 右侧：两个按钮（靠右） -->
+        <view class="right-section">
+          <view v-for="item in buttons" >
+            <button v-if="item.type === 'share'" open-type="share" class="bottom-add-btn">
+              <text class="add-text" >{{ item.text || '-' }}</text>
+            </button>
+            <button v-if="item.type !== 'share'" class="bottom-add-btn" @click="handleButtonClick(item.code)">
+              <text class="add-text" >{{ item.text || '-' }}</text>
+            </button>
+          </view>
         </view>
       </view>
     </view>
@@ -21,6 +20,17 @@
 </template>
 
 <script setup>
+
+
+const getBarStyle = () => {
+  let barHeight = 60;
+  let bottom = 0;
+
+  return {
+    height: `${barHeight}px`,
+    bottom: bottom
+  };
+}
 
 // ===== Props 定义 =====
 defineProps({
@@ -32,24 +42,50 @@ const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
 </script>
 
 <style scoped>
-.bottom-bar {
-  height: 60px; /* 固定高度 */
-  color: white;
+
+.bottom-bar-wrapper {
+  position: fixed;
+  left: 0;
+  right: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
+  flex-direction: column;
+  z-index: 100;
+  background: transparent; /* 背景交给内部元素 */
+  box-sizing: border-box;
+}
+
+/* --- Inner: 包含你的原始内容 --- */
+.bottom-bar-inner {
+  flex-shrink: 0; /* 防止被压缩 */
+  display: flex;
+  flex-direction: column;
+  border-top-left-radius: 10px; /* 示例圆角 */
+  border-top-right-radius: 10px;
+}
+
+.bottom-bar-top {
+  height: 40px;
+  display: flex;          /* 设置为 Flex 容器 */
+  align-items: center;    /* 垂直居中 */
+  /* justify-content: space-between; */ /* 移除这个 */
+  box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.6);
+  width: 100%;
+  padding-left: 16px;    /* 控制内容与边界距离 */
+  padding-right: 16px;
+  gap: 10px;
+  color: #007aff;
 }
 
 .bottom-bar-content {
-  height: 100%;
+  height: 60px;
   padding: 0 16px;
   display: flex;
   align-items: center;
   box-sizing: border-box;
   width: 100%;
-  /* 不使用 justify-content，靠 margin-left: auto 实现右对齐 */
+  background: #ffffff;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* —————— 左侧区域 —————— */
@@ -59,6 +95,12 @@ const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
   align-items: center;
   gap: 12px;
   min-width: 0; /* 允许内部文本省略 */
+}
+
+.center-section {
+  text-align: center;    /* 关键：让内部内容（文字）在此区域内居中 */
+  flex: 1;               /* 关键：占据所有可用的剩余空间 */
+  min-width: 0;          /* 允许内部文本溢出时被省略 */
 }
 
 .group-info {
@@ -84,8 +126,6 @@ const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
   display: flex;
   align-items: center;
   padding: 6px 8px;
-  background-color: #f5f5f5;
-  border-radius: 16px;
   height: 32px;
   font-size: 13px;
   width: 100%;
@@ -153,4 +193,5 @@ const handleButtonClick = (buttonCode) => emit('button-click',buttonCode)
 .add-text {
   font-weight: 500;
 }
+
 </style>

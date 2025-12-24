@@ -77,6 +77,25 @@
   ],
   "subPackages": [
     {
+      "root": "subPackages/points",
+      "pages": [
+        {
+          "path": "pages/points-product-manage",
+          "style": {
+            "navigationBarTitleText": "积分兑换管理",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/points-product-edit",
+          "style": {
+            "navigationBarTitleText": "积分兑换品编辑",
+            "enablePullDownRefresh": false
+          }
+        }
+      ]
+    },
+    {
       "root": "subPackages/study-tools",
       // ← 子包根路径
       "pages": [
@@ -91,6 +110,20 @@
           "path": "pages/writing/pinyin-converter",
           "style": {
             "navigationBarTitleText": "拼音",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/ledger/index",
+          "style": {
+            "navigationBarTitleText": "家庭账本",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/ledger/edit",
+          "style": {
+            "navigationBarTitleText": "编辑流水",
             "enablePullDownRefresh": false
           }
         }

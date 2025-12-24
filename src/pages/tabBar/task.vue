@@ -333,7 +333,6 @@ onShow(() => {
   if (!refreshUri){
     return
   }
-  debugger
   if (refreshUri === currentTab){
     fetchAllData()
     removeStoredData(STORAGE_KEYS.REFRESH_TAB)

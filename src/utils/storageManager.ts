@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
     CURRENT_MEMBER: 'cached_current_member',
     USER_INFO:'cached_user_info',
     REFRESH_TAB:'cached_refresh_tab',
+    POINT_PRODUCT_LIST:'point_product_list',
     // 可以在这里添加更多键名...
 } as const; // 使用 'as const' 使键值成为字面量类型，增强类型安全性
 

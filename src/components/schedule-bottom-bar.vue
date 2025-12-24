@@ -17,7 +17,7 @@
     </view>
     <view class="bottom-bar-content">
       <!-- 左侧：群组信息 + 成员选择器 -->
-      <view class="left-section" v-if="showGroupMember">
+      <view class="left-section" >
         <!-- 群组信息 -->
         <view class="group-info">
           <view class="member-switcher">
@@ -37,7 +37,7 @@
         </view>
 
         <!-- 成员选择器 -->
-        <view class="member-switcher" v-if="!showAllOfMine">
+        <view class="member-switcher" v-if="!showAllOfMine & showGroupMember" >
           <picker
               @change="handleMemberChange"
               :value="displayMemberIndex"
