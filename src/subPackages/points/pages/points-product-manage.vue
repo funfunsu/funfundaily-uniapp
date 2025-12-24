@@ -76,7 +76,6 @@ const handleButtonClick = (buttonCode) => {
 
 // 处理成员切换
 function handleMemberChange(e) {
-  debugger
   currentGroup.value = e.currentGroup;
   console.log( '当前群组:', currentGroup.value);
   fetchProducts()
