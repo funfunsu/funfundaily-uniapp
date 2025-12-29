@@ -536,16 +536,6 @@ defineExpose({
   color: #2196f3;
 }
 
-/* 小屏幕适配 */
-@media (max-width: 375px) {
-  .day-column {
-    width: 90px !important;
-  }
-
-  .day-column-header {
-    width: 90px !important;
-  }
-}
 
 /* 布局类 */
 .flex-row {

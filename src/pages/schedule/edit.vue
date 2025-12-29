@@ -2,7 +2,7 @@
   <view class="page-container">
     <view class="page-content-container">
       <!-- 引入schedule-content组件 -->
-      <schedule-edit :schedule="editingSchedule" />
+      <schedule-edit :schedule="editingSchedule" :cur-date="curDate"/>
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
@@ -13,11 +13,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'; // 导入 ref
+import {ref} from 'vue'; // 导入 ref
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import scheduleEdit from '../../components/schedule/schedule-edit.vue'
 import apiTs from '../../utils/apiTs'
-import { onLoad } from '@dcloudio/uni-app';
+import {onLoad} from '@dcloudio/uni-app';
 import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 import DateUtils from "../../utils/util"; // 导入 onLoad 生命周期
 
@@ -26,6 +26,7 @@ const editingSchedule = ref({ itemType: 'schedule' }); // 初始化为一个带�
 const buttons = ref([{ code: 'save', text: '保存' }]);
 const currentMember = ref({});
 const currentGroup = ref({});
+const curDate = ref(null)
 
 
 // =============== 生命周期 ===============
@@ -41,6 +42,8 @@ onLoad((query) => {
       startTime = new Date()
     }
     const date = new Date(startTime);
+    curDate.value = date
+
     date.setMinutes(date.getMinutes() + 45);
     editingSchedule.value.startTime = DateUtils.formatDateTime(startTime);
     editingSchedule.value.endTime = DateUtils.formatDateTime(date);
@@ -59,9 +62,8 @@ async function loadSchedule(id) {
       id: id
     };
     // 假设 apiTs.schedule.info 返回一个符合 editingSchedule 结构的对象
-    const scheduleData = await apiTs.schedule.info(req);
     // 更新 ref 的 value
-    editingSchedule.value = scheduleData;
+    editingSchedule.value = await apiTs.schedule.info(req);
   } catch (error) {
     console.error('加载日程信息失败:', error);
     // 可以在这里添加用户提示，比如 uni.showToast

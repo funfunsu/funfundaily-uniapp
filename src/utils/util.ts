@@ -105,6 +105,31 @@ export default class DateUtils {
 	}
 
 
+	static getMinutesDiff(date1:Date, date2:Date):number {
+		if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
+			throw new Error("Both arguments must be Date objects");
+		}
+		// 获取时间戳（毫秒）
+		const time1 = date1.getTime();
+		const time2 = date2.getTime();
+		// 计算毫秒差
+		const timeDifferenceInMs = time2 - time1;
+		// 转换为分钟 (1分钟 = 60 * 1000 毫秒)
+		return timeDifferenceInMs / (1000 * 60);
+	}
+	static getDaysDiff(date1:Date, date2:Date):number {
+		if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
+			throw new Error("Both arguments must be Date objects");
+		}
+
+		const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+		// 计算毫秒差，然后转换为天数，并向下取整
+		// 使用 Math.floor 确保负数也能正确处理 (例如 -1.5 -> -2)
+		return Math.floor((date2.getTime() - date1.getTime()) / MS_PER_DAY);
+	}
+
+
 	static getDayInMonth(date : Date = new Date()) : string {
 		return padZero(date.getDate())
 	}

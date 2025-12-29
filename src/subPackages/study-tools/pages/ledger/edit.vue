@@ -157,20 +157,19 @@ const saveTransaction = async () => {
     const finalAmountInCents = formData.value.transactionType === 'INCOME' ? amountInCents : -amountInCents;
 
     const req = {
-      amount: finalAmountInCents, // 发送给后端的是分
-      description: formData.value.summary || '无摘要', // 如果摘要为空，后端可能需要一个默认值
-      // time: formData.value.time, // 如果需要发送时间，取消注释并赋值
+      flow:{
+        amount: finalAmountInCents, // 发送给后端的是分
+        description: formData.value.summary || '无摘要',
+        flowType: formData.value.flowType, // 'CASH'
+        // 'INCOME' or 'EXPENSE'
+        transactionType: formData.value.transactionType
+      },
       groupId: formData.value.groupId,
       targetUserId: formData.value.userId,
-      flowType: formData.value.flowType, // 'CASH'
-      transactionType: formData.value.transactionType // 'INCOME' or 'EXPENSE'
-      // 可能还需要其他字段，如 category 等，根据后端接口调整
     };
 
-    console.log('Sending request:', req); // 调试日志
-
     // 调用 API 保存流水
-    const response = await apiTs.flow.add(req); // 假设有一个 create 接口
+    const response = await apiTs.flow.save(req); // 假设有一个 create 接口
 
     console.log('Save response:', response);
 

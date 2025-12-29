@@ -170,8 +170,8 @@ const apiTs = {
             '/api/transaction-flows/balance',
             data
         ),
-        add: (data: any): Promise<any> => api.post<any>(
-            '/api/transaction-flows/add',
+        save: (data: any): Promise<any> => api.post<any>(
+            '/api/transaction-flows/save',
             data
         ),
         subtract: (data: any): Promise<any> => api.post<any>(

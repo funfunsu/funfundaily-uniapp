@@ -174,7 +174,7 @@ onLoad(async (query) => {
     } catch (loginError) {
       // 处理自动登录失败
       console.error("❌ 自动登录失败:", loginError);
-      uni.showToast({
+      await uni.showToast({
         title: loginError.message || "自动登录失败，请尝试手动登录", // 更具体的提示
         icon: "none",
         duration: 3000 // 稍长一些的显示时间
@@ -192,7 +192,7 @@ onLoad(async (query) => {
     }
   } else {
     console.warn("⚠️ 缺少分享令牌");
-    uni.showToast({ title: "缺少分享令牌", icon: "none" });
+    await uni.showToast({title: "缺少分享令牌", icon: "none"});
   }
 });
 

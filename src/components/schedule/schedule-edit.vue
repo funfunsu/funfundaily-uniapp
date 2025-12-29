@@ -64,12 +64,12 @@
           </view>
 
           <!-- 每周重复：周几+时间 -->
-          <view v-else-if="schedule.repeatType === 'weekly' || schedule.repeatType === '2weekly'" class="form-item  form-item-inline">
+          <view v-else-if="isWeekRepeat(schedule.repeatType)" class="form-item  form-item-inline">
             <text class="label">重复星期</text>
             <view class="week-days-container">
               <view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
-                    :class="{ selected: schedule.repeatKeys.includes(index+'') }"
-                    @click="toggleWeekDay(index+'')">
+                    :class="{ selected: schedule.repeatKeys.includes(weekDayIndex[index]) }"
+                    @click="toggleWeekDay(weekDayIndex[index])">
                 {{ day }}
               </view>
             </view>
@@ -94,7 +94,7 @@
           </view>
         </view>
         <!-- 时间设置 - 开始时间和结束时间放在一行 -->
-        <view class="form-row" v-if="schedule.itemType != 'task'">
+        <view class="form-row" v-if="schedule.itemType !== 'task'">
           <view class="form-item form-item-inline">
             <text class="label">开始时间 *</text>
             <picker class="picker" mode="time" :value="getTimeOnly(schedule.startTime)" start="00:00"
@@ -169,21 +169,36 @@
 // 引入必要的 Vue 功能
 import { ref, reactive, computed, onMounted } from 'vue'; // 移除了 watch，除非你需要它
 import DateUtils from "../../utils/util";
+import {getStoredData, setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 
 // --- Props 定义 ---
 const props = defineProps({
-  schedule: Object
+  schedule: Object,
+  curDate:new Date()
 });
 
 // --- Refs for static-ish options (对应 Vue 2 data 中的静态选项) ---
 // 使用 ref 定义这些不太会改变的选项数组
-const repeatTypeOptions = ref(['不重复', '每天', '每周','每两周', '每月', '每年']);
-const repeatTypeValues = ref(['none', 'daily', 'weekly','2weekly', 'monthly', 'yearly']);
-const weekDays = ref(['日', '一', '二', '三', '四', '五', '六']);
+const repeatTypeOptions = ref(['不重复', '每天', '每周','单周','双周','每两周', '每月', '每年']);
+const repeatTypeValues = ref(['none', 'daily', 'weekly','oddWeek','evenWeek', 'monthly', 'yearly']);
+const weekDays = ref(['一', '二', '三', '四', '五', '六','日']);
+const weekDayIndex = ref(['1','2','3','4','5','6','0']);
 const monthDays = ref(Array.from({length: 31}, (_, i) => (i + 1).toString()));
 const itemLabelOptions = ref(['学校', '家里']);
 const itemLabelValues = ref(['school', 'home']);
 const showDescription = ref(false)
+
+let startTime;
+let endTime;
+
+let repeatDiffDays = getStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION);
+let scheduleDiffMin = getStoredData(STORAGE_KEYS.SCHEDULE_CACHED_DURATION);
+if (!repeatDiffDays){
+  repeatDiffDays = 180
+}
+if (!scheduleDiffMin){
+  scheduleDiffMin = 45
+}
 
 // --- Methods ---
 // 注意：以下所有修改 props.schedule 的方法都存在直接修改 props 的问题，
@@ -209,9 +224,19 @@ const handleTimeChange = (e, field) => {
   const timeValue = e.detail.value;
   props.schedule[field] = DateUtils.replaceTimePart(props.schedule[field], timeValue + ':00');
   if (field === 'startTime') {
-    const date = new Date(props.schedule[field]);
-    date.setMinutes(date.getMinutes() + 45);
-    props.schedule['endTime'] = DateUtils.formatDateTime(date);
+    startTime = new Date(props.schedule[field]);
+    endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + scheduleDiffMin);
+
+    props.schedule['endTime'] = DateUtils.formatDateTime(endTime);
+  }else if (field === 'endTime') {
+    endTime = new Date(props.schedule[field])
+    startTime = new Date(props.schedule['startTime']);
+    const minuteDiff = DateUtils.getMinutesDiff(startTime,endTime)
+    if (scheduleDiffMin !== minuteDiff){
+      scheduleDiffMin = minuteDiff
+      setStoredData(STORAGE_KEYS.SCHEDULE_CACHED_DURATION,minuteDiff)
+    }
   }
 };
 
@@ -264,37 +289,59 @@ const getItemLabelText = (type) => {
   return index !== -1 ? itemLabelOptions.value[index] : itemLabelOptions.value[0]; // 使用 .value
 };
 
+const handleRepeatDateChanged = (field)=>{
+  if (field === 'repeatStartDay'){
+    const repeatStartDay = new Date(props.schedule['repeatStartDay']);
+    const endDate = new Date(repeatStartDay);
+    endDate.setDate(endDate.getDate() + repeatDiffDays);
+    props.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(endDate);
+  }else if (field === 'repeatEndDay'){
+    const repeatEndDay = new Date(props.schedule[field]);
+    const repeatStartDay = new Date(props.schedule['repeatStartDay']);
+    const dayDiff = DateUtils.getDaysDiff(repeatStartDay,repeatEndDay);
+    if (repeatDiffDays !== dayDiff){
+      repeatDiffDays = dayDiff
+      setStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION,dayDiff)
+    }
+  }
+}
+
 const handleRepeatDateChange = (e, field) => {
   const dateStr = e.detail.value;
   props.schedule[field] = DateUtils.replaceDatePart(props.schedule[field], dateStr);
+  handleRepeatDateChanged(field)
 };
 
 const handleEventDateChange = (e) => {
   const dateStr = e.detail.value;
   props.schedule['startTime'] = DateUtils.replaceDatePart(props.schedule['startTime'], dateStr);
   props.schedule['endTime'] = DateUtils.replaceDatePart(props.schedule['endTime'], dateStr);
-  console.log(props.schedule);
 };
+
+const isWeekRepeat = (repeatType) =>{
+  return repeatType === 'weekly' || repeatType === 'oddWeek' || repeatType === 'evenWeek'
+}
 
 const handleRepeatTypeChange = (e) => {
   const index = e.detail.value;
-  const today = new Date();
+  const today = props.curDate?props.curDate:new Date();
 
   props.schedule.repeatType = repeatTypeValues.value[index]; // 使用 .value
   if (props.schedule.repeatType === 'none') {
     return;
   }
-  if (props.schedule.repeatType === 'weekly' || props.schedule.repeatType === '2weekly') {
+  if (isWeekRepeat(props.schedule.repeatType)) {
     props.schedule.repeatKeys = [DateUtils.getWeekDay(today).toString()];
   } else if (props.schedule.repeatType === 'yearly') {
     props.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
   } else if (props.schedule.repeatType === 'monthly') {
     props.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
   }
-  props.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today);
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + 180);
-  props.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(endDate);
+  if (!props.schedule.repeatStartDay){
+    props.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today);
+    handleRepeatDateChanged('repeatStartDay');
+  }
+  console.log(props.schedule)
 };
 
 const handleItemLabelChange = (e) => {

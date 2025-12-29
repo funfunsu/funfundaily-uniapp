@@ -38,6 +38,7 @@ import { onLoad } from '@dcloudio/uni-app';
 import { autoLogin } from '../../utils/auth';
 import apiTs from '../../utils/apiTs';
 import {STORAGE_KEYS, setStoredData, getStoredData} from '../../utils/storageManager';
+import {getShareToken} from "../../utils/token";
 
 // --- 响应式状态 ---
 const showProfileUpdate = ref(false);

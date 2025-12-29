@@ -59,6 +59,27 @@
       </view>
     </view>
 
+    <!-- 客服二维码弹窗 -->
+    <view v-if="showQrcodeModal" class="qrcode-modal" @click="closeQrcodeModal">
+      <view class="qrcode-container" @click.stop>
+        <view class="qrcode-header">
+          <text class="qrcode-title">联系客服</text>
+          <text class="close-icon" @click="closeQrcodeModal">×</text>
+        </view>
+        <view class="qrcode-body">
+          <!-- 新增点击事件，添加提示文字 -->
+          <image
+              class="qrcode-img"
+              src="/static/images/kefu-qrcode.png"
+              mode="widthFix"
+              lazy-load
+              @click="previewQrcode"
+          ></image>
+          <text class="qrcode-desc">长按图片可识别二维码</text>
+        </view>
+      </view>
+    </view>
+
     <view class="contact-service-section">
       <button class="create-btn" @click="showCreateGroupForm">
         <text class="contact-icon">+</text>
@@ -66,7 +87,8 @@
       </button>
     </view>
     <view class="contact-service-section">
-      <button class="contact-service-btn" open-type="contact">
+      <!-- 移除 open-type="contact"，新增点击事件 -->
+      <button class="contact-service-btn" @click="showQrcodeModal = true">
         <text class="contact-icon">&#x1F4AC;</text>
         <text>联系客服</text>
       </button>
@@ -87,6 +109,8 @@ const selectedGroupIdx = ref(0)
 const showGroupForm = ref(false)
 const newGroupName = ref('')
 const inputFocus = ref(false)
+// 新增：控制客服二维码弹窗显示
+const showQrcodeModal = ref(false)
 
 // --- 模板引用 ---
 const groupNameInputRef = ref(null)
@@ -95,9 +119,28 @@ const groupNameInputRef = ref(null)
 import api from '../../utils/apiTs'
 import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../utils/storageManager'
 import apiTs from "../../utils/apiTs";
-// import scheduleBottomBar from "../../components/schedule-bottom-bar.vue"; // 如果需要底部栏组件，可以在这里导入并使用
 
 // --- 方法定义 ---
+
+const previewQrcode = () => {
+  // 替换为你的实际二维码图片地址
+  const qrcodeUrl = '/static/images/kefu-qrcode.png'
+
+  // 使用uni-app的预览图片API
+  uni.previewImage({
+    urls: [qrcodeUrl], // 需要预览的图片链接列表
+    current: 0, // 当前显示图片的索引
+    longPressActions: {
+      itemList: ['识别图中二维码', '保存图片', '转发朋友'], // 自定义长按菜单（微信会自动补充识别二维码选项）
+      success: function(res) {
+        console.log('长按操作：', res.tapIndex)
+      },
+      fail: function(res) {
+        console.log('长按操作失败：', res.errMsg)
+      }
+    }
+  })
+}
 
 const fetchUserInfo = async () => {
   try {
@@ -143,32 +186,6 @@ const editNickname = () => {
   })
 }
 
-const editGroup = async (group) => {
-  // 编辑群组逻辑
-  // 第一步：输入昵称
-  uni.showModal({
-    title: '修改群组',
-    placeholderText: group.groupName,
-    editable: true,
-    success: async (res1) => {
-      if (res1.confirm && res1.content?.trim()) {
-        const groupName = res1.content.trim()
-        try {
-          await api.group.modify({ id: group.id, groupName: groupName })
-          await fetchGroupList() // 刷新列表
-        } catch (error) {
-          console.error('修改群组失败:', error)
-          uni.showToast({ title: '修改失败', icon: 'none' })
-        }
-      }
-    },
-    fail: () => {
-      console.log("编辑群组操作被取消或失败");
-    }
-  })
-}
-
-
 const fetchGroupList = async () => {
   try {
     const res = await api.group.list()
@@ -180,28 +197,13 @@ const fetchGroupList = async () => {
     }
   } catch (err) {
     console.error('获取群组列表失败', err)
-    // 可以从本地存储加载缓存数据作为备选
-    // const cachedGroups = getStoredData(STORAGE_KEYS.GROUP_LIST);
-    // if (Array.isArray(cachedGroups)) {
-    //   groupList.value = cachedGroups;
-    // }
   }
-}
-
-// const bindGroupChange = (e) => { // 如果使用 picker
-//   selectedGroupIdx.value = e.detail.value
-// }
-
-const handleGroupManageClick = () => {
-  uni.navigateTo({
-    url: '/pages/profile/group-manage'
-  })
 }
 
 const handleGroupMembersClick = (group) => {
   setStoredData(STORAGE_KEYS.CURRENT_GROUP, group)
   uni.navigateTo({
-    url: `/pages/profile/group-manage?id=${group.id}` // 推荐传递ID以便目标页面获取最新数据
+    url: `/pages/profile/group-manage?id=${group.id}`
   })
 }
 
@@ -209,12 +211,9 @@ const showCreateGroupForm = () => {
   showGroupForm.value = true
   newGroupName.value = ''
   nextTick(() => {
-    // 自动聚焦输入框（App/小程序支持有限，但尽量尝试）
     if (groupNameInputRef.value && typeof (groupNameInputRef.value ).focus === 'function') {
-      (groupNameInputRef.value ).focus() // uni-app 特定调用方式
+      (groupNameInputRef.value ).focus()
     }
-    // 滚动到可视区域（可选）
-    // uni.createSelectorQuery()... (这部分在 Vue 3 中可能需要调整，但逻辑类似)
   })
 }
 
@@ -243,34 +242,24 @@ const submitCreateGroup = async () => {
   cancelCreateGroup()
 }
 
+// 新增：关闭二维码弹窗方法
+const closeQrcodeModal = () => {
+  showQrcodeModal.value = false
+}
+
 // --- 生命周期钩子 ---
-// 页面加载时执行
 onLoad(async (option) => {
-  // 可以在这里处理页面参数 option
   await fetchUserInfo()
   await fetchGroupList()
 })
 
-// 页面显示时也可能需要刷新数据（例如从管理页返回）
 onShow(() => {
-  // 如果需要实时更新，可以考虑在这里调用 fetchGroupList()
-  // 但要注意性能，避免不必要的请求。通常由后端推送或手动刷新更好。
+  // 如需刷新数据可在此调用
 })
-
-// 如果需要在组件挂载后立即执行某些 DOM 相关操作（虽然这里不太需要）
-// onMounted(() => {
-//   console.log('Profile page mounted');
-// })
-
-// 将需要在模板中调用的方法暴露出去（在 <script setup> 中通常是隐式暴露的，
-// 但如果需要在父组件调用或更复杂的场景下，可以明确导出）
-// defineExpose({ fetchUserInfo, fetchGroupList }) // 示例
-
 </script>
 
 <style scoped>
-/* ... (你的样式部分保持不变) ... */
-
+/* 原有样式保持不变 */
 .profile-container {
   background-color: #f8f9fa;
   min-height: 100vh;
@@ -288,8 +277,35 @@ onShow(() => {
   padding: 40rpx 30rpx;
   margin-bottom: 30rpx;
   box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+  position: relative;
 }
 
+.user-info-section::after {
+  content: '';
+  position: absolute;
+  bottom: 20rpx;
+  width: 60rpx;
+  height: 6rpx;
+  background-color: #007aff;
+  border-radius: 3rpx;
+  opacity: 0.6;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007aff, #00bfff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+  transition: transform 0.2s;
+}
+
+.user-info-section:active .avatar {
+  transform: scale(0.95);
+}
 
 .avatar-text {
   color: white;
@@ -297,66 +313,24 @@ onShow(() => {
   font-weight: bold;
 }
 
+.user-details {
+  text-align: center;
+}
+
 .user-name {
   font-size: 36rpx;
   font-weight: 600;
   color: #333;
-  margin-bottom: 30rpx;
+  margin-bottom: 12rpx;
+  text-align: center;
+  max-width: 80%;
+  word-break: break-all;
 }
 
-.group-selector-container {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  max-width: 500rpx;
-  background: #f0f7ff;
-  border-radius: 16rpx;
-  padding: 16rpx 20rpx;
-}
-
-.group-label {
-  font-size: 26rpx;
-  color: #666;
-  white-space: nowrap;
-  margin-right: 12rpx;
-}
-
-.group-picker-wrapper {
-  flex: 1;
-  position: relative;
-}
-
-.group-picker {
-  width: 100%;
-}
-
-.picker-value {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 28rpx;
-  color: #333;
-  padding: 12rpx 0;
-}
-
-.picker-arrow {
-  font-size: 20rpx;
+.edit-hint {
+  font-size: 24rpx;
   color: #999;
-  transform: scaleY(0.7);
-}
-
-.add-group-btn {
-  margin-left: 16rpx;
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background-color: #e6f0ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #007aff;
-  font-size: 40rpx;
-  font-weight: bold;
+  margin-top: 8rpx;
 }
 
 /* 菜单区域 */
@@ -382,6 +356,11 @@ onShow(() => {
 
 .menu-item:last-child {
   border-bottom: none;
+}
+
+.menu-left {
+  display: flex;
+  align-items: center;
 }
 
 .menu-title {
@@ -443,6 +422,10 @@ onShow(() => {
 
 .group-form-body {
   padding: 0 40rpx 30rpx;
+}
+
+.form-item {
+  margin-top: 20rpx;
 }
 
 .form-label {
@@ -509,109 +492,132 @@ onShow(() => {
 .contact-service-section {
   display: flex;
   justify-content: center;
-  margin-top: 40rpx; /* 与上方内容保持一定距离 */
-  padding: 0 20rpx; /* 与页面左右边距一致 */
+  margin-top: 40rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
 }
+
 .create-btn{
   background-color: #007aff;
   color: white;
   height: 40px;
-  width: 100%; /* 或者设置一个固定最大宽度，如 max-width: 600rpx; */
+  width: 100%;
   padding: 24rpx 0;
-  border: 2rpx solid #007aff; /* 蓝色边框 */
-  border-radius: 12rpx; /* 圆角 */
+  border: 2rpx solid #007aff;
+  border-radius: 12rpx;
   font-size: 32rpx;
   font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16rpx; /* 图标和文字之间的间距 */
-  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1); /* 可选：轻微阴影 */
-  transition: all 0.2s ease; /* 可选：过渡动画 */
+  gap: 16rpx;
+  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1);
+  transition: all 0.2s ease;
 }
 
 .contact-service-btn {
   height: 40px;
-  width: 100%; /* 或者设置一个固定最大宽度，如 max-width: 600rpx; */
+  width: 100%;
   padding: 24rpx 0;
-  background-color: #ffffff; /* 白色背景 */
-  border: 2rpx solid #007aff; /* 蓝色边框 */
-  border-radius: 12rpx; /* 圆角 */
-  color: #007aff; /* 蓝色文字 */
+  background-color: #ffffff;
+  border: 2rpx solid #007aff;
+  border-radius: 12rpx;
+  color: #007aff;
   font-size: 32rpx;
   font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16rpx; /* 图标和文字之间的间距 */
-  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1); /* 可选：轻微阴影 */
-  transition: all 0.2s ease; /* 可选：过渡动画 */
+  gap: 16rpx;
+  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1);
+  transition: all 0.2s ease;
 }
 
 .contact-service-btn:hover,
-.contact-service-btn:active { /* 可选：鼠标悬停或按下时的效果 */
-  background-color: #f0f8ff; /* 浅蓝色背景 */
-  transform: scale(0.98); /* 轻微缩小 */
+.contact-service-btn:active {
+  background-color: #f0f8ff;
+  transform: scale(0.98);
 }
 
 .contact-icon {
-  font-size: 36rpx; /* 稍大一点的图标 */
-}
-
-
-.user-info-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 40rpx 30rpx;
-  margin-bottom: 30rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
-  position: relative;
-}
-
-.user-info-section::after {
-  content: '';
-  position: absolute;
-  bottom: 20rpx;
-  width: 60rpx;
-  height: 6rpx;
-  background-color: #007aff;
-  border-radius: 3rpx;
-  opacity: 0.6;
-}
-
-.user-name {
   font-size: 36rpx;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 12rpx; /* 减小间距，为提示文字留空间 */
-  text-align: center;
-  max-width: 80%;
-  word-break: break-all;
 }
 
-.edit-hint {
-  font-size: 24rpx;
-  color: #999;
-  margin-top: 8rpx;
-}
-
-.avatar {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #007aff, #00bfff);
+/* 新增：客服二维码弹窗样式 */
+.qrcode-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 24rpx;
-  transition: transform 0.2s;
+  z-index: 10000;
 }
 
-.user-info-section:active .avatar {
-  transform: scale(0.95);
+.qrcode-container {
+  width: 80%;
+  max-width: 500rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.qrcode-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 30rpx;
+  background: #f8f9fa;
+  border-bottom: 1rpx solid #eee;
+}
+
+.qrcode-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.close-icon {
+  font-size: 40rpx;
+  color: #999;
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qrcode-body {
+  padding: 40rpx 30rpx;
+  text-align: center;
+}
+
+.qrcode-img {
+  width: 100%;
+  max-width: 300rpx;
+  margin: 0 auto;
+  border-radius: 10rpx;
+}
+
+.qrcode-desc {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  color: #666;
 }
 </style>

@@ -8,7 +8,7 @@
         </view>
         <view class="stat-divider"></view>
         <view class="stat-block" @click="handleHistoryClick">
-          <text class="stat-number">{{ point.count || 0 }}</text>
+          <text class="stat-number">{{ pointBalance || 0 }}</text>
           <text class="stat-label">总积分</text>
         </view>
         <view class="stat-divider"></view>
@@ -25,7 +25,7 @@
       <view v-show="listShow" class="task-list">
         <view v-if="taskList.length === 0" class="empty-state">
           <text class="empty-icon">📋</text>
-          <text class="empty-text">今天没有任务，休息一下吧！</text>
+          <text class="empty-text">今天没有任务，来创建一个吧！</text>
         </view>
 
         <view v-for="task in taskList" :key="task.id"> <!-- 添加 key 提高性能 -->
@@ -75,7 +75,7 @@ interface PointData {
 }
 
 // =============== 响应式状态 ===============
-const point = ref<PointData>({ count: 0 })
+const pointBalance = ref(0)
 const taskList = ref<Task[]>([])
 const currentDate = ref(new Date())
 const listShow = ref(true)
@@ -85,6 +85,9 @@ const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},cent
 
 const currentMember =ref<object>()
 const currentGroup =ref<object>()
+
+const flowType = 'POINTS';
+
 
 
 // =============== 计算属性 ===============
@@ -115,20 +118,26 @@ onLoad(async (query) => {
 
 // =============== 方法 ===============
 async function fetchAllData() {
-  await Promise.all([fetchPoint(), fetchTaskList()])
+  await Promise.all([fetchPointBalance(), fetchTaskList()])
 }
 
-async function fetchPoint() {
-  if(!currentMember.value){
+
+
+async function fetchPointBalance() {
+  if (!currentMember.value || !currentGroup.value) {
+    console.warn('Member or Group not selected, skipping balance fetch.');
     return;
   }
   const req = {
-    userId: currentMember.value.userId,
+    flowType: flowType,
+    targetUserId: currentMember.value.userId,
     groupId: currentGroup.value.id
   }
-  const member = await apiTs.group.user.get(req)
-  point.value = {
-    count:member.score
+  try {
+    pointBalance.value = await apiTs.flow.balance(req)
+  } catch (error) {
+    console.error('获取余额失败:', error);
+    // 可以设置一个默认值或提示用户
   }
 
 }
@@ -208,9 +217,7 @@ const onTaskCheck = ({ task, completed }) => {
   if (index !== -1) {
     taskList.value.splice(index, 1, updatedTask)
   }
-  point.value = {
-    count:point.value.count+task.extra.score
-  }
+  pointBalance.value = pointBalance.value+task.extra.score
 }
 
 
