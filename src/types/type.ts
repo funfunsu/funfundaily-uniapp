@@ -156,37 +156,8 @@ export interface GroupMemberItem {
   username: string
   nickname: string
   avatar?: string
-  role: 'admin' | 'member'
+  role: 'Admin' | 'Member'
   joinedAt: string
-}
-
-export interface GroupMemberListRequest {
-  groupId: string
-  page?: number
-  limit?: number
-}
-
-export interface GroupMemberListResponse {
-  list: GroupMemberItem[]
-  total: number
-  page: number
-  limit: number
-}
-
-export interface AddGroupMemberRequest {
-  groupId: string
-  userIds: string[]
-}
-
-export interface RemoveGroupMemberRequest {
-  groupId: string
-  userId: string
-}
-
-export interface UpdateGroupMemberRequest {
-  groupId: string
-  userId: string
-  role: 'admin' | 'member'
 }
 
 // 定义任务相关类型

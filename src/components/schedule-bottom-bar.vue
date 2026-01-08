@@ -424,6 +424,7 @@ watch(_groupList, (newList) => {
 .bottom-bar-content {
   height: 60px;
   padding: 0 16px;
+  padding-bottom: 15px;
   display: flex;
   align-items: center;
   box-sizing: border-box;

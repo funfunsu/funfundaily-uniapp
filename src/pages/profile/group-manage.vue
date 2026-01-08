@@ -111,7 +111,7 @@ onShareAppMessage((res) => {
   const shareData = {
     groupId:currentGroup.value.id,
     groupName:currentGroup.value.groupName,
-    role:'member',
+    role:'Member',
     label:'parents'
   }
 

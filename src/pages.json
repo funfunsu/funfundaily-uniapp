@@ -73,6 +73,13 @@
         "navigationBarTitleText": "日程分享",
         "enablePullDownRefresh": false
       }
+    },
+    {
+      "path": "pages/task/share",
+      "style": {
+        "navigationBarTitleText": "任务分享",
+        "enablePullDownRefresh": false
+      }
     }
   ],
   "subPackages": [

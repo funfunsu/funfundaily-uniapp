@@ -160,6 +160,11 @@ const apiTs = {
             '/api/checkin/list',
             data
         ),
+        // 添加打卡
+        listV2: (data: any): Promise<any> => api.post<any>(
+            '/api/checkin/listV2',
+            data
+        ),
     },
     flow:{
         list: (data: any): Promise<any> => api.post<any>(

@@ -23,9 +23,11 @@
 
       <!-- 任务列表 -->
       <view v-show="listShow" class="task-list">
-        <view v-if="taskList.length === 0" class="empty-state">
-          <text class="empty-icon">📋</text>
-          <text class="empty-text">今天没有任务，来创建一个吧！</text>
+        <view v-if="taskList.length === 0" class="no-tasks-container">
+          <!-- 引导创建任务的按钮 -->
+          <button class="create-task-btn" @click="onAddTaskClick">
+            + 添加一个任务
+          </button>
         </view>
 
         <view v-for="task in taskList" :key="task.id"> <!-- 添加 key 提高性能 -->
@@ -34,6 +36,9 @@
               @edit-task="onEditTask"
               @check-task="onTaskCheck"
               @delay-click="onTaskDelay"
+              @toggle-select="toggleSelect"
+              :mode="mode"
+              :is-selected="isTaskSelected(task)"
               :task="task"
           />
         </view>
@@ -43,58 +48,48 @@
     <!-- 底部栏 -->
     <schedule-bottom-bar
         :buttons="buttons"
-        :top-side-config = "barTopSideConfig"
+        :show-group-member="mode !== 'share'"
+        :top-side-config="barTopSideConfig"
         @member-change="handleMemberChange"
         @buttonClick="handleButtonClick"/>
   </view>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import {computed, onMounted, ref} from 'vue'
 import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import TaskCard from '../../components/task/task-card.vue'
 import DateUtils from "../../utils/util";
-import {onLoad, onPullDownRefresh, onShow} from "@dcloudio/uni-app";
+import {onLoad, onShareAppMessage, onShow} from "@dcloudio/uni-app";
 import {getStoredData, removeStoredData, STORAGE_KEYS} from "../../utils/storageManager";
-
-// =============== 类型定义 ===============
-interface Task {
-  id: string | number
-  itemTitle?: string
-  itemDesc?: string
-  extra?: {
-    score?: number | string
-  }
-  isCompleted?: boolean
-  completedTime?: number | string | null,
-}
-
-interface PointData {
-  count: number
-}
 
 // =============== 响应式状态 ===============
 const pointBalance = ref(0)
-const taskList = ref<Task[]>([])
+const taskList = ref([]) // Task[] 类型会自动推断
 const currentDate = ref(new Date())
 const listShow = ref(true)
 const isLoadingMore = ref(false)
-const buttons = ref<object[]>([{code: 'addEvent', text: '添加任务'}])
-const barTopSideConfig = ref<{}>({left:{text:'←前一天',code:'lastDay'},center:{text:`${DateUtils.getDateStr(currentDate.value)}`,code:'date-refresh'},right:{text:'后一天→',code:'nextDay'}})
+const buttons = ref([
+  {code: 'toShare', text: '分享'},
+  {code: 'addEvent', text: '添加任务'}
+])
+const barTopSideConfig = ref({
+  left: {text: '←前一天', code: 'lastDay'},
+  center: {text: `${DateUtils.getDateStr(currentDate.value)}`, code: 'date-refresh'},
+  right: {text: '后一天→', code: 'nextDay'}
+})
 
-const currentMember =ref<object>()
-const currentGroup =ref<object>()
+const currentMember = ref(null) // object 类型
+const currentGroup = ref(null) // object 类型
+
+const mode = ref('normal');
+// 新增：存储选中的任务 ID
+const selectedTaskIds = ref(new Set());
 
 const flowType = 'POINTS';
 
-
-
 // =============== 计算属性 ===============
-const formattedCurrentDate = computed(() => {
-  const d = currentDate.value
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-})
 
 const totalCount = computed(() => taskList.value.length)
 
@@ -108,8 +103,7 @@ const todayPoints = computed(() =>
         .reduce((sum, t) => sum + (Number(t.extra.score) || 0), 0)
 )
 
-
-// --- 生命周期 ---
+// =============== 生命周期 ===============
 
 // 页面加载时获取 groupId 参数
 onLoad(async (query) => {
@@ -117,11 +111,20 @@ onLoad(async (query) => {
 });
 
 // =============== 方法 ===============
-async function fetchAllData() {
-  await Promise.all([fetchPointBalance(), fetchTaskList()])
+
+function onAddTaskClick() {
+  uni.navigateTo({
+    url: '/pages/task/edit'
+  });
 }
 
-
+async function fetchAllData() {
+  await Promise.all([fetchPointBalance(), fetchTaskList()])
+  // 退出分享模式时，清空选中状态
+  if (mode.value !== 'share') {
+    selectedTaskIds.value.clear();
+  }
+}
 
 async function fetchPointBalance() {
   if (!currentMember.value || !currentGroup.value) {
@@ -141,22 +144,86 @@ async function fetchPointBalance() {
   }
 
 }
-
-async function handleButtonClick(buttonCode) {
-  if (buttonCode === 'addEvent') {
-    // 跳转到日程编辑页面
-    await uni.navigateTo({
-      url: '/pages/task/edit'
-    });
-  }else if(buttonCode === 'lastDay'){
-    await updateDate(-1)
-  }else if(buttonCode === 'nextDay'){
-    await updateDate(1)
-  }else if(buttonCode === 'date-refresh'){
-    currentDate.value = new Date();
-    await fetchAllData()
+ function handleButtonClick(buttonCode) {
+  switch (buttonCode) {
+    case 'addEvent':
+      onAddTaskClick()
+      break;
+    case 'lastDay':
+      updateDate(-1);
+      break;
+    case 'nextDay':
+      updateDate(1);
+      break;
+    case 'date-refresh':
+      currentDate.value = new Date();
+      fetchAllData();
+      break;
+    case 'cancelShare':
+      // 退出分享模式
+      mode.value = 'normal';
+      selectedTaskIds.value.clear(); // 清空选中状态
+      buttons.value = [
+        {code: 'addEvent', text: '添加任务'},
+        {code: 'toShare', text: '分享'}
+      ];
+      break;
+    case 'toShare':
+      // 进入分享模式
+      mode.value = 'share';
+      buttons.value = [
+        {code: 'cancelShare', text: '取消'},
+        {code: 'selectAll', text: '全选'},
+        {code: 'toggleSelectAll', text: '反选'},
+        {code: 'doShare', type: 'share', text: '去分享'}
+      ];
+      break;
+    case 'selectAll':
+      // 全选
+      selectedTaskIds.value.clear();
+      taskList.value.forEach(task => {
+        selectedTaskIds.value.add(task.id);
+      });
+      break;
+    case 'toggleSelectAll':
+      // 反选
+      const newSelectedIds = new Set();
+      taskList.value.forEach(task => {
+        if (!selectedTaskIds.value.has(task.id)) {
+          // 未完成且未被选中 -> 选中它
+          newSelectedIds.add(task.id);
+        } else if (selectedTaskIds.value.has(task.id)) {
+          // 已被选中 -> 不包含在新集合中（即取消选中）
+        }
+      });
+      selectedTaskIds.value = newSelectedIds;
+      break;
+    default:
+      // 可以选择在这里处理未知的 buttonCode，或者什么都不做
+      console.warn('Unknown button code:', buttonCode);
+      break;
   }
 }
+
+// 判断任务是否被选中
+const isTaskSelected = (task) => {
+  return selectedTaskIds.value.has(task.id);
+};
+
+// 切换单个任务的选中状态
+const toggleSelect = (task) => {
+  if (mode.value !== 'share') return; // 只在分享模式下有效
+
+  if (selectedTaskIds.value.has(task.id)) {
+    selectedTaskIds.value.delete(task.id);
+  } else {
+    if (!task.isCompleted) { // 可选：不允许选中已完成的任务
+      selectedTaskIds.value.add(task.id);
+    }
+  }
+  console.log('Selected IDs:', selectedTaskIds.value);
+};
+
 // 处理成员切换
 async function handleMemberChange(e) {
   currentMember.value = e.currentMember;
@@ -176,10 +243,10 @@ const onEditTask = (task) => {
 }
 
 const onTaskDelay = async (task) => {
-  const startDate = DateUtils.getDateFromDateTimeStr(task.startTime,null);
-  task.startTime = DateUtils.replaceDatePart(task.startTime,DateUtils.getDateStr(DateUtils.getDayOff(new Date(startDate),1)))
-  const endDate = DateUtils.getDateFromDateTimeStr(task.endTime,null);
-  task.endTime = DateUtils.replaceDatePart(task.endTime,DateUtils.getDateStr(DateUtils.getDayOff(new Date(endDate),1)))
+  const startDate = DateUtils.getDateFromDateTimeStr(task.startTime, null);
+  task.startTime = DateUtils.replaceDatePart(task.startTime, DateUtils.getDateStr(DateUtils.getDayOff(new Date(startDate), 1)))
+  const endDate = DateUtils.getDateFromDateTimeStr(task.endTime, null);
+  task.endTime = DateUtils.replaceDatePart(task.endTime, DateUtils.getDateStr(DateUtils.getDayOff(new Date(endDate), 1)))
 
   try {
     const req = { // 移除了类型注解
@@ -189,23 +256,23 @@ const onTaskDelay = async (task) => {
     };
     await apiTs.schedule.save(req);
     await fetchTaskList()
-  }catch (e){
-
+  } catch (e) {
+    console.error('延迟任务失败:', e);
   }
 }
 
-const onTaskCheck = ({ task, completed }) => {
-  console.log('任务完成状态变更:', task.id, completed)
-  const updatedTask: Task = {
+const onTaskCheck = ({task, completed}) => {
+  console.log('任务完成状态变更:', task, completed)
+  task.recordExtra.count = task.recordExtra.count? task.recordExtra.count+1 : 1;
+  const completeFlag = task.extra.taskType === 'Time'?true : task.recordExtra.count >= task.extra.totalCount
+  const updatedTask = {
     ...task,
-    isCompleted: true,
-    completedTime: Date.now()
+    isCompleted: completeFlag,
+    completedTime: Date.now(),
   }
 
-
-
-  const  data = {
-    taskId:task.id,
+  const data = {
+    taskId: task.id,
     targetUserId: currentMember.value.userId,
     groupId: currentGroup.value.id,
     taskTime: DateUtils.formatDateTime(currentDate.value)
@@ -217,14 +284,47 @@ const onTaskCheck = ({ task, completed }) => {
   if (index !== -1) {
     taskList.value.splice(index, 1, updatedTask)
   }
-  pointBalance.value = pointBalance.value+task.extra.score
+  if (completeFlag){
+    pointBalance.value = pointBalance.value + Number(task.extra?.score || 0) // 确保加的是数字
+  }
 }
 
+async function fetchCheckinRecordList() {
+  const itemKeyList = taskList.value.map(task => task.showExtra.itemKey);
+  if (!itemKeyList || itemKeyList.length <= 0) {
+    return
+  }
+  const req = {
+    targetUserId: currentMember.value.userId,
+    groupId: currentGroup.value.id,
+    taskKeys: itemKeyList
+  }
+  const  records = await apiTs.checkin.listV2(req)
 
+  const recordMap = new Map()
+  records.forEach((r) => {
+    const taskKey = r.taskKey?r.taskKey : r.taskId
+    if (recordMap.has(taskKey)){
+      const existR = recordMap.get(taskKey)
+      if (r.extra.count > existR.extra.count){
+        recordMap.set(taskKey, r)
+      }
+    }else{
+      recordMap.set(taskKey, r)
+    }
+  })
+
+  taskList.value.forEach(task => {
+    const record = recordMap.get(task.showExtra.itemKey)
+    task.isCompleted = task.extra.taskType === 'Time'?!!record  : record && record.extra.count >= task.extra.totalCount;
+    task.completedTime =  record ? record.completeTime : null
+    task.recordExtra = record? record.extra : {}
+  })
+}
 
 async function fetchTaskList() {
   try {
-    if(!currentMember.value || !currentGroup.value){
+    if (!currentMember.value || !currentGroup.value) {
       return;
     }
     const req = {
@@ -233,45 +333,20 @@ async function fetchTaskList() {
       targetUserId: currentMember.value.userId,
       groupId: currentGroup.value.id
     }
-    const [taskListResp, recordResp] = await Promise.all([
-      apiTs.checkin.task.list(req),
-      apiTs.checkin.list(req)
-    ])
 
-    const taskDateList = taskListResp || []
+    const taskDateList = await apiTs.checkin.task.list(req);
 
-    const tasks = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value)).schedules;
-    const records = recordResp || []
+    taskList.value = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
 
-    const recordMap = new Map()
-    records.forEach((r: any) => {
-      if (r.taskId) recordMap.set(r.taskId, r)
-    })
-
-    taskList.value = tasks.map(task => {
-      const record = recordMap.get(task.id)
-      return {
-        ...task,
-        isCompleted: !!record,
-        completedTime: record ? record.completeTime : null
-      }
-    })
+    await fetchCheckinRecordList()
   } catch (error) {
     console.error('获取任务失败', error)
     taskList.value = []
   }
 }
 
-function handleNextDayClick() {
-  updateDate(1)
-}
-
-function handleLastDayClick() {
-  updateDate(-1)
-}
-
-async function updateDate(days: number) {
-  currentDate.value = DateUtils.getDayOff(currentDate.value,days)
+async function updateDate(days) { // 移除类型注解
+  currentDate.value = DateUtils.getDayOff(currentDate.value, days)
   barTopSideConfig.value.center.text = DateUtils.getDateStr(currentDate.value);
   await fetchAllData()
 }
@@ -279,51 +354,9 @@ async function updateDate(days: number) {
 
 // =============== 导航方法 ===============
 function handleHistoryClick() {
-  uni.navigateTo({ url: '/pages/point/history' })
+  uni.navigateTo({url: '/pages/point/history'})
 }
 
-function handleEditTaskClick(id: string | number) {
-  uni.navigateTo({ url: `/pages/task/edit?id=${id}` })
-}
-
-function handleAddClick() {
-  uni.navigateTo({ url: '/pages/task/edit' })
-}
-
-function itemClick(id: string | number) {
-  console.log('任务点击:', id)
-}
-
-function onScrollTolower() {
-  if (isLoadingMore.value) return
-  isLoadingMore.value = true
-  setTimeout(() => {
-    // 模拟加载更多（实际应分页请求）
-    isLoadingMore.value = false
-  }, 500)
-}
-
-onPullDownRefresh(async () => {
-  debugger
-  console.log('触发下拉刷新');
-  try {
-    await fetchAllData(); // 执行刷新数据的逻辑
-    await uni.showToast({
-      title: '刷新成功',
-      icon: 'success'
-    });
-  } catch (error) {
-    console.error('刷新失败:', error);
-    await uni.showToast({
-      title: '刷新失败',
-      icon: 'none'
-    });
-  } finally {
-    // *** 关键：无论成功与否，都需要调用 uni.stopPullDownRefresh() ***
-    // 这会停止下拉刷新的动画，收回下拉区域
-    uni.stopPullDownRefresh();
-  }
-});
 
 // =============== 生命周期 ===============
 onMounted(() => {
@@ -337,13 +370,46 @@ onMounted(() => {
 onShow(() => {
   const currentTab = '/pages/tabBar/task'
   const refreshUri = getStoredData(STORAGE_KEYS.REFRESH_TAB)
-  if (!refreshUri){
+  if (!refreshUri) {
     return
   }
-  if (refreshUri === currentTab){
+  if (refreshUri === currentTab) {
     fetchAllData()
     removeStoredData(STORAGE_KEYS.REFRESH_TAB)
   }
+});
+
+onShareAppMessage((res) => {
+  const selectedTasks = taskList.value.filter(task => selectedTaskIds.value.has(task.id));
+  if (selectedTasks.length === 0) {
+    uni.showToast({
+      title: '请先选择要分享的任务',
+      icon: 'none'
+    });
+    return;
+  }
+  console.log('准备分享任务:', selectedTasks);
+
+  const uniqueSelectedJsonString = JSON.stringify(selectedTasks);
+  const shareTitle = `分享 ${selectedTasks.length} 个任务`;
+
+  // 返回 Promise，动态生成分享配置
+  return new Promise(async (resolve) => {
+    const resData = await apiTs.share.create({
+      content: uniqueSelectedJsonString,
+      sceneCode: 'task_share'
+    });
+
+    if (resData?.token) {
+      resolve({
+        title: shareTitle,
+        path: `/pages/task/share?token=${resData.token}`,
+        imageUrl: '' // 可选
+      });
+    } else {
+      await uni.showToast({title: '生成分享链接失败', icon: 'none'});
+    }
+  });
 });
 </script>
 <style scoped>
@@ -379,11 +445,11 @@ onShow(() => {
   position: fixed;
   width: 100%;
   height: 60px;
-  z-index:100
+  z-index: 100
 }
 
 /* --- 任务统计卡片内部样式 --- */
-.stats-row{
+.stats-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -418,25 +484,42 @@ onShow(() => {
   flex-grow: 1;
 }
 
-
-/* --- 空状态 --- */
-.empty-state {
-  text-align: center;
-  padding: 40rpx;
+/* --- 无任务状态容器 --- */
+.no-tasks-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  padding: 40rpx 0; /* 上下留出一些空间 */
+  /* 如果你想让按钮占据整个列表区域，可以添加 height: 100vh; 或者具体的高度 */
+  /* height: 100vh; */
 }
 
-.empty-icon {
-  font-size: 72rpx;
-  margin-bottom: 20rpx;
+/* --- 创建任务按钮样式 --- */
+.create-task-btn {
+  width: 60%; /* 按钮宽度占容器的 60% */
+  height: 80rpx; /* 按钮高度 */
+  line-height: 80rpx; /* 使文字垂直居中 */
+  font-size: 28rpx; /* 文字大小 */
+  font-weight: bold; /* 文字加粗 */
+  color: #007aff; /* 文字颜色为蓝色 */
+  background-color: transparent; /* 背景透明 */
+  border: none; /* 关键：重置 uniapp 默认边框 */
+  border: 2rpx dashed #007aff; /* 自定义蓝色虚线边框 */
+  border-radius: 40rpx; /* 按钮圆角 */
+  /* 防止按钮在某些平台被点击时有默认的视觉反馈 */
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  box-sizing: border-box; /* 确保 padding/border 不增加总宽高 */
 }
 
-.empty-text {
-  font-size: 28rpx;
-  color: #999;
+/* 按钮点击态效果 (可选) */
+.create-task-btn:active {
+  opacity: 0.8; /* 点击时透明度降低 */
+  background-color: #0062cc; /* 点击时背景色加深 */
+  /* 或者使用 transform: scale(0.95); 来实现轻微的缩放效果 */
+  /* transform: scale(0.95); */
 }
 
 
@@ -445,6 +528,11 @@ onShow(() => {
   .stat-number {
     font-size: 32rpx;
   }
+  .create-task-btn {
+    width: 70%; /* 在小屏上可以稍微宽一点 */
+    height: 70rpx;
+    line-height: 70rpx;
+    font-size: 26rpx;
+  }
 }
-
 </style>

@@ -2,7 +2,7 @@
   <view class="page-container">
     <view class="page-content-container">
       <!-- 引入schedule-content组件 -->
-      <schedule-edit :schedule="editingSchedule" />
+      <task-edit :schedule="editingSchedule" />
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
@@ -15,7 +15,7 @@
 import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app'; // 引入 uni-app 的生命周期钩子
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
-import scheduleEdit from '../../components/schedule/schedule-edit.vue';
+import taskEdit from '../../components/schedule/task-edit.vue';
 import apiTs from '../../utils/apiTs';
 import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 import DateUtils from "../../utils/util";
@@ -36,6 +36,8 @@ onLoad((query) => {
     const date= new Date();
     editingSchedule.value.startTime = DateUtils.getDayStartTimeStr(date);
     editingSchedule.value.endTime = DateUtils.getDayEndTimeStr(date);
+    editingSchedule.value.repeatStartDay = editingSchedule.value.startTime;
+    editingSchedule.value.repeatEndDay = editingSchedule.value.endTime;
     editingSchedule.value.itemType = 'task';
     editingSchedule.value.extra = {score:1};
   }

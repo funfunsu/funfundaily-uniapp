@@ -9,6 +9,7 @@
                         @grid-click="handleGridClick"
                         @eventClick="handleEventClick"
                         @selection-change="onSelectionChange"/>
+
     </view>
 
     <!-- 底部固定栏 -->
@@ -25,7 +26,7 @@
 
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import {ref, onMounted, nextTick, computed} from 'vue';
 import apiTs from '../../utils/apiTs';
 import DateUtils from '../../utils/util';
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
@@ -58,7 +59,6 @@ const scheduleRef = ref(null); // 用于访问子组件实例
 
 
 // =============== 计算属性 (如果需要的话) ===============
-// 如果原来有计算属性，可以在这里用 computed 定义
 
 
 // =============== 生命周期 ===============
@@ -304,5 +304,7 @@ onShareAppMessage((res) => {
   flex: 1; /* 让内容区域占据所有可用空间 */
   overflow-y: auto; /* 允许滚动 */
   -webkit-overflow-scrolling: touch; /* 平滑滚动 */
+  position: relative; /* 为按钮定位提供参考 */
 }
+
 </style>

@@ -28,6 +28,7 @@
   <!-- 中间内容区域 -->
   <view class="content-container">
     <view class="content-wrapper">
+
       <view class="flex-row">
         <view class="time-axis" style="width: 12%; flex-shrink: 0;">
           <view class="flex-column">
@@ -42,7 +43,12 @@
         </view>
 
         <view class="dates-container" style="width: 88%;">
-          <view class="flex-row">
+          <view v-if="isScheduleEmpty" class="no-schedule-container">
+            <button class="create-schedule-btn" @click="toggleGrid(dates[0],hours[0])">
+              + 添加一个日程
+            </button>
+          </view>
+          <view  v-else class="flex-row">
             <view
                 class="day-column"
                 v-for="(date, dateIndex) in dates"
@@ -88,7 +94,7 @@
 </template>
 
 <script setup>
-import {ref, watch, onMounted, reactive} from 'vue';
+import {ref, watch, onMounted, reactive, computed} from 'vue';
 import DateUtils from '../../utils/util';
 
 // Props 定义
@@ -115,6 +121,8 @@ const props = defineProps({
   }
 });
 
+
+
 // State
 const selectedEvents = ref(new Set());
 const dates = ref([]);
@@ -123,6 +131,21 @@ const availableColors = ['blue', '1', '2', '3', '4', '5', '6']; // 定义可用�
 
 const emit = defineEmits([ 'event-click','grid-click'])
 
+
+// 如果原来有计算属性，可以在这里用 computed 定义
+const isScheduleEmpty = computed(() => {
+  const hasNonEmptySchedule = props.eventList.some((item) => {
+    // 检查 item 是否存在，item.schedules 是否存在，以及其长度是否大于 0
+    return item && item.schedules && item.schedules.length > 0;
+  });
+
+  // 如果 hasNonEmptySchedule 为 true (即找到了非空的 schedules)，则整体不为空，isScheduleEmpty 应为 false
+  // 如果 hasNonEmptySchedule 为 false (即所有 schedules 都是空的或不存在)，则整体为空，isScheduleEmpty 应为 true
+  // 因此，返回值是 hasNonEmptySchedule 的反面
+  return !hasNonEmptySchedule;
+
+
+});
 
 // Methods
 const updateDatesFromEventList = (list) => {
@@ -182,7 +205,6 @@ const getEventKey = (event, date) => {
 };
 
 const toggleGrid = (date,hour) =>{
-  console.log(date,hour)
   emit('grid-click',date,hour)
 }
 
@@ -546,5 +568,54 @@ defineExpose({
 .flex-column {
   display: flex;
   flex-direction: column;
+}
+
+
+/* --- 无日程状态容器 --- */
+.no-schedule-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40rpx 0; /* 上下留出一些空间 */
+  /* 如果你想让按钮占据整个列表区域，可以添加 height: 100vh; 或者具体的高度 */
+  /* height: 100vh; */
+}
+
+/* --- 创建日程按钮样式 (蓝色虚线边框) --- */
+.create-schedule-btn {
+  width: 60%; /* 按钮宽度占容器的 60% */
+  height: 80rpx; /* 按钮高度 */
+  line-height: 80rpx; /* 使文字垂直居中 */
+  font-size: 28rpx; /* 文字大小 */
+  font-weight: bold; /* 文字加粗 */
+  color: #007aff; /* 文字颜色为蓝色 */
+  background-color: transparent; /* 背景透明 */
+  border: none; /* 关键：重置 uniapp 默认边框 */
+  border: 2rpx dashed #007aff; /* 自定义蓝色虚线边框 */
+  border-radius: 40rpx; /* 按钮圆角 */
+  /* 防止按钮在某些平台被点击时有默认的视觉反馈 */
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  box-sizing: border-box; /* 确保 padding/border 不增加总宽高 */
+}
+
+/* 按钮点击态效果 (可选) */
+.create-schedule-btn:active {
+  opacity: 0.7; /* 点击时透明度降低 */
+  /* 或者可以改变边框样式 */
+  /* border-style: solid; */
+  /* background-color: rgba(0, 122, 255, 0.1); */
+}
+
+/* --- 小屏适配 --- */
+@media (max-width: 375px) {
+  .create-schedule-btn {
+    width: 70%; /* 在小屏上可以稍微宽一点 */
+    height: 70rpx;
+    line-height: 70rpx;
+    font-size: 26rpx;
+  }
 }
 </style>
