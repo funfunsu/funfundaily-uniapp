@@ -85,7 +85,7 @@ onMounted(async () => {
 
 // --- 方法 ---
 const performRedirect = () => {
-  let targetUrl = '/pages/tabBar/schedule';
+  let targetUrl = '/pages/tabBar/task';
   if (redirectPath.value) {
     targetUrl = redirectPath.value.split('?')[0];
   }

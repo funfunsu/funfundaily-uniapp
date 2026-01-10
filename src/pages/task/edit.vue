@@ -15,7 +15,7 @@
 import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app'; // 引入 uni-app 的生命周期钩子
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
-import taskEdit from '../../components/schedule/task-edit.vue';
+import taskEdit from '../../components/task/task-edit.vue';
 import apiTs from '../../utils/apiTs';
 import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 import DateUtils from "../../utils/util";

@@ -45,7 +45,7 @@ export async function autoLogin(shareToken): Promise<String> {
 	// #ifndef MP-WEIXIN
 	if (config.env === 'dev') {
 		const data = { 'code': "Test3", 'shareToken': shareToken };
-		data.code = DateUtils.getDayStartTimeStr(new Date());
+		data.code = DateUtils.getDayStartTimeStr(new Date(2026,1,9));
 		const token = await apiTs.user.login(data);
 		console.log('Dev Auto login success', token);
 		setToken(token);

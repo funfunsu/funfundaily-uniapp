@@ -21,6 +21,29 @@ export default class DateUtils {
 		const diff = d.getDate() - day + (day === 0 ? -6 : 1);
 		return new Date(d.setDate(diff));
 	}
+	/**
+	 * 获取指定月份的【当月第一天】Date对象 (00:00:00)
+	 * @param date 传入任意当月的Date对象，不传默认取【当前系统日期】
+	 * @returns Date 当月第一天 0时0分0秒
+	 */
+	static getFirstDayOfMonth(date: Date = new Date()): Date {
+		const year = date.getFullYear();
+		const month = date.getMonth();
+		// 核心：年月不变，日期固定为1号，时分秒重置为0
+		return new Date(year, month, 1, 0, 0, 0);
+	}
+
+	/**
+	 * 获取指定月份的【当月最后一天】Date对象 (23:59:59)
+	 * @param date 传入任意当月的Date对象，不传默认取【当前系统日期】
+	 * @returns Date 当月最后一天 23时59分59秒
+	 */
+	static getLastDayOfMonth(date: Date = new Date()): Date {
+		const year = date.getFullYear();
+		const month = date.getMonth();
+		// 核心：月份+1，日期传0 → JS会自动解析为【上月最后一天】，时分秒设为最后一刻
+		return new Date(year, month + 1, 0, 23, 59, 59);
+	}
 
 	/**
 	 * 获取指定日期所属周的周一（yyyy-MM-dd 字符串格式）
@@ -71,6 +94,11 @@ export default class DateUtils {
 
 	static getDateFromDateTimeStr(dateTimeStr:string,defaultVal:string) : string {
 		return dateTimeStr.split(splitStr)[0] || defaultVal;
+	}
+	static getMonthAndDayFromDateTimeStr(dateTimeStr:string,defaultVal:string) : string {
+		const dateStr =  dateTimeStr.split(splitStr)[0] || defaultVal;
+		const dateArr = dateStr.split('-')
+		return `${dateArr[1]}-${dateArr[2]}`
 	}
 	static combineDateAndHourMin(dateStr:string,timeHourStr:string) : string {
 		return dateStr+splitStr+timeHourStr;
@@ -184,15 +212,9 @@ export default class DateUtils {
 		return this.formatDate(date)+' '+this.getTimeStr(date);
 	}
 
-	/**
-	 * 通用日期格式化：Date 转 yyyy-MM-dd 字符串
-	 * @param date 需格式化的日期
-	 * @returns 格式化后的日期字符串
-	 */
-	static formatDateToMonth(date : Date) : string {
-		const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份 0-11 → 1-12，补0
-		const day = String(date.getDate()).padStart(2, '0'); // 日期补0
-		return `${month}-${day}`;
+	static formatYearAndMonth(date : string) : string {
+		const arr = date.split('-')
+		return `${arr[0]}-${arr[1]}`;
 	}
 
 	// 可扩展其他日期工具方法（如获取周日、格式化时间等）

@@ -281,15 +281,16 @@ async function handleMemberChange(e) {
   transition: all 0.3s ease;
 }
 
+.type-option.selected {
+  background-color: #2196f3;
+}
+
 .type-text {
   font-size: 28rpx;
   color: #666;
   font-weight: 500;
 }
 
-.type-option.selected {
-  background-color: #2196f3;
-}
 
 .type-option.selected .type-text {
   color: #fff;

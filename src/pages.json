@@ -80,6 +80,20 @@
         "navigationBarTitleText": "任务分享",
         "enablePullDownRefresh": false
       }
+    },
+    {
+      "path": "pages/task/calendar",
+      "style": {
+        "navigationBarTitleText": "任务日历",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/task/checkin-calendar",
+      "style": {
+        "navigationBarTitleText": "打卡日历",
+        "enablePullDownRefresh": false
+      }
     }
   ],
   "subPackages": [

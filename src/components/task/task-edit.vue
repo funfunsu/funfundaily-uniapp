@@ -16,47 +16,38 @@
           </view>
         </view>
       </view>
-
       <!-- 设置模式选择 -->
       <view class="form-section">
         <text class="section-title">模式</text>
-        <view class="form-row">
-          <!-- 使用 flex 并排 -->
-          <view class="form-item  form-item-inline" @click="setSettingType('Times')">
-            <button :class="['selector-btn', { active: schedule.extra.taskType === 'Times' }]">
-              按次数
-            </button>
-          </view>
-          <view class="form-item  form-item-inline" @click="setSettingType('Time')">
-            <button :class="['selector-btn', { active: schedule.extra.taskType === 'Time' }]">
-              按时间
-            </button>
-          </view>
-        </view>
+        <fun-radio-group
+            :options="radioOptions"
+            @update:model-value="onTaskTypeChanged"
+            v-model="schedule.extra.taskType"
+        ></fun-radio-group>
       </view>
 
       <!-- 时间设置相关 (当 mode 为 'Time') -->
-      <view class="form-section" v-if="schedule.extra.taskType === 'Time'">
+      <view class="form-section" v-if="schedule.extra.taskType === 'Habit'">
         <text class="section-title">时间设置</text>
         <view class="form-row">
 
           <!-- 重复类型选择 -->
           <view class="form-item  form-item-inline">
-            <text class="label">重复类型</text>
             <picker class="picker" mode="selector" :range="repeatTypeOptions"
                     :value="getRepeatTypeIndex(schedule.repeatType)" @change="handleRepeatTypeChange">
               <view class="picker-display">{{ getRepeatTypeText(schedule.repeatType) }}</view>
             </picker>
           </view>
-          <!-- 不重复：日期+时间 -->
-          <view  v-if="schedule.repeatType === 'none'" class="form-item  form-item-inline">
-            <text class="label">事件日期 *</text>
-            <picker class="picker" mode="date" :value="formatDate(schedule.startTime)" start="2025-01-01"
-                    end="2030-12-31" @change="(e) => handleEventDateChange(e)">
-              <view class="picker-display">{{ formatDate(schedule.startTime) }}</view>
-            </picker>
+          <view class="form-item  form-item-inline" v-if="schedule.repeatType !== 'daily'">
+            <fun-radio-group
+                :options="repeatDurationOptions"
+                @update:model-value="onRepeatDurationChanged"
+                v-model="repeatDuration"
+            ></fun-radio-group>
           </view>
-          <view v-else-if="isWeekRepeat(schedule.repeatType)" class="form-item  form-item-inline">
+        </view>
+        <view v-if="repeatDuration !== 'whole'" class="form-row">
+          <view v-if="isWeekRepeat(schedule.repeatType)" class="form-item  form-item-inline">
             <text class="label">重复星期</text>
             <view class="week-days-container">
               <view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
@@ -83,47 +74,13 @@
           </view>
         </view>
         <!-- 重复时间范围 - 仅在设置重复时显示 -->
-        <view v-if="schedule.repeatType !== 'none'" class="form-row">
-          <view class="form-item form-item-inline">
-            <text class="label">重复开始日期</text>
-            <picker class="picker" mode="date" :value="formatDate(schedule.repeatStartDay)"
-                    start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleRepeatDateChange(e, 'repeatStartDay')">
-              <view class="picker-display">{{ formatDate(schedule.repeatStartDay) }}</view>
-            </picker>
-          </view>
-
-          <view class="form-item form-item-inline">
-            <text class="label">重复结束日期</text>
-            <picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
-                    start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-              <view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
-            </picker>
-          </view>
-        </view>
-      </view>
-
-      <!-- 次数设置相关 (当 mode 为 'count') -->
-      <view class="form-section" v-else-if="schedule.extra.taskType === 'Times'">
-        <text class="section-title">次数设置</text>
-
         <view class="form-row">
-          <view class="form-item form-item-inline" >
-            <text class="label">重复类型</text>
-            <picker class="picker" mode="selector" :range="repeatTypeOptions"
-                    :value="getRepeatTypeIndex(schedule.repeatType)" @change="handleRepeatTypeChange">
-              <view class="picker-display">{{ getRepeatTypeText(schedule.repeatType) }}</view>
-            </picker>
-          </view>
+
           <view class="form-item form-item-inline">
-            <text class="label">次数</text>
+            <text class="label">打卡次数</text>
             <input class="input" type="number" v-model.number="schedule.extra.totalCount" placeholder="请输入总执行次数"/>
           </view>
 
-        </view>
-
-        <view class="form-row">
           <view class="form-item form-item-inline">
             <text class="label">截止日期</text>
             <picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
@@ -135,8 +92,27 @@
         </view>
       </view>
 
+      <!-- 次数设置相关 (当 mode 为 'count') -->
+      <view class="form-section" v-else-if="schedule.extra.taskType === 'Todo'">
+        <text class="section-title">Todo</text>
+        <view class="form-row">
+          <view class="form-item form-item-inline">
+            <text class="label">截止日期</text>
+            <picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
+                    start="2023-01-01" end="2030-12-31"
+                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
+              <view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
+            </picker>
+          </view>
+          <view class="form-item form-item-inline">
+            <text class="label">完成次数</text>
+            <input class="input" type="number" v-model.number="schedule.extra.totalCount" placeholder="请输入总执行次数"/>
+          </view>
+        </view>
+      </view>
+
       <!-- 类型设置 -->
-      <view class="form-section" v-if="schedule.itemType !== 'task' && settingMode === 'Time'">
+      <view class="form-section" v-if="schedule.itemType !== 'task' && settingMode === 'Todo'">
         <text class="section-title">类型设置</text>
 
         <view class="form-item">
@@ -168,29 +144,58 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import DateUtils from "../../utils/util";
 import { getStoredData, setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
+import FunRadioGroup from "../fun-components/fun-radio-group.vue";
+import {HOBIT_TASK_REPEAT_TYPE_LABELS, HOBIT_TASK_REPEAT_TYPE_VALUES} from "../../utils/constants";
 
 // --- Props 定义 ---
 const props = defineProps({
-  schedule: Object,
-  curDate: new Date()
+  schedule: {
+    type: Object,
+    required: true
+  },
+  curDate: {
+    type: Date,
+    default: () => new Date() // ✅ 正确：引用类型的默认值必须是函数返回
+  }
 });
 
+const radioOptions = reactive([
+  { label: '习惯养成', value: 'Habit' },
+  { label: 'To-Do', value: 'Todo' }
+])
+const repeatDurationOptions = reactive([
+  { label: '不指定', value: 'whole' },
+  { label: '指定日期', value: 'select' }
+])
+
+const onRepeatDurationChanged = (e) =>{
+  if (e === 'whole'){
+    props.schedule.repeatKeys = ['whole']
+  }else{
+    props.schedule.repeatKeys = []
+    watchRepeatType(props.schedule.repeatType,e)
+  }
+}
+const onTaskTypeChanged = (e) =>{
+  if (e === 'Todo'){
+    props.schedule.repeatType = 'none'
+    props.schedule.repeatKeys = []
+  }
+}
+
+const repeatDuration = ref('whole')
+
 // --- Refs for static-ish options ---
-const repeatTypeOptions = ref(['一次性', '每天', '每周', '每月', '每年']);
-const repeatTypeValues = ref(['none', 'daily', 'weekly', 'monthly', 'yearly']);
+const repeatTypeOptions = ref(HOBIT_TASK_REPEAT_TYPE_LABELS);
+const repeatTypeValues = ref(HOBIT_TASK_REPEAT_TYPE_VALUES);
 const weekDays = ref(['一', '二', '三', '四', '五', '六', '日']);
 const weekDayIndex = ref(['1', '2', '3', '4', '5', '6', '0']);
 const monthDays = ref(Array.from({ length: 31 }, (_, i) => (i + 1).toString()));
 const itemLabelOptions = ref(['学校', '家里']);
 const itemLabelValues = ref(['school', 'home']);
-const showDescription = ref(false);
 
 // --- 新增：设置模式 ---
 const settingMode = ref('Time');
-
-let startTime;
-let endTime;
-
 let repeatDiffDays = getStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION);
 let scheduleDiffMin = getStoredData(STORAGE_KEYS.SCHEDULE_CACHED_DURATION);
 if (!repeatDiffDays) {
@@ -279,7 +284,7 @@ const handleRepeatDateChanged = (field) => {
       setStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION, dayDiff);
     }
 
-    if(props.schedule.extra.taskType === 'Times'){
+    if(props.schedule.extra.taskType === 'Habit'){
       props.schedule['endTime'] = props.schedule[field];
     }
   }
@@ -301,24 +306,24 @@ const isWeekRepeat = (repeatType) => {
   return repeatType === 'weekly' || repeatType === 'oddWeek' || repeatType === 'evenWeek';
 };
 
-const handleRepeatTypeChange = (e) => {
-  const index = e.detail.value;
-  const today = props.curDate ? props.curDate : new Date();
-  props.schedule.repeatType = repeatTypeValues.value[index];
-  if (props.schedule.repeatType === 'none') {
+const watchRepeatType = (repeatType,repeatDuration) => {
+  if (repeatType === 'none') {
     return;
   }
-  if (isWeekRepeat(props.schedule.repeatType)) {
-    props.schedule.repeatKeys = [DateUtils.getWeekDay(today).toString()];
-  } else if (props.schedule.repeatType === 'yearly') {
-    props.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
-  } else if (props.schedule.repeatType === 'monthly') {
-    props.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
+  const today = props.curDate ? props.curDate : new Date();
+  if (repeatDuration !== 'whole'){
+    if (isWeekRepeat(repeatType)) {
+      props.schedule.repeatKeys = [DateUtils.getWeekDay(today).toString()];
+    } else if (repeatType === 'yearly') {
+      props.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
+    } else if (repeatType === 'monthly') {
+      props.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
+    }
   }
   if (!props.schedule.repeatStartDay) {
     props.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today);
   }
-  if (props.schedule.repeatType === 'yearly') {
+  if (repeatType === 'yearly') {
     const repeatStartDay = new Date(props.schedule.repeatStartDay);
     const endDate = new Date(repeatStartDay);
     endDate.setDate(endDate.getDate() + 360 * 20);
@@ -326,10 +331,12 @@ const handleRepeatTypeChange = (e) => {
   } else {
     handleRepeatDateChanged('repeatStartDay');
   }
+}
 
-  if ( props.schedule.extra.taskType === 'Times'){
-    props.schedule.repeatKeys = ['whole']
-  }
+const handleRepeatTypeChange = (e) => {
+  const index = e.detail.value;
+  props.schedule.repeatType = repeatTypeValues.value[index];
+  watchRepeatType(repeatTypeValues.value[index],repeatDuration.value)
 };
 
 const handleItemLabelChange = (e) => {
@@ -357,106 +364,106 @@ onMounted(() => {
   // 组件挂载时，可以根据 props.schedule 的初始状态判断 settingMode
   // 例如，如果 props.schedule 中有 totalCount，则初始为 'count' 模式
   if (!props.schedule.extra.taskType){
-    props.schedule.extra.taskType = 'Times';
+    props.schedule.extra.taskType = 'Habit';
+    props.schedule.repeatKeys = ['whole']
   }
   if(!props.schedule.extra.totalCount){
     props.schedule.extra.totalCount = 1
   }
 });
 </script>
-
 <style scoped>
+/* 全局容器 - 统一 rpx 单位 */
 .schedule-edit-container {
-  height: 100%;
+  height: 100vh;
   background-color: #f5f5f5;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
-
 
 .edit-content {
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
+  padding: 30rpx;
+  box-sizing: border-box;
 }
 
 .form-section {
   background-color: white;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 32rpx;
   font-weight: bold;
   color: #333;
-  margin-bottom: 15px;
+  margin-bottom: 30rpx;
   display: block;
 }
 
 /* 基础表单项样式 */
 .form-item {
-  margin-bottom: 15px;
+  margin-bottom: 30rpx;
+  box-sizing: border-box;
 }
 
-/* 行内表单项容器 */
+/* 核心修复：form-row 样式 */
 .form-row {
   display: flex;
   flex-wrap: wrap;
-  margin-bottom: 15px;
-  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* 行内表单项样式 */
+/* 核心修复：form-item-inline 样式 */
 .form-item-inline {
-  flex: 1;
-  min-width: 200px;
-  margin-bottom: 0;
+  width: calc(50% - 15rpx);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin-right: 15rpx;
+  margin-bottom: 20rpx;
+  flex-shrink: 0;
+  flex-grow: 0;
 }
 
-/* 标签样式 */
+.form-row > .form-item-inline:nth-child(2n) {
+  margin-right: 0 !important;
+}
+
+/* 标签样式 - 统一 rpx */
 .label {
   display: block;
-  font-size: 14px;
+  font-size: 28rpx;
   color: #666;
-  margin-bottom: 8px;
+  margin-bottom: 16rpx;
   font-weight: 500;
-}
-
-.expand-trigger {
-  cursor: pointer;
-  color: #2196f3;
-  transition: color 0.3s;
-  margin-bottom: 10px;
-  display: inline-block;
-}
-
-.expand-trigger:active {
-  color: #1976d2;
-}
-
-.expand-icon {
-  font-size: 12px;
-  color: #999;
-  margin-left: 5px;
 }
 
 .expand-container {
   animation: slideDown 0.2s ease-out;
 }
 
-/* 输入框通用样式 */
-.input,
-.textarea {
+/* ✅✅✅ 【重中之重】input 终极完美样式 - 根治：默认值偏下+光标居左+placeholder居中  */
+.input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 0 24rpx; /* 关键1：上下padding设为0，左右保留24rpx，彻底消除内边距挤压 */
+  border: 2rpx solid #ddd;
+  border-radius: 8rpx;
+  font-size: 28rpx;
   box-sizing: border-box;
   transition: border-color 0.3s;
+  height: 80rpx; /* 高度不变，和你原来一致 */
+  line-height: 80rpx; /* 关键2：行高=高度，实现【非聚焦/聚焦】都垂直居中 */
+  text-align: left; /* 关键3：强制文字、光标永远居左，永不居中 */
+  vertical-align: middle; /* 关键4：小程序专属，修复基线对齐bug，让默认值必居中 */
 }
 
 .input:focus,
@@ -465,29 +472,38 @@ onMounted(() => {
   border-color: #2196f3;
 }
 
+/* ✅ textarea 样式保留，正常无问题 */
 .textarea {
-  height: 100px;
+  width: 100%;
+  padding: 24rpx;
+  border: 2rpx solid #ddd;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+  height: 200rpx;
   resize: none;
+  text-align: left;
 }
 
-.input {
-  height: 40px;
-  resize: none;
-}
-
-/* 选择器样式 */
 .picker {
   width: 100%;
+  box-sizing: border-box;
 }
-
 .picker-display {
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
+  width: 100%;
+  padding: 24rpx;
+  border: 2rpx solid #ddd;
+  border-radius: 8rpx;
+  font-size: 28rpx;
   background-color: white;
-  position: relative;
   transition: border-color 0.3s;
+  width: 100%;
+  box-sizing: border-box;
+  height: 80rpx;
+  display: flex; /* flex居中对view容器无任何兼容问题 */
+  align-items: center;
+  justify-content: center;
 }
 
 .picker-display:active {
@@ -497,22 +513,25 @@ onMounted(() => {
 /* 星期选择器样式 */
 .week-days-container {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 8px;
+  box-sizing: border-box;
 }
 
 .week-day-item {
-  width: 36px;
-  height: 36px;
+  width: 72rpx;
+  height: 72rpx;
   border-radius: 50%;
   background-color: #f5f5f5;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 28rpx;
   color: #666;
   transition: all 0.3s;
+  margin-right: 20rpx;
+}
+
+.week-day-item:last-child {
+  margin-right: 0;
 }
 
 .week-day-item.selected {
@@ -528,12 +547,13 @@ onMounted(() => {
 .radio-label {
   display: flex;
   align-items: center;
-  margin-right: 20px;
+  margin-right: 40rpx;
+  box-sizing: border-box;
 }
 
 .radio-text {
-  margin-left: 5px;
-  font-size: 14px;
+  margin-left: 10rpx;
+  font-size: 28rpx;
   color: #333;
 }
 
@@ -541,120 +561,36 @@ onMounted(() => {
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-20rpx);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-/* 适配小屏幕 */
-@media (max-width: 414px) {
-  .edit-content {
-    padding: 10px;
-  }
-
-  .form-section {
-    padding: 12px;
-  }
-
-  .form-row {
-    flex-direction: column;
-    gap: 15px;
-  }
-
-  .form-item-inline {
-    min-width: 100%;
-  }
-
-  .week-days-container {
-    gap: 8px;
-  }
-
-  .week-day-item {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
-  }
-
-  .radio-label {
-    margin-bottom: 10px;
-  }
-}
-
-/* 适配平板等大屏幕 */
-@media (min-width: 768px) {
-  .form-row {
-    gap: 20px;
-  }
-
-  .form-item-inline {
-    flex: 0 0 calc(50% - 10px);
-    min-width: calc(50% - 10px);
-  }
-
-  .form-section {
-    padding: 20px;
-  }
-
-  .input,
-  .textarea,
-  .picker-display {
-    padding: 14px;
-    font-size: 16px;
-  }
-}
-
-
 .type-selector {
   display: flex;
   justify-content: space-around;
   align-items: center;
   width: 100%;
+  box-sizing: border-box;
 }
-
 .selector-item {
   flex: 1;
-  padding: 0 10rpx;
-}
-
-.selector-btn {
-  width: 100%;
-  height: 80rpx;
-  line-height: 80rpx;
-  background-color: #f8f8f8;
-  border: 1px solid #ddd;
-  border-radius: 10rpx;
+  box-sizing: border-box;
+  padding: 24rpx;
+  border: 2rpx solid #ddd;
   font-size: 28rpx;
-  color: #666;
   transition: all 0.3s;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
-.selector-btn.active {
+.selector-item.selected {
   background-color: #007aff;
   color: white;
-  border-color: #007aff;
-}
-
-.count-settings-row {
-  display: flex;
-  flex-wrap: wrap; /* 允许换行，以防屏幕太窄 */
-}
-
-.inline-item {
-  flex: 1; /* 平分剩余空间 */
-  min-width: 45%; /* 设置最小宽度，确保在窄屏上也能合理显示 */
-  margin-right: 20rpx; /* 右边距 */
-}
-
-.inline-item:last-child {
-  margin-right: 0; /* 最后一个元素去掉右边距 */
-}
-
-.button-container {
-  margin-top: 40rpx;
-  padding: 0 20rpx;
+  border-color: #007aff; /* 选中后边框和背景色一致，视觉更干净 */
 }
 </style>
