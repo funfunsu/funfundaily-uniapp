@@ -17,6 +17,7 @@
           :mode="mode"
           :is-selected="isTaskSelected(task)"
           :task="task"
+          :cur-date = currentDate
       />
     </view>
   </view>

@@ -2,7 +2,12 @@
   <view class="page-container">
     <view class="page-content-container">
       <!-- 引入schedule-content组件 -->
-      <task-edit :schedule="editingSchedule" />
+      <task-edit
+          ref="scheduleEditRef"
+          :schedule="editingSchedule"
+          :goal-list="userGoals"
+          :cur-date="new Date()"
+      ></task-edit>
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
@@ -17,7 +22,14 @@ import { onLoad } from '@dcloudio/uni-app'; // 引入 uni-app 的生命周期钩
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
 import taskEdit from '../../components/task/task-edit.vue';
 import apiTs from '../../utils/apiTs';
-import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
+import {
+  getStoredData,
+  getStoredKey,
+  removeStoredData,
+  removeStoredDataByKeys,
+  setStoredData,
+  STORAGE_KEYS
+} from "../../utils/storageManager";
 import DateUtils from "../../utils/util";
 
 // --- 数据定义 (使用 ref) ---
@@ -26,9 +38,14 @@ const buttons = ref([{ code: 'save', text: '保存' }]);
 const currentMember = ref({}); // 使用 ref
 const currentGroup = ref({});  // 使用 ref
 
+const scheduleEditRef = ref(null);
+const userGoals = ref([]);
+
+
 // --- 生命周期 ---
 // onLoad 是 uni-app 特有的，需要从 @dcloudio/uni-app 导入
 onLoad((query) => {
+
   if (query && query.id) {
     buttons.value =  [{ code: 'delete', text: '删除' },{ code: 'save', text: '保存' }]
     loadSchedule(query.id);
@@ -36,11 +53,12 @@ onLoad((query) => {
     const date= new Date();
     editingSchedule.value.startTime = DateUtils.getDayStartTimeStr(date);
     editingSchedule.value.endTime = DateUtils.getDayEndTimeStr(date);
-    editingSchedule.value.repeatStartDay = editingSchedule.value.startTime;
-    editingSchedule.value.repeatEndDay = editingSchedule.value.endTime;
+    editingSchedule.value.repeatStartDay = DateUtils.getDateStr(date);
+    editingSchedule.value.repeatEndDay = DateUtils.getNextDayStr(date);
     editingSchedule.value.itemType = 'task';
     editingSchedule.value.extra = {score:1};
   }
+
 });
 
 // --- 方法定义 (async/await 语法保持不变) ---
@@ -67,14 +85,22 @@ const switchToTab = ()=>{
 
 const save = async () => {
   try {
+    if (!scheduleEditRef.value) {
+      await uni.showToast({title: '数据加载中，请稍后重试', icon: 'none'});
+      return;
+    }
     const req = { // 移除了类型注解
       targetUserId: currentMember.value.userId, // 访问 ref 的值
       groupId: currentGroup.value.id,          // 访问 ref 的值
-      items: [editingSchedule.value]           // 访问 ref 的值
+      items: [scheduleEditRef.value.getFinalSchedule()]           // 访问 ref 的值
     };
-    console.log('submit!', editingSchedule.value);
 
+    if (scheduleEditRef.value.getFinalSchedule().itemType === 'goal'){
+      removeStoredDataByKeys(STORAGE_KEYS.USER_ALL_GOAL,currentMember.value.userId)
+    }
+    console.log('submit!', editingSchedule.value);
     await apiTs.schedule.save(req);
+
     switchToTab();
   } catch (error) {
     console.error('保存失败:', error);
@@ -86,12 +112,16 @@ const save = async () => {
 const deleteItem = async () => {
   try {
     await apiTs.schedule.delete(editingSchedule.value.id);
+    if (editingSchedule.value.itemType === 'goal'){
+      removeStoredDataByKeys(STORAGE_KEYS.USER_ALL_GOAL,currentMember.value.userId)
+    }
     switchToTab();
   } catch (error) {
     console.error('删除失败:', error);
     // 可以添加错误提示逻辑
   }
 }
+
 
 
 
@@ -106,6 +136,9 @@ const handleMemberChange = (e) => { // 移除了类型注解
                                     // 修改 ref 的值需要 .value
   currentMember.value = e.currentMember;
   currentGroup.value = e.currentGroup;
+
+  const key = getStoredKey(STORAGE_KEYS.USER_ALL_GOAL,currentMember.value.userId)
+  userGoals.value= getStoredData(key) || [];
   console.log(currentGroup.value, currentMember.value); // 访问 ref 的值
 };
 

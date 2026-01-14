@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
     //缓存的日程时长-分钟
     SCHEDULE_CACHED_DURATION:'schedule_item_cached_duration',
     SCHEDULE_REPEAT_CACHED_DURATION:'schedule_repeat_cached_duration',
+    USER_ALL_GOAL:'USER_ALL_GOAL',
     // 可以在这里添加更多键名...
 } as const; // 使用 'as const' 使键值成为字面量类型，增强类型安全性
 
@@ -33,6 +34,10 @@ export function getStoredData<T>(key: string): T | null {
         console.warn(`[StorageManager] Failed to parse stored data for key: ${key}`, e);
     }
     return null;
+}
+
+export function getStoredKey(prefix:string,key:string) : string{
+    return `${prefix}-${key}`;
 }
 
 /**
@@ -56,6 +61,18 @@ export function setStoredData<T>(key: string, data: T): void {
 export function removeStoredData(key: string): void {
     try {
         uni.removeStorageSync(key);
+    } catch (e) {
+        console.error(`[StorageManager] Failed to remove stored data for key: ${key}`, e);
+    }
+}
+
+/**
+ * 从存储中移除指定键名的数据
+ * @param key 存储键名
+ */
+export function removeStoredDataByKeys(prefix: string,key :string): void {
+    try {
+        uni.removeStorageSync(getStoredKey(prefix,key));
     } catch (e) {
         console.error(`[StorageManager] Failed to remove stored data for key: ${key}`, e);
     }

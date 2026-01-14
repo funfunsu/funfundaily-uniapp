@@ -56,7 +56,7 @@ onLoad((query) => {
 
 onMounted(async () => {
   try {
-    const token = await autoLogin();
+    const token = await autoLogin(null);
     if (token) {
       isInLoginLoading.value = false;
       const fetchedUserInfo = await apiTs.user.getInfo();
@@ -79,7 +79,6 @@ onMounted(async () => {
   } catch (err: any) {
     console.error('Index page - Auto login or fetch user info failed:', err);
     isInLoginLoading.value = false;
-    uni.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
   }
 });
 

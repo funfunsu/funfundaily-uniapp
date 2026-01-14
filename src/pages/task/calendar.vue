@@ -29,6 +29,7 @@ import DateUtils from "../../utils/util";
 import apiTs from "../../utils/apiTs";
 import TaskCard from "../../components/task/task-card.vue";
 import TaskListContainer from "../../components/task/task-list-container.vue";
+import TaskUtil from "../../utils/taskUtil";
 
 const listShow = ref(true)
 const currentMember = ref({}); // 使用 ref
@@ -51,12 +52,13 @@ const handleDateSelected = (selectedDate) => {
 
 const updateTaskList = ()=>{
   const targetItem = taskData.value.find(item => item.date === DateUtils.formatDate(currentDate.value))
-  taskList.value = targetItem?.schedules || []
-  fetchCheckinRecordList()
+  taskList.value = targetItem?.schedules.filter(item => TaskUtil.isTaskUndo(item,currentDate.value)).sort((a, b) => {return TaskUtil.sortTaskToShow(a,b) })
+
+  const itemKeyList = taskList.value.map(task => task.showExtra.itemKey);
+  fetchCheckinRecordList(itemKeyList)
 }
 
-async function fetchCheckinRecordList() {
-  const itemKeyList = taskList.value.map(task => task.showExtra.itemKey);
+async function fetchCheckinRecordList(itemKeyList) {
   if (!itemKeyList.length) return
   const req = { targetUserId: currentMember.value.userId, groupId: currentGroup.value.id, taskKeys: itemKeyList }
   const records = await apiTs.checkin.listV2(req)
@@ -70,7 +72,8 @@ async function fetchCheckinRecordList() {
   })
   taskList.value.forEach(task => {
     const record = recordMap.get(task.showExtra.itemKey)
-    task.isCompleted = task.extra.taskType === 'Time' ? !!record : record && record.extra.count >= task.extra.totalCount;
+
+    task.isCompleted = record? record.extra.count >= task.extra.totalCount : false;
     task.completedTime = record ? record.completeTime : null
     task.recordExtra = record ? record.extra : {}
   })
@@ -112,7 +115,7 @@ async function fetchScheduleData() {
     }
     const requestData = {
       fromDate: DateUtils.getDayStartTimeStr(DateUtils.getFirstDayOfMonth(currentDateToMonth.value)),
-      toDate: DateUtils.getDayStartTimeStr(DateUtils.getLastDayOfMonth(currentDateToMonth.value)),
+      toDate: DateUtils.getDayStartTimeStr(DateUtils.getFirstDayOfNextMonth(currentDateToMonth.value)),
     };
 
     if (currentGroup.value && currentGroup.value.id){
@@ -127,8 +130,8 @@ async function fetchScheduleData() {
 
     taskData.value = res.map(item => ({
       date: item.date,
-      count: item.schedules?.length || 0,
-      dueCount: item.schedules?.filter(s => s.showExtra.dueDate === item.date).length || 0,
+      count: item.schedules?.filter(s => TaskUtil.isTaskUndo(s,new Date(item.date))).length || 0,
+      dueCount: item.schedules?.filter(s => s.showExtra.dueDate === item.date && TaskUtil.isTaskUndo(s,new Date(item.date))).length || 0,
       schedules:item.schedules
     }))
     updateTaskList()

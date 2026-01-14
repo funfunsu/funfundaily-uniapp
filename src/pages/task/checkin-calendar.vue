@@ -160,7 +160,7 @@ async function fetchScheduleData() {
     }
     const requestData = {
       fromDate: DateUtils.getDayStartTimeStr(DateUtils.getFirstDayOfMonth(currentDateToMonth.value)),
-      toDate: DateUtils.getDayStartTimeStr(DateUtils.getLastDayOfMonth(currentDateToMonth.value)),
+      toDate: DateUtils.getDayStartTimeStr(DateUtils.getFirstDayOfNextMonth(currentDateToMonth.value)),
     };
 
     if (currentGroup.value && currentGroup.value.id){

@@ -4,134 +4,158 @@
       <!-- 基本信息 -->
       <view class="form-section">
         <text class="section-title">基本信息</text>
-
         <view class="form-item">
           <text class="label">标题 *</text>
-          <input class="input" v-model="schedule.itemTitle" placeholder="请输入日程标题"/>
+          <input class="input" v-model="localSchedule.itemTitle" placeholder="请输入日程标题"/>
         </view>
         <view class="form-item">
           <text class="label">描述</text>
           <view class="expand-container">
-            <textarea class="textarea" v-model="schedule.itemDesc" placeholder="请输入日程描述"/>
+            <textarea class="textarea" v-model="localSchedule.itemDesc" placeholder="请输入日程描述"/>
           </view>
         </view>
       </view>
+
       <!-- 设置模式选择 -->
       <view class="form-section">
         <text class="section-title">模式</text>
         <fun-radio-group
             :options="radioOptions"
-            @update:model-value="onTaskTypeChanged"
-            v-model="schedule.extra.taskType"
+            @update:modelValue="onTaskTypeChanged"
+            :modelValue="scheduleExtra.taskType"
         ></fun-radio-group>
       </view>
 
-      <!-- 时间设置相关 (当 mode 为 'Time') -->
-      <view class="form-section" v-if="schedule.extra.taskType === 'Habit'">
-        <text class="section-title">时间设置</text>
+      <!-- 习惯养成模式 -->
+      <view class="form-section" v-if="scheduleExtra?.taskType === 'Habit'">
         <view class="form-row">
-
-          <!-- 重复类型选择 -->
-          <view class="form-item  form-item-inline">
+          <view class="form-item form-item-inline">
             <picker class="picker" mode="selector" :range="repeatTypeOptions"
-                    :value="getRepeatTypeIndex(schedule.repeatType)" @change="handleRepeatTypeChange">
-              <view class="picker-display">{{ getRepeatTypeText(schedule.repeatType) }}</view>
+                    :value="getRepeatTypeIndex(localSchedule?.repeatType)"
+                    @change="handleRepeatTypeChange">
+              <view class="picker-display">{{ getRepeatTypeText(localSchedule?.repeatType) }}</view>
             </picker>
           </view>
-          <view class="form-item  form-item-inline" v-if="schedule.repeatType !== 'daily'">
+          <view class="form-item form-item-inline" v-if="localSchedule?.repeatType !== 'daily'">
             <fun-radio-group
                 :options="repeatDurationOptions"
                 @update:model-value="onRepeatDurationChanged"
-                v-model="repeatDuration"
+                :model-value="localRepeatDuration"
             ></fun-radio-group>
           </view>
         </view>
-        <view v-if="repeatDuration !== 'whole'" class="form-row">
-          <view v-if="isWeekRepeat(schedule.repeatType)" class="form-item  form-item-inline">
+
+        <view v-if="localRepeatDuration !== 'whole'" class="form-row">
+          <view style="width: 100%" v-if="isWeekRepeat(localSchedule?.repeatType)">
             <text class="label">重复星期</text>
             <view class="week-days-container">
               <view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
-                    :class="{ selected: schedule.repeatKeys.includes(weekDayIndex[index]) }"
+                    :class="{ selected: localSchedule?.repeatKeys?.includes(weekDayIndex[index]) }"
                     @click="toggleWeekDay(weekDayIndex[index])">
                 {{ day }}
               </view>
             </view>
           </view>
-          <view class="form-item form-item-inline" v-else-if="schedule.repeatType === 'monthly'">
+          <view   style="width: 100%" v-else-if="localSchedule?.repeatType === 'monthly'">
             <text class="label">日期 *</text>
             <picker class="picker" mode="selector" :range="monthDays"
-                    :value="getMonthDayIndex(schedule.repeatKeys[0])"
-                    @change="(e) => handleMonthDayChange(e, 'startTime')">
-              <view class="picker-display">{{ schedule.repeatKeys[0] }}日</view>
+                    :value="getMonthDayIndex(localSchedule?.repeatKeys?.[0])"
+                    @change="handleMonthDayChange">
+              <view class="picker-display">{{ localSchedule?.repeatKeys?.[0] }}日</view>
             </picker>
           </view>
-          <view class="form-item  form-item-inline" v-else-if="schedule.repeatType === 'yearly'">
+          <view  style="width: 100%" v-else-if="localSchedule?.repeatType === 'yearly'">
             <text class="label">日期 *</text>
-            <picker class="picker" mode="date" :value="schedule.repeatKeys[0]" fields="month-day"
-                    @change="(e) => handleYearDateChange(e)">
-              <view class="picker-display">{{ (schedule.repeatKeys[0]) }}</view>
+            <picker class="picker" mode="date" :value="localSchedule?.repeatKeys?.[0]" fields="month-day"
+                    @change="handleYearDateChange">
+              <view class="picker-display">{{ localSchedule?.repeatKeys?.[0] }}</view>
             </picker>
           </view>
         </view>
-        <!-- 重复时间范围 - 仅在设置重复时显示 -->
-        <view class="form-row">
 
+        <view class="form-row">
           <view class="form-item form-item-inline">
             <text class="label">打卡次数</text>
-            <input class="input" type="number" v-model.number="schedule.extra.totalCount" placeholder="请输入总执行次数"/>
+            <input class="input" type="number" v-model.number="scheduleExtra.totalCount" placeholder="请输入总执行次数"/>
           </view>
-
           <view class="form-item form-item-inline">
             <text class="label">截止日期</text>
-            <picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
+            <picker class="picker" mode="date" :value="formatDate(localSchedule?.repeatEndDay)"
                     start="2023-01-01" end="2030-12-31"
                     @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-              <view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
+              <view class="picker-display">{{ formatDate(localSchedule?.repeatEndDay) }}</view>
             </picker>
           </view>
         </view>
       </view>
 
-      <!-- 次数设置相关 (当 mode 为 'count') -->
-      <view class="form-section" v-else-if="schedule.extra.taskType === 'Todo'">
-        <text class="section-title">Todo</text>
+      <view class="form-section" v-else-if="scheduleExtra?.taskType === 'Todo'">
         <view class="form-row">
           <view class="form-item form-item-inline">
             <text class="label">截止日期</text>
-            <picker class="picker" mode="date" :value="formatDate(schedule.repeatEndDay)"
+            <picker class="picker" mode="date" :value="formatDate(localSchedule?.repeatEndDay)"
                     start="2023-01-01" end="2030-12-31"
                     @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-              <view class="picker-display">{{ formatDate(schedule.repeatEndDay) }}</view>
+              <view class="picker-display">{{ formatDate(localSchedule?.repeatEndDay) }}</view>
             </picker>
           </view>
           <view class="form-item form-item-inline">
             <text class="label">完成次数</text>
-            <input class="input" type="number" v-model.number="schedule.extra.totalCount" placeholder="请输入总执行次数"/>
+            <input class="input" type="number" v-model.number="scheduleExtra.totalCount" placeholder="请输入总执行次数"/>
+          </view>
+        </view>
+      </view>
+
+      <view class="form-section" v-else-if="scheduleExtra?.taskType === 'Goal'">
+        <view class="form-row">
+          <view class="form-item form-item-inline">
+            <text class="label">截止日期</text>
+            <picker class="picker" mode="date" :value="formatDate(localSchedule?.repeatEndDay)"
+                    start="2023-01-01" end="2030-12-31"
+                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
+              <view class="picker-display">{{ formatDate(localSchedule?.repeatEndDay) }}</view>
+            </picker>
           </view>
         </view>
       </view>
 
       <!-- 类型设置 -->
-      <view class="form-section" v-if="schedule.itemType !== 'task' && settingMode === 'Todo'">
-        <text class="section-title">类型设置</text>
-
+      <view class="form-section" v-if="localSchedule?.itemType === 'task'">
+        <text class="section-title">目标</text>
         <view class="form-item">
-          <text class="label">日程类型</text>
-          <picker class="picker" mode="selector" :range="itemLabelOptions"
-                  :value="getItemLabelIndex(schedule.itemLabel)" @change="handleItemLabelChange">
-            <view class="picker-display">{{ getItemLabelText(schedule.itemLabel) }}</view>
-          </picker>
+          <text class="label">关联目标</text>
+          <!-- ✅ 关联目标 单选列表 -->
+          <view class="goal-select-wrap">
+            <view
+                class="goal-select-item"
+                v-for="(goal, idx) in goalList"
+                :key="idx"
+                :class="{active: localSchedule.parentId === goal.id}"
+                @click="handleSelectGoal(goal)"
+            >
+              <text class="goal-name">{{goal.itemTitle || '未命名目标'}}</text>
+              <text class="icon-selected" v-show="localSchedule.parentId === goal.id">✓</text>
+            </view>
+            <!-- ✅ 无目标选项 - 选中后parentId置空 -->
+            <view
+                class="goal-select-item"
+                :class="{active: !localSchedule.parentId}"
+                @click="handleSelectGoal({id: 0, title: '无目标'})"
+            >
+              <text class="goal-name">无目标</text>
+              <text class="icon-selected" v-show="!localSchedule.parentId">✓</text>
+            </view>
+          </view>
         </view>
       </view>
 
-      <!-- 积分设置 - 放在一行显示 -->
-      <view class="form-section" v-if="schedule.itemType === 'task'">
+      <!-- 积分设置 -->
+      <view class="form-section" v-if="localSchedule?.itemType === 'task'">
         <text class="section-title">积分设置</text>
-
         <view class="form-row">
           <view class="form-item form-item-inline">
             <text class="label">积分数量</text>
-            <input class="input" type="number" v-model.number="schedule.extra.score" placeholder="积分"/>
+            <input class="input" type="number" v-model.number="scheduleExtra.score" placeholder="积分"/>
           </view>
         </view>
       </view>
@@ -141,7 +165,7 @@
 
 <script setup>
 // 引入必要的 Vue 功能
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import DateUtils from "../../utils/util";
 import { getStoredData, setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
 import FunRadioGroup from "../fun-components/fun-radio-group.vue";
@@ -155,37 +179,97 @@ const props = defineProps({
   },
   curDate: {
     type: Date,
-    default: () => new Date() // ✅ 正确：引用类型的默认值必须是函数返回
+    default: () => new Date()
+  },
+  goalList: {
+    type: Array,
+    default: () => []
   }
 });
 
+// ✅ 选中目标 赋值parentId
+const handleSelectGoal = (goal) => {
+  localSchedule.value.parentId = goal.id; // 核心赋值：选中目标的id = parentId
+  // 无目标时 parentId = null，和上面的无目标选项联动
+};
+
+// watch(() => localSchedule.value.parentId, () => {}, { immediate: true });
+
+// 定义自定义事件，可选通知父组件数据就绪
+const emit = defineEmits(['schedule-ready']);
+
+// ✅ 初始化给兜底完整结构，模板渲染时永远有值，杜绝undefined报错
+const localSchedule = ref({
+  id: '',
+  itemTitle: '',
+  itemDesc: null,
+  location: null,
+  repeatType: 'none',
+  repeatKeys: ['whole'],
+  repeatStartDay: DateUtils.getDateStr(new Date()),
+  repeatEndDay: DateUtils.getDateStr(new Date()),
+  itemType: 'task',
+  label: null,
+  startTime: '',
+  endTime: '',
+  userId: '',
+  extra: { score: 0, taskType: 'Habit', totalCount: 1 },
+  updateScope: null,
+  showExtra: null
+});
+
+// ✅ 核心：独立响应式extra对象，解决v-model绑定嵌套属性undefined报错
+const scheduleExtra = reactive({ score: 0, taskType: 'Habit', totalCount: 1 });
+
 const radioOptions = reactive([
   { label: '习惯养成', value: 'Habit' },
-  { label: 'To-Do', value: 'Todo' }
+  { label: 'ToDo', value: 'Todo' },
+  { label: '目标', value: 'Goal' }
 ])
 const repeatDurationOptions = reactive([
   { label: '不指定', value: 'whole' },
   { label: '指定日期', value: 'select' }
 ])
 
-const onRepeatDurationChanged = (e) =>{
+// ✅ 重复时长切换事件 - 修改为操作 localRepeatDuration ref
+const onRepeatDurationChanged = (e) => {
+  localRepeatDuration.value = e; // 直接修改 ref
   if (e === 'whole'){
-    props.schedule.repeatKeys = ['whole']
-  }else{
-    props.schedule.repeatKeys = []
-    watchRepeatType(props.schedule.repeatType,e)
+    localSchedule.value.repeatKeys = ['whole'];
+  } else {
+    // 确保 watchRepeatType 函数能正确处理新的 repeatType 和 e
+    watchRepeatType(localSchedule.value.repeatType, e);
   }
 }
-const onTaskTypeChanged = (e) =>{
+
+// ✅ 任务类型切换事件(习惯/Todo)
+const onTaskTypeChanged = (e) => {
+  scheduleExtra.taskType = e;
   if (e === 'Todo'){
-    props.schedule.repeatType = 'none'
-    props.schedule.repeatKeys = []
+    localSchedule.value.repeatType = 'none';
+    localSchedule.value.repeatKeys = [];
+    localSchedule.value.itemType = 'task'
+  } else if(e === 'Habit'){
+    localSchedule.value.repeatType = 'daily'; // 或其他默认类型
+    localSchedule.value.repeatKeys = ['whole'];
+    localSchedule.value.itemType = 'task'
+  }else if(e === 'Goal'){
+    localSchedule.value.repeatType = 'none'; // 或其他默认类型
+    localSchedule.value.repeatKeys = [];
+    localSchedule.value.itemType = 'goal'
   }
 }
 
-const repeatDuration = ref('whole')
+// ✅ 使用 ref 替代 computed 来管理 localRepeatDuration 的状态
+const localRepeatDuration = ref('whole');
 
-// --- Refs for static-ish options ---
+// ✅ 一个计算属性来根据 localSchedule.value.repeatKeys 计算当前状态（如果需要的话，主要用于初始化）
+// 但主要状态由 localRepeatDuration 控制
+const calculateRepeatDuration = (keys) => {
+  return keys?.includes('whole') ? 'whole' : 'select';
+};
+
+// --- 静态下拉选项定义 ---
 const repeatTypeOptions = ref(HOBIT_TASK_REPEAT_TYPE_LABELS);
 const repeatTypeValues = ref(HOBIT_TASK_REPEAT_TYPE_VALUES);
 const weekDays = ref(['一', '二', '三', '四', '五', '六', '日']);
@@ -194,23 +278,33 @@ const monthDays = ref(Array.from({ length: 31 }, (_, i) => (i + 1).toString()));
 const itemLabelOptions = ref(['学校', '家里']);
 const itemLabelValues = ref(['school', 'home']);
 
-// --- 新增：设置模式 ---
-const settingMode = ref('Time');
+// ✅ 计算属性-自动响应任务类型变化
+const settingMode = computed(() => {
+  return scheduleExtra.taskType === 'Todo' ? 'Todo' : 'Time'
+});
+
+// 读取缓存配置
 let repeatDiffDays = getStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION);
-let scheduleDiffMin = getStoredData(STORAGE_KEYS.SCHEDULE_CACHED_DURATION);
 if (!repeatDiffDays) {
   repeatDiffDays = 180;
 }
-if (!scheduleDiffMin) {
-  scheduleDiffMin = 45;
+
+// ✅ 重复类型联动处理
+const watchRepeatType = (type, duration) => {
+  if(duration === 'select') {
+    if (isWeekRepeat(type)) {
+      localSchedule.value.repeatKeys = [DateUtils.getWeekDay(props.curDate).toString()];
+    } else if ( type === 'yearly') {
+      localSchedule.value.repeatKeys = [DateUtils.getDayInYear(props.curDate)];
+    } else if ( type === 'monthly') {
+      localSchedule.value.repeatKeys = [DateUtils.getDayInMonth(props.curDate)];
+    }else {
+      localSchedule.value.repeatKeys = []
+    }
+  }
 }
 
-
-// 设置类型选择函数
-const setSettingType = (type) => {
-  props.schedule.extra.taskType = type;
-};
-
+// ✅ 获取日期天数
 const getMonthDay = (dateTimeStr) => {
   if (!dateTimeStr) return 1;
   const date = new Date(dateTimeStr);
@@ -218,159 +312,167 @@ const getMonthDay = (dateTimeStr) => {
   return date.getDate();
 };
 
+// ✅ 获取日期天数索引
 const getMonthDayIndex = (dateTimeStr) => {
   const day = getMonthDay(dateTimeStr);
   return day - 1;
 };
 
-
-const handleMonthDayChange = (e, field) => {
+// ✅ 月份日期选择事件
+const handleMonthDayChange = (e) => { // 移除 field 参数，不需要
   const dayIndex = e.detail.value;
-  if (props.schedule.repeatKeys && Array.isArray(props.schedule.repeatKeys)) {
-    props.schedule.repeatKeys[0] = monthDays.value[dayIndex];
+  if (localSchedule.value.repeatKeys && Array.isArray(localSchedule.value.repeatKeys)) {
+    localSchedule.value.repeatKeys[0] = monthDays.value[dayIndex];
   }
 };
 
+// ✅ 年份日期选择事件
 const handleYearDateChange = (e) => {
   const dateStr = e.detail.value;
-  const [year, month, day] = dateStr.split('-');
-  const formattedKey = month + '-' + day;
-  if (props.schedule.repeatKeys && Array.isArray(props.schedule.repeatKeys)) {
-    props.schedule.repeatKeys[0] = formattedKey;
+  // 从 "YYYY-MM-DD" 提取 "MM-DD"
+  const [_, month, day] = dateStr.split('-');
+  const formattedKey = `${month}-${day}`;
+  if (localSchedule.value.repeatKeys && Array.isArray(localSchedule.value.repeatKeys)) {
+    localSchedule.value.repeatKeys[0] = formattedKey;
   }
 };
 
+// ✅ 日期格式化方法
 const formatDate = (dateTimeStr) => {
-  if (dateTimeStr) {
-    return DateUtils.getDateFromDateTimeStr(dateTimeStr);
-  }
+  if (!dateTimeStr) return '';
+  return DateUtils.getDateFromDateTimeStr(dateTimeStr) || ''
 };
 
+// ✅ 重复类型索引获取
 const getRepeatTypeIndex = (type) => {
-  if (!props.schedule.repeatType) {
-    props.schedule.repeatType = 'none';
-  }
-  const index = repeatTypeValues.value.indexOf(props.schedule.repeatType);
+  if (!type) type = 'none';
+  const index = repeatTypeValues.value.indexOf(type);
   return index !== -1 ? index : 0;
 };
 
+// ✅ 重复类型文本获取
 const getRepeatTypeText = (type) => {
   const index = repeatTypeValues.value.indexOf(type);
   return index !== -1 ? repeatTypeOptions.value[index] : repeatTypeOptions.value[0];
 };
 
+// ✅ 标签索引获取
 const getItemLabelIndex = (type) => {
-  const index = itemLabelValues.value.indexOf(type);
-  return index !== -1 ? index : 0;
-};
+  if(!type) return 0
+  const index = itemLabelValues.value.indexOf(type)
+  return index > -1 ? index : 0
+}
 
+// ✅ 标签文本获取
 const getItemLabelText = (type) => {
-  const index = itemLabelValues.value.indexOf(type);
-  return index !== -1 ? itemLabelOptions.value[index] : itemLabelOptions.value[0];
-};
+  const index = getItemLabelIndex(type)
+  return itemLabelOptions.value[index]
+}
 
-const handleRepeatDateChanged = (field) => {
-  if (field === 'repeatStartDay') {
-    const repeatStartDay = new Date(props.schedule['repeatStartDay']);
+// ✅ 是否是每周重复
+const isWeekRepeat = (type) => {
+  return type === 'weekly'
+}
+
+// ✅ 重复类型切换事件
+const handleRepeatTypeChange = (e) => {
+  const index = e.detail.value
+  localSchedule.value.repeatType = repeatTypeValues.value[index]
+  if(localSchedule.value.repeatType !== 'none') {
+    watchRepeatType(e, localRepeatDuration.value);
+  }
+
+  if ( localSchedule.value.repeatType === 'yearly'){
+    const repeatStartDay = new Date(localSchedule.value.repeatStartDay);
     const endDate = new Date(repeatStartDay);
-    endDate.setDate(endDate.getDate() + repeatDiffDays);
-    props.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(endDate);
-  } else if (field === 'repeatEndDay') {
-    const repeatEndDay = new Date(props.schedule[field]);
-    const repeatStartDay = new Date(props.schedule['repeatStartDay']);
-    const dayDiff = DateUtils.getDaysDiff(repeatStartDay, repeatEndDay);
-    if (repeatDiffDays !== dayDiff) {
-      repeatDiffDays = dayDiff;
-      setStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION, dayDiff);
-    }
-
-    if(props.schedule.extra.taskType === 'Habit'){
-      props.schedule['endTime'] = props.schedule[field];
-    }
-  }
-};
-
-const handleRepeatDateChange = (e, field) => {
-  const dateStr = e.detail.value;
-  props.schedule[field] = DateUtils.replaceDatePart(props.schedule[field], dateStr);
-  handleRepeatDateChanged(field);
-};
-
-const handleEventDateChange = (e) => {
-  const dateStr = e.detail.value;
-  props.schedule['startTime'] = DateUtils.replaceDatePart(props.schedule['startTime'], dateStr);
-  props.schedule['endTime'] = DateUtils.replaceDatePart(props.schedule['endTime'], dateStr);
-};
-
-const isWeekRepeat = (repeatType) => {
-  return repeatType === 'weekly' || repeatType === 'oddWeek' || repeatType === 'evenWeek';
-};
-
-const watchRepeatType = (repeatType,repeatDuration) => {
-  if (repeatType === 'none') {
-    return;
-  }
-  const today = props.curDate ? props.curDate : new Date();
-  if (repeatDuration !== 'whole'){
-    if (isWeekRepeat(repeatType)) {
-      props.schedule.repeatKeys = [DateUtils.getWeekDay(today).toString()];
-    } else if (repeatType === 'yearly') {
-      props.schedule.repeatKeys = [DateUtils.getDayInYear(today)];
-    } else if (repeatType === 'monthly') {
-      props.schedule.repeatKeys = [DateUtils.getDayInMonth(today)];
-    }
-  }
-  if (!props.schedule.repeatStartDay) {
-    props.schedule.repeatStartDay = DateUtils.getDayStartTimeStr(today);
-  }
-  if (repeatType === 'yearly') {
-    const repeatStartDay = new Date(props.schedule.repeatStartDay);
-    const endDate = new Date(repeatStartDay);
-    endDate.setDate(endDate.getDate() + 360 * 20);
-    props.schedule.repeatEndDay = DateUtils.getDayEndTimeStr(endDate);
-  } else {
+    endDate.setDate(endDate.getDate() + 360*20);
+    localSchedule.value.repeatEndDay = DateUtils.getDateStr(endDate);
+  }else {
     handleRepeatDateChanged('repeatStartDay');
   }
 }
 
-const handleRepeatTypeChange = (e) => {
-  const index = e.detail.value;
-  props.schedule.repeatType = repeatTypeValues.value[index];
-  watchRepeatType(repeatTypeValues.value[index],repeatDuration.value)
-};
-
-const handleItemLabelChange = (e) => {
-  const index = e.detail.value;
-  props.schedule.itemLabel = itemLabelValues.value[index];
-};
-
-const toggleWeekDay = (dayIndex) => {
-  const key = dayIndex.toString();
-  if (!Array.isArray(props.schedule.repeatKeys)) {
-    props.schedule.repeatKeys = [];
-  }
-  const index = props.schedule.repeatKeys.indexOf(key);
-  if (index > -1) {
-    props.schedule.repeatKeys.splice(index, 1);
+// ✅ 星期勾选事件
+const toggleWeekDay = (day) => {
+  const idx = localSchedule.value.repeatKeys.findIndex(item => item === day)
+  if(idx > -1) {
+    localSchedule.value.repeatKeys.splice(idx,1)
   } else {
-    props.schedule.repeatKeys.push(key);
+    localSchedule.value.repeatKeys.push(day)
   }
-  props.schedule.repeatKeys.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-};
+}
+
+// ✅ 标签切换事件
+const handleItemLabelChange = (e) => {
+  const index = e.detail.value
+  localSchedule.value.itemLabel = itemLabelValues.value[index]
+}
+
+// ✅ 【重中之重修复】日期赋值事件 - 加固版，支持所有日期字段赋值，不会丢失最新值
+const handleRepeatDateChange = (e, field) => {
+  if (field && e?.detail?.value) {
+    localSchedule.value[field] = e.detail.value;
+  }
+  handleRepeatDateChanged(field)
+}
 
 
-// --- Lifecycle Hooks ---
+const handleRepeatDateChanged = (field)=>{
+  if (field === 'repeatStartDay'){
+    const repeatStartDay = new Date(localSchedule.value[field]);
+    const endDate = new Date(repeatStartDay);
+    endDate.setDate(endDate.getDate() + repeatDiffDays);
+    localSchedule.value.repeatEndDay = DateUtils.getDateStr(endDate);
+  }else if (field === 'repeatEndDay'){
+    const repeatEndDay = new Date(localSchedule.value[field]);
+    const repeatStartDay = new Date(localSchedule.value['repeatStartDay']);
+    const dayDiff = DateUtils.getDaysDiff(repeatStartDay,repeatEndDay);
+    if (repeatDiffDays !== dayDiff){
+      repeatDiffDays = dayDiff
+      setStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION,dayDiff)
+    }
+  }
+}
+
+// ✅ 万能深拷贝方法
+const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+
+// ✅ 初始化赋值 + 监听props变化自动同步
 onMounted(() => {
-  // 组件挂载时，可以根据 props.schedule 的初始状态判断 settingMode
-  // 例如，如果 props.schedule 中有 totalCount，则初始为 'count' 模式
-  if (!props.schedule.extra.taskType){
-    props.schedule.extra.taskType = 'Habit';
-    props.schedule.repeatKeys = ['whole']
+  const scheduleData = props.schedule?.extra ? props.schedule : { ...props.schedule, extra: { score:0, taskType:'Habit', totalCount:1 } };
+  console.log(scheduleData)
+  const copyData = deepClone(scheduleData);
+  localSchedule.value = copyData;
+  if (!localSchedule.value.id){
+    localSchedule.value.repeatType = 'daily';
+    handleRepeatDateChanged('repeatStartDay')
+    // localSchedule.value.repeatStartDay = DateUtils.getDateStr(props.curDate)
   }
-  if(!props.schedule.extra.totalCount){
-    props.schedule.extra.totalCount = 1
-  }
+  Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+  localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 初始化 localRepeatDuration
+  emit('schedule-ready', true);
 });
+
+watch(
+    () => props.schedule,
+    (newSchedule) => {
+      const scheduleData = newSchedule?.extra ? newSchedule : { ...newSchedule, extra: { score:0, taskType:'Habit', totalCount:1 } };
+      const copyData = deepClone(scheduleData);
+      localSchedule.value = copyData;
+      Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+      localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 同步 localRepeatDuration
+      emit('schedule-ready', true);
+    },
+    { deep: true, immediate: true } // immediate: true 确保首次传入 props 时也触发一次
+);
+
+// ✅ 暴露给父组件的核心方法 - 合并所有最新值并返回，父组件直接调用即可拿到全部最新数据
+defineExpose({
+  getFinalSchedule: () => {
+    localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    return localSchedule.value;
+  }
+})
 </script>
 <style scoped>
 /* 全局容器 - 统一 rpx 单位 */
@@ -592,5 +694,35 @@ onMounted(() => {
   background-color: #007aff;
   color: white;
   border-color: #007aff; /* 选中后边框和背景色一致，视觉更干净 */
+}
+.goal-select-wrap { width: 100%; display: flex; flex-direction: column; gap: 8rpx; }
+.goal-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 16rpx;
+  border-radius: 12rpx;
+  background: #f7f8fa;
+  font-size: 28rpx;
+  color: #333;
+  transition: all 0.2s ease;
+}
+/* 选中态高亮 */
+.goal-select-item.active {
+  background: #e6f0ff;
+  color: #007AFF;
+}
+.goal-name { flex: 1; }
+.icon-selected {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #007AFF;
+}
+/* 点击反馈 */
+.goal-select-item:active {
+  background: #e5e7eb;
+}
+.goal-select-item.active:active {
+  background: #d1e0ff;
 }
 </style>

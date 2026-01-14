@@ -21,6 +21,25 @@ export default class DateUtils {
 		const diff = d.getDate() - day + (day === 0 ? -6 : 1);
 		return new Date(d.setDate(diff));
 	}
+	static isTheSameDay( d1:Date, d2:Date){
+		return d1.getFullYear() == d2.getFullYear() || d1.getMonth() == d2.getMonth() || d1.getDate()  == d2.getDate()
+	}
+
+	static getNextMonday(date: Date = new Date()): Date {
+		const d = new Date(date);
+		const day = d.getDay(); // 0 (周日) 到 6 (周六)
+
+		// 计算当前日期距离下周一还有几天
+		// 如果今天是周日(day=0)，下周一就是 +1 天
+		// 如果今天是周一(day=1)，下周一就是 +7 天
+		// 如果今天是周二(day=2)，下周一就是 +6 天
+		// 公式： (8 - day) % 7  如果是周一(1)，结果是 0；我们需要的是 7
+		// 更简单的逻辑： 8 - day 如果 day 不是 0；如果是 0 (周日)，则是 1
+		const daysUntilNextMonday = day === 0 ? 1 : 8 - day;
+
+		d.setDate(d.getDate() + daysUntilNextMonday);
+		return d;
+	}
 	/**
 	 * 获取指定月份的【当月第一天】Date对象 (00:00:00)
 	 * @param date 传入任意当月的Date对象，不传默认取【当前系统日期】
@@ -31,6 +50,17 @@ export default class DateUtils {
 		const month = date.getMonth();
 		// 核心：年月不变，日期固定为1号，时分秒重置为0
 		return new Date(year, month, 1, 0, 0, 0);
+	}
+
+	static getFirstDayOfNextMonth(date: Date = new Date()): Date {
+		const year = date.getFullYear();
+		const month = date.getMonth();
+
+		// 核心逻辑：创建一个日期对象，日期设为 0 号
+		// 在 JavaScript 中，如果月份+1后的“0号”，实际上会自动回滚到该月份的上一个月的最后一天
+		// 但这里我们利用它来获取“下个月”的第一天：我们指定“当前月+2月”的“0号”，即下下个月的前一天，也就是下个月的第一天
+		// 更简单直接的方法：直接使用 new Date(year, month + 1, 1)
+		return new Date(year, month + 1, 1, 0, 0, 0);
 	}
 
 	/**
@@ -230,4 +260,6 @@ export default class DateUtils {
 		sundayDate.setDate(mondayDate.getDate() + 6); // 在副本上操作
 		return this.formatDate(sundayDate);
 	}
+
+
 }

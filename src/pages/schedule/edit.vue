@@ -2,7 +2,10 @@
   <view class="page-container">
     <view class="page-content-container">
       <!-- 引入schedule-content组件 -->
-      <schedule-edit :schedule="editingSchedule" :cur-date="curDate"/>
+      <schedule-edit
+          ref="scheduleEditRef"
+          :schedule="editingSchedule"
+          :cur-date="curDate"/>
     </view>
     <!-- 底部固定栏 -->
     <schedule-bottom-bar :buttons="buttons"
@@ -26,8 +29,9 @@ const editingSchedule = ref({ itemType: 'schedule' }); // 初始化为一个带�
 const buttons = ref([{ code: 'save', text: '保存' }]);
 const currentMember = ref({});
 const currentGroup = ref({});
-const curDate = ref(null)
+const curDate = ref(new Date())
 
+const scheduleEditRef = ref(null);
 
 // =============== 生命周期 ===============
 onLoad((query) => {
@@ -41,15 +45,10 @@ onLoad((query) => {
     }else {
       startTime = new Date()
     }
-    const date = new Date(startTime);
-    curDate.value = date
+    curDate.value = new Date(startTime)
 
-    date.setMinutes(date.getMinutes() + 45);
-    editingSchedule.value.startTime = DateUtils.formatDateTime(startTime);
-    editingSchedule.value.endTime = DateUtils.formatDateTime(date);
-
+    editingSchedule.value.repeatStartDay = DateUtils.getDateStr(startTime);
     editingSchedule.value.itemType = 'schedule';
-    editingSchedule.value.extra = {};
   }
 });
 
@@ -81,10 +80,14 @@ const switchToTab = ()=>{
 
 const save = async () => {
   try {
+    if (!scheduleEditRef.value) {
+      await uni.showToast({title: '数据加载中，请稍后重试', icon: 'none'});
+      return;
+    }
     const req = {
       targetUserId: currentMember.value.userId,
       groupId: currentGroup.value.id,
-      items: [editingSchedule.value] // 使用 .value 获取当前值
+      items: [scheduleEditRef.value.getFinalSchedule()] // 使用 .value 获取当前值
     };
 
     console.log('提交的数据:', editingSchedule.value);

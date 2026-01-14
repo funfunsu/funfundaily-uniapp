@@ -34,6 +34,13 @@
         <template v-if="task.repeatEndDay">
           <text class = "task-marks">{{markText}}</text>
         </template>
+
+        <text  v-if="task.recordExtra?.count" class="check-in-count">
+          {{ task.recordExtra?.count || 0 }}/{{task.extra.totalCount}} 次
+        </text>
+        <text  v-else class="check-in-count">
+          {{task.extra.totalCount}} 次
+        </text>
       </view>
 
       <!-- 操作区域（仅在非分享模式下显示） -->
@@ -50,13 +57,6 @@
               <text class="check-icon" v-if="task.isCompleted">✓</text>
             </view>
           </template>
-          <!-- 得分，紧跟在进度或开关后 -->
-          <text
-              class="task-point"
-              :class="{ 'task-point--completed': task.isCompleted }"
-          >
-            +{{ task.extra?.score || 0 }} 分
-          </text>
         </view>
       </template>
     </view>
@@ -64,31 +64,25 @@
     <view class="task-desc-and-time" >
       <text class="task-desc">{{ task.itemDesc || ' ' }}</text>
       <template v-if="mode !== 'share'">
-        <template v-if="isReadOnly">
-          <text v-if="task.completedTime" class="completed-time">
-            {{ DateUtils.formatDateTimeToShow(new Date(task.completedTime)) }}
-          </text>
-        </template>
+        <text v-if="task.completedTime" class="completed-time">
+          {{ DateUtils.formatDateTimeToShow(new Date(task.completedTime)) }}
+        </text>
         <template v-else>
-          <text v-if="task.isCompleted" class="completed-time">
-            {{ DateUtils.formatDateTimeToShow(new Date(task.completedTime)) }}
+          <text v-if="todayIsDueDate(task.showExtra?.dueDate)" class="completed-time">
+            🚩本日截止
           </text>
-          <!-- 按时间任务的推迟按钮 -->
-          <text
-              v-else-if="task.extra.taskType === 'Time' && task.repeatType === 'none'"
-              class="delay"
-              @click.stop="delayClick"
-          >
-            推迟
+          <text v-else  class="completed-time">
+            截止于{{ task.showExtra?.dueDate }}
           </text>
         </template>
-        <text  v-if="task.recordExtra?.count" class="check-in-count">
-          {{ task.recordExtra?.count || 0 }}/{{task.extra.totalCount}} 次
-        </text>
-        <text  v-else class="check-in-count">
-          {{task.extra.totalCount}} 次
-        </text>
       </template>
+      <!-- 得分，紧跟在进度或开关后 -->
+      <text v-if="task.extra?.score>0"
+          class="task-point"
+          :class="{ 'task-point--completed': task.isCompleted }"
+      >
+        +{{ task.extra?.score || 0 }} 分
+      </text>
     </view>
   </view>
 </template>
@@ -113,10 +107,18 @@ const props = defineProps({
   isSelected: {
     type: Boolean,
     default: false
+  },
+  curDate:{
+    type: Date,
+    default:new Date()
   }
 })
 
 const taskRepeatTypeLabelMap= TASK_REPEAT_TYPE_LABEL_MAP;
+
+const todayIsDueDate = (duDate) => {
+  return DateUtils.getDateStr(props.curDate) === duDate;
+}
 
 const markText = computed(() => {
   if (props.task.repeatType === 'none'){
@@ -212,11 +214,6 @@ const toggleSelection = () => {
   display: flex;
   align-items: center;
 }
-.task-type-icon {
-  font-size: 36rpx;
-  margin-right: 12rpx;
-  flex-shrink: 0;
-}
 .task-title {
   color: #007aff;
   word-break: break-word;
@@ -261,7 +258,7 @@ const toggleSelection = () => {
 .check-in-count {
   flex-shrink: 0;
   font-size: 24rpx;
-  color: #9e9e9e;
+  color: #007aff8f;
   font-weight: 500;
   white-space: nowrap;
   margin-left: auto;
@@ -323,5 +320,8 @@ const toggleSelection = () => {
   font-size: 40rpx;
   font-weight: bold;
   line-height: 1;
+}
+.flag-warning{
+  color: #34C759;   /* 完成状态-绿色小旗 (完成成功色) */
 }
 </style>

@@ -218,7 +218,7 @@ async function fetchScheduleData() {
   try {
     const requestData = {
       fromDate: DateUtils.getDayStartTimeStr(DateUtils.getMonday(currentDate.value)),
-      toDate: DateUtils.getDayStartTimeStr(DateUtils.getSunday(currentDate.value)),
+      toDate: DateUtils.getDayStartTimeStr(DateUtils.getNextMonday(currentDate.value)),
     };
 
     if (currentGroup.value && currentGroup.value.id){

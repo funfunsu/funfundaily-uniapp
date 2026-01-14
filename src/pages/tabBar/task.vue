@@ -1,6 +1,6 @@
 <template>
   <view class="page-container">
-    <!-- ✅ ✅ ✅ 新增：右侧抽屉式悬浮按钮组 start -->
+    <!-- 右侧抽屉式悬浮按钮组 -->
     <drawer-right-btn
         ref="drawerRef"
         :circle-translate="40"
@@ -9,7 +9,6 @@
         main-color="#007AFF"
         :radius="140"
         :is-open="isDrawerBtnOpen"
-        @close="handleClose"
     >
       <template #default="{circleSize, mainColor, radius}">
         <DrawerBtnItem btnText="任务日历" :angle="85" :radius="radius" :circleSize="100"
@@ -44,18 +43,35 @@
 
     <!-- 内容区域 -->
     <view class="content-container" @click="drawerShow && (drawerShow = false)">
-      <!-- ✅ ✅ ✅ 核心改动：替换为封装好的任务列表组件 -->
-      <task-list-container
-          v-show="listShow"
-          :current-date="currentDate"
-          :task-list="taskList"
-          :current-member="currentMember"
-          :mode="mode"
-          :selected-task-ids="selectedTaskIds"
-          @check-task="onTaskCheck"
-          @delay-click="onTaskDelay"
-          @toggle-select="toggleSelect"
-      />
+      <!-- ✅✅✅ 核心修改：按【目标分组】遍历渲染，每个分组带目标标题 -->
+      <view v-show="listShow" class="task-group-wrap" v-for="(goalGroup, idx) in goalTaskList" :key="idx">
+        <!-- 目标分组标题栏 - 可点击折叠/展开 + 精美样式 -->
+        <view class="goal-group-title" @click="toggleGoalGroup(idx)">
+          <view class="goal-title-left">
+            <text class="goal-icon">🎯</text>
+            <text class="goal-title-text">{{ goalMap[goalGroup.parentId]?.itemTitle || `` }}</text>
+          </view>
+          <text class="goal-collapse-icon" :class="{'icon-fold': goalGroup.isCollapse}">
+            {{ goalGroup.isCollapse ? '⊕' : '⊖' }}
+          </text>
+        </view>
+        <!-- 折叠控制：展开显示任务列表，收起隐藏 -->
+        <view class="goal-task-content" v-show="!goalGroup.isCollapse">
+          <task-list-container
+              :current-date="currentDate"
+              :task-list="goalGroup.taskList"
+              :current-member="currentMember"
+              :mode="mode"
+              :selected-task-ids="selectedTaskIds"
+              @check-task="onTaskCheck"
+              @delay-click="onTaskDelay"
+              @toggle-select="toggleSelect"
+          />
+        </view>
+
+      </view>
+      <!-- 无任务兜底 -->
+      <view v-show="listShow && goalTaskList.length === 0" class="empty-task">今日暂无任务</view>
     </view>
 
     <!-- 底部栏 -->
@@ -74,16 +90,19 @@ import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import DateUtils from "../../utils/util";
 import {onLoad, onShareAppMessage, onShow} from "@dcloudio/uni-app";
-import {getStoredData, removeStoredData, STORAGE_KEYS} from "../../utils/storageManager";
+import {getStoredData, getStoredKey, removeStoredData, setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 import DrawerRightBtn from "../../components/fun-components/drawer-btn/drawer-right-btn.vue";
 import DrawerBtnItem from "../../components/fun-components/drawer-btn/drawer-btn-item.vue";
-// ✅ ✅ ✅ 引入封装好的任务列表组件
 import TaskListContainer from "../../components/task/task-list-container.vue";
-const drawerRef = ref(null); // 用于访问子组件实例
+import TaskUtil from "../../utils/taskUtil";
+const drawerRef = ref(null);
+const allUserGoalList = ref(null)
+
 
 // =============== 响应式状态 ===============
 const pointBalance = ref(0)
-const taskList = ref([]) // Task[] 类型会自动推断
+const taskList = ref([])
+const goalTaskList = ref([]) // ✅ 核心：[{parentId:目标ID, title:目标标题, taskList:该目标下的任务数组}]
 const currentDate = ref(new Date())
 const listShow = ref(true)
 const isDrawerBtnOpen = ref(false)
@@ -106,6 +125,8 @@ const selectedTaskIds = ref(new Set());
 const drawerShow = ref(false);
 const flowType = 'POINTS';
 
+const goalMap = ref({});
+
 // =============== 计算属性 ===============
 const totalCount = computed(() => taskList.value.length)
 const completedCount = computed(() => taskList.value.filter(t => t.isCompleted).length)
@@ -117,7 +138,9 @@ const todayPoints = computed(() =>
 
 // =============== 生命周期 ===============
 onLoad(async (query) => {});
-
+const toggleGoalGroup = (index) => {
+  goalTaskList.value[index].isCollapse = !goalTaskList.value[index].isCollapse;
+}
 
 function onAddTaskClick() {
   uni.navigateTo({ url: '/pages/task/edit' });
@@ -149,6 +172,40 @@ async function fetchPointBalance() {
   try { pointBalance.value = await apiTs.flow.balance(req) }
   catch (error) { console.error('获取余额失败:', error); }
 }
+async function fetchUserAllGoal() {
+  if (!currentMember.value || !currentGroup.value) return;
+  // 第一步：先读取【本地缓存】，有缓存直接用，无缓存再请求接口
+  const key = getStoredKey(STORAGE_KEYS.USER_ALL_GOAL,currentMember.value.userId)
+  const goalList = getStoredData(key);
+  if (goalList) {
+    const map = {};
+    goalList.forEach(item => map[item.id] = item);
+    goalMap.value = map;
+    return;
+  }
+  // 第二步：无缓存，调用接口【加载用户所有目标】(用你批量查询目标的接口)
+  try {
+    if (!currentMember.value || !currentGroup.value) return;
+    const req = {
+      fromDate: DateUtils.getDateStr(currentDate.value),
+      toDate: DateUtils.getNextDayStr(currentDate.value),
+      targetUserId: currentMember.value.userId,
+      groupId: currentGroup.value.id,
+      scheduleItemType: 'goal'
+    }
+    const taskDateList =  await apiTs.schedule.list(req);
+    const goalList = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
+    setStoredData(key,goalList);
+    if (goalList) {
+      const map = {};
+      goalList.forEach(item => map[item.id] = item);
+      goalMap.value = map;
+    }
+  } catch (error) {
+    console.error('加载用户所有目标失败', error);
+    allUserGoalList.value = [];
+  }
+}
 
 function handleButtonClick(buttonCode) {
   switch (buttonCode) {
@@ -177,21 +234,56 @@ function handleButtonClick(buttonCode) {
   }
 }
 
-// ✅ 任务列表事件 - 只保留逻辑，无需再定义isTaskSelected，已移入组件
 const toggleSelect = (task) => {
   if (mode.value !== 'share') return;
   selectedTaskIds.value.has(task.id) ? selectedTaskIds.value.delete(task.id) : !task.isCompleted && selectedTaskIds.value.add(task.id);
 };
 
 async function handleMemberChange(e) {
-  currentMember.value = e.currentMember; currentGroup.value = e.currentGroup; await fetchAllData()
+  currentMember.value = e.currentMember; currentGroup.value = e.currentGroup;
+  await fetchAllData()
+  await fetchUserAllGoal()
 }
 const onTaskDelay = async (task) => {
   taskList.value = taskList.value.filter(item => item.id !== task.id)
+  // ✅ 同步更新分组列表中的数据
+  goalTaskList.value.forEach(item => {
+    item.taskList = item.taskList.filter(t => t.id !== task.id)
+  })
 }
 
 const onTaskCheck = ({task, completed}) => {
   if (completed) pointBalance.value = pointBalance.value + Number(task.extra?.score || 0)
+}
+
+// ✅✅✅ 新增：异步加载【目标标题】的核心方法
+async function getGoalTitleById(goalId) {
+  // if(!goalId) return '无目标';
+  // try {
+  //   // ========== 核心修改点1：这里替换成你【查询目标标题的真实接口】 ==========
+  //   // 传参：goalId = task.parentId 就是目标ID
+  //   const res = await apiTs.goal.getById({id: goalId, groupId: currentGroup.value.id});
+  //   // 返回目标标题，根据你的真实接口返回字段调整，比如 res.title / res.name
+  //   return res?.title || res?.name || `目标(${goalId})`;
+  // } catch (error) {
+  //   console.error(`获取目标${goalId}标题失败`, error);
+  //   return `目标(${goalId})`;
+  // }
+}
+
+// ✅✅✅ 新增：批量加载分组目标标题 + 组装分组数据
+async function assemblyGoalTaskGroup(rawGroupList) {
+  const goalTaskArr = [];
+  // 遍历分组后的原始数据，异步加载标题
+  for (const group of rawGroupList) {
+    const goalTitle = await getGoalTitleById(group.parentId);
+    goalTaskArr.push({
+      parentId: group.parentId,
+      title: goalTitle, // 异步加载的目标标题
+      taskList: group.taskList // 该目标下的所有任务
+    })
+  }
+  return goalTaskArr;
 }
 
 async function fetchCheckinRecordList() {
@@ -207,28 +299,46 @@ async function fetchCheckinRecordList() {
       if (r.extra.count > existR.extra.count) recordMap.set(taskKey, r)
     } else recordMap.set(taskKey, r)
   })
+  const taskMap =  new Map()
   taskList.value.forEach(task => {
     const record = recordMap.get(task.showExtra.itemKey)
-    task.isCompleted = task.extra.taskType === 'Time' ? !!record : record && record.extra.count >= task.extra.totalCount;
+    task.isCompleted = record ? record.extra.count >= task.extra.totalCount :false;
     task.completedTime = record ? record.completeTime : null
     task.recordExtra = record ? record.extra : {}
   })
+
+  // ✅✅✅ 核心修改点2：先分组，再异步加载标题，最后赋值给渲染数组
+  const rawGroupList = Object.values(
+      taskList.value.reduce((acc, item) => {
+        const { parentId } = item;
+        if (!acc[parentId]) {
+          acc[parentId] = { parentId, taskList: [] };
+        }
+        acc[parentId].taskList.push(item);
+        return acc;
+      }, {})
+  );
+  // 异步加载目标标题并组装最终分组数据
+  goalTaskList.value = await assemblyGoalTaskGroup(rawGroupList);
 }
 
 async function fetchTaskList() {
   try {
     if (!currentMember.value || !currentGroup.value) return;
     const req = {
-      fromDate: DateUtils.getDayStartTimeStr(currentDate.value),
-      toDate: DateUtils.getDayEndTimeStr(currentDate.value),
+      fromDate: DateUtils.getDateStr(currentDate.value),
+      toDate: DateUtils.getNextDayStr(currentDate.value),
       targetUserId: currentMember.value.userId,
       groupId: currentGroup.value.id
     }
     const taskDateList = await apiTs.checkin.task.list(req);
-    taskList.value = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
+    const list = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
+    taskList.value = list.filter(item => TaskUtil.isTaskUndo(item,currentDate.value)).sort((a, b) => {return TaskUtil.sortTaskToShow(a,b) })
     await fetchCheckinRecordList()
   } catch (error) {
-    console.error('获取任务失败', error); taskList.value = []
+    console.error('获取任务失败', error);
+    taskList.value = [];
+    goalTaskList.value = []; // 兜底清空分组列表
   }
 }
 
@@ -242,7 +352,7 @@ function handleHistoryClick() {
   uni.navigateTo({url: '/pages/point/history'})
 }
 
-onMounted(() => { fetchAllData() })
+onMounted(() => { fetchAllData();fetchUserAllGoal() })
 onShow(() => {
   drawerRef.value?.closeDrawer()
   const currentTab = '/pages/tabBar/task'
@@ -289,6 +399,7 @@ onShareAppMessage((res) => {
   padding-top: 10px;
   padding-bottom: 84px;
   padding-right: 20rpx;
+  padding-left: 20rpx;
 }
 
 /* --- 任务统计卡片 --- */
@@ -311,4 +422,66 @@ onShareAppMessage((res) => {
 .stat-number { font-size: 36rpx; font-weight: bold; color: #2196f3; display: block; }
 .stat-label { font-size: 24rpx; color: #888; margin-top: 8rpx; }
 .stat-divider { width: 2rpx; height: 40rpx; background: #eee; }
+.task-group-wrap {
+  width: 100%;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+.task-group-wrap:active {
+  transform: scale(0.995);
+  box-shadow: 0 1rpx 8rpx rgba(0, 0, 0, 0.06);
+}
+/* 分组标题栏 - 渐变+图标+圆角+点击反馈 */
+.goal-group-title {
+  background: linear-gradient(90deg, #f8fbff 0%, #f0f7ff 100%);
+  padding: 20rpx 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  border-bottom: 1px solid #f5f8ff;
+}
+.goal-title-left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.goal-icon {
+  font-size: 32rpx;
+  line-height: 1;
+}
+.goal-title-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1d2129;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+/* 折叠/展开图标 */
+.goal-collapse-icon {
+  font-size: 36rpx;
+  color: #86909c;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+.icon-fold {
+  transform: rotate(0deg);
+}
+/* 任务列表容器内边距适配 */
+.goal-task-content {
+  padding: 8rpx 0;
+  transition: all 0.3s ease-in-out;
+}
+.empty-task {
+  text-align: center;
+  font-size: 28rpx;
+  color: #999;
+  margin-top: 100rpx;
+}
 </style>
