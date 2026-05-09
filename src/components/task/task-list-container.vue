@@ -103,17 +103,25 @@ const onTaskDelay = async (task) => {
 }
 
 
-const onTaskCheck = ({task, completed}) => {
+const onTaskCheck = async ({task, completed}) => {
+  task.recordExtra = task.recordExtra || {};
   task.recordExtra.count = task.recordExtra.count ? task.recordExtra.count + 1 : 1;
-  const completeFlag = task.extra.taskType === 'Time' ? true : task.recordExtra.count >= task.extra.totalCount
-  const data = { taskId: task.id, targetUserId: props.currentMember.userId, groupId: props.currentMember.groupId, taskTime: DateUtils.formatDateTime(props.currentDate) }
-  apiTs.checkin.task.complete(data)
+  const completeFlag = task.extra.taskType === 'Time' ? true : task.recordExtra.count >= task.extra.totalCount;
+  const data = { taskId: task.id, targetUserId: props.currentMember.userId, groupId: props.currentMember.groupId, taskTime: DateUtils.formatDateTime(props.currentDate) };
+  // 等接口完成再 emit，父级再拉余额；否则余额会跟流水写库时序不一致
+  try {
+    await apiTs.checkin.task.complete(data);
+  } catch (e) {
+    console.error('打卡失败:', e);
+    uni.showToast({ title: '打卡失败', icon: 'none' });
+    return;
+  }
 
-  const updatedTask = { ...task, isCompleted: completeFlag, completedTime: Date.now() }
-  const index = props.taskList.findIndex(t => t.id === task.id)
-  if (index !== -1) props.taskList.splice(index, 1, updatedTask)
-  emit('check-task', task,completeFlag)
-}
+  const updatedTask = { ...task, isCompleted: completeFlag, completedTime: Date.now() };
+  const index = props.taskList.findIndex(t => t.id === task.id);
+  if (index !== -1) props.taskList.splice(index, 1, updatedTask);
+  emit('check-task', task, completeFlag);
+};
 </script>
 
 <style scoped>

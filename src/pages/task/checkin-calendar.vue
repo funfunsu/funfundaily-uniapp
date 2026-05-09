@@ -140,7 +140,8 @@ const onTaskDelay = async (task) => {
   taskList.value = taskList.value.filter(item => item.id !== task.id)
 }
 
-const onTaskCheck = ({task, completed}) => {
+// emit('check-task', task, completed) 是位置参数
+const onTaskCheck = (task, completed) => {
   if (completed) pointBalance.value = pointBalance.value + Number(task.extra?.score || 0)
 }
 

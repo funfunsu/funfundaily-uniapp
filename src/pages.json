@@ -113,6 +113,20 @@
             "navigationBarTitleText": "积分兑换品编辑",
             "enablePullDownRefresh": false
           }
+        },
+        {
+          "path": "pages/points-exchange",
+          "style": {
+            "navigationBarTitleText": "积分兑换",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/points-exchange-records",
+          "style": {
+            "navigationBarTitleText": "兑换记录",
+            "enablePullDownRefresh": false
+          }
         }
       ]
     },
