@@ -102,11 +102,46 @@ onLoad((query) => {
 });
 
 const deleteItem = async () => {
-  products.value.splice(index,1);
-  await submitForm()
+  if (index === -1) {
+    uni.showToast({
+      title: '请先保存商品',
+      icon: 'none'
+    });
+    return;
+  }
+
+  uni.showModal({
+    title: '确认删除',
+    content: '确定要删除这个商品吗？',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          const productId = products.value[index].id;
+          await apiTs.pointExchange.removeProduct(productId, currentGroup.value.id);
+          uni.showToast({
+            title: '商品删除成功',
+            icon: 'success'
+          });
+          setStoredData(STORAGE_KEYS.REFRESH_TAB, parentPage.value);
+          await uni.navigateBack();
+        } catch (error) {
+          console.error('删除商品失败:', error);
+          uni.showToast({
+            title: '删除商品失败',
+            icon: 'none'
+          });
+        }
+      }
+    }
+  });
 }
 
 const saveItem = async () => {
+  await submitForm();
+}
+
+// 提交表单
+const submitForm = async () => {
   if (!formData.value.name || formData.value.points === null || !formData.value.description) {
     await uni.showToast({
       title: '请填写所有必填项',
@@ -114,40 +149,41 @@ const saveItem = async () => {
     });
     return;
   }
-  const curItem = {
-    id: index === -1 ? products.value.length : products.value[index].id, // 如果是新增，生成新ID
-    name: formData.value.name,
-    points: formData.value.points,
-    description: formData.value.description
-  };
-  if (index === -1) {
-    products.value.push(curItem);
-  } else {
-    products.value[index] = curItem;
+
+  try {
+    const request = {
+      groupId: currentGroup.value.id,
+      name: formData.value.name,
+      description: formData.value.description,
+      requiredScore: formData.value.points
+    };
+
+    if (index === -1) {
+      // 新增商品
+      await apiTs.pointExchange.createProduct(request);
+      uni.showToast({
+        title: '商品创建成功',
+        icon: 'success'
+      });
+    } else {
+      // 编辑商品
+      const productId = products.value[index].id;
+      await apiTs.pointExchange.updateProduct(productId, request);
+      uni.showToast({
+        title: '商品更新成功',
+        icon: 'success'
+      });
+    }
+
+    setStoredData(STORAGE_KEYS.REFRESH_TAB, parentPage.value);
+    await uni.navigateBack();
+  } catch (error) {
+    console.error('保存商品失败:', error);
+    uni.showToast({
+      title: '保存商品失败',
+      icon: 'none'
+    });
   }
-  await submitForm();
-}
-
-// 提交表单
-const submitForm = async () => {
-  const req = {
-    scene: 'point',
-    sceneVar: 'products',
-    groupId: currentGroup.value.id,
-    contentList: products.value // 响应式数组可以直接使用
-  };
-
-  await apiTs.universal_records.saveForGroup(req);
-
-  await uni.showToast({
-    title: '商品保存成功',
-    icon: 'success'
-  });
-
-  setStoredData(STORAGE_KEYS.REFRESH_TAB,parentPage.value)
-
-  // 保存成功后返回上一页
-  await uni.navigateBack();
 };
 
 // 重置表单

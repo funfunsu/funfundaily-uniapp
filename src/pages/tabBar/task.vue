@@ -186,9 +186,11 @@ async function fetchUserAllGoal() {
   // 第二步：无缓存，调用接口【加载用户所有目标】(用你批量查询目标的接口)
   try {
     if (!currentMember.value || !currentGroup.value) return;
+    const nextDay = new Date(currentDate.value);
+    nextDay.setDate(nextDay.getDate() + 1);
     const req = {
-      fromDate: DateUtils.getDateStr(currentDate.value),
-      toDate: DateUtils.getNextDayStr(currentDate.value),
+      fromDate: DateUtils.getDayStartTimeStr(currentDate.value),
+      toDate: DateUtils.getDayStartTimeStr(nextDay),
       targetUserId: currentMember.value.userId,
       groupId: currentGroup.value.id,
       scheduleItemType: 'goal'
@@ -252,8 +254,12 @@ const onTaskDelay = async (task) => {
   })
 }
 
-const onTaskCheck = ({task, completed}) => {
-  if (completed) pointBalance.value = pointBalance.value + Number(task.extra?.score || 0)
+// task-list-container 的 emit('check-task', task, completed) 是位置参数，这里也按位置接收
+const onTaskCheck = (task, completed) => {
+  if (completed) {
+    // 不再本地累加 task.extra.score，直接拉后端真实余额（来源：transaction_flow 最近一条的 balance）
+    fetchPointBalance();
+  }
 }
 
 // ✅✅✅ 新增：异步加载【目标标题】的核心方法
@@ -286,59 +292,91 @@ async function assemblyGoalTaskGroup(rawGroupList) {
   return goalTaskArr;
 }
 
-async function fetchCheckinRecordList() {
-  const itemKeyList = taskList.value.map(task => task.showExtra.itemKey);
-  if (!itemKeyList.length) return
-  const req = { targetUserId: currentMember.value.userId, groupId: currentGroup.value.id, taskKeys: itemKeyList }
-  const records = await apiTs.checkin.listV2(req)
-  const recordMap = new Map()
-  records.forEach((r) => {
-    const taskKey = r.taskKey ? r.taskKey : r.taskId
-    if (recordMap.has(taskKey)) {
-      const existR = recordMap.get(taskKey)
-      if (r.extra.count > existR.extra.count) recordMap.set(taskKey, r)
-    } else recordMap.set(taskKey, r)
-  })
-  const taskMap =  new Map()
-  taskList.value.forEach(task => {
-    const record = recordMap.get(task.showExtra.itemKey)
-    task.isCompleted = record ? record.extra.count >= task.extra.totalCount :false;
-    task.completedTime = record ? record.completeTime : null
-    task.recordExtra = record ? record.extra : {}
-  })
-
-  // ✅✅✅ 核心修改点2：先分组，再异步加载标题，最后赋值给渲染数组
+async function rebuildGoalTaskList() {
   const rawGroupList = Object.values(
       taskList.value.reduce((acc, item) => {
-        const { parentId } = item;
-        if (!acc[parentId]) {
-          acc[parentId] = { parentId, taskList: [] };
+        const {parentId} = item;
+        const key = parentId == null ? '__none__' : parentId;
+        if (!acc[key]) {
+          acc[key] = {parentId, taskList: []};
         }
-        acc[parentId].taskList.push(item);
+        acc[key].taskList.push(item);
         return acc;
       }, {})
   );
-  // 异步加载目标标题并组装最终分组数据
   goalTaskList.value = await assemblyGoalTaskGroup(rawGroupList);
 }
 
 async function fetchTaskList() {
   try {
     if (!currentMember.value || !currentGroup.value) return;
-    const req = {
-      fromDate: DateUtils.getDateStr(currentDate.value),
-      toDate: DateUtils.getNextDayStr(currentDate.value),
+    const nextDay = new Date(currentDate.value);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const baseReq = {
+      fromDate: DateUtils.getDayStartTimeStr(currentDate.value),
+      toDate: DateUtils.getDayStartTimeStr(nextDay),
       targetUserId: currentMember.value.userId,
       groupId: currentGroup.value.id
-    }
-    const taskDateList = await apiTs.checkin.task.list(req);
-    const list = taskDateList.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
-    taskList.value = list.filter(item => TaskUtil.isTaskUndo(item,currentDate.value)).sort((a, b) => {return TaskUtil.sortTaskToShow(a,b) })
-    await fetchCheckinRecordList()
+    };
+
+    // 后端已经在 ScheduleItemDTO.showExtra 里塞好了 itemKey/dueDate/lastCompleteKey
+    // 以及 updateScope.lastCompleteTime，前端直接 filter+sort 即可。
+    const taskDateList = await apiTs.checkin.task.list(baseReq);
+    const todayStr = DateUtils.getDateStr(currentDate.value);
+    const rawList = (Array.isArray(taskDateList) ? taskDateList : [])
+        .find(element => element && element.date === todayStr)?.schedules || [];
+
+    taskList.value = rawList
+        .filter(item => TaskUtil.isTaskUndo(item, currentDate.value))
+        .sort((a, b) => TaskUtil.sortTaskToShow(a, b));
+
+    // 用 listV2（按 taskKey 拉打卡记录）注入 isCompleted；失败不影响任务展示
+    await applyCheckinStatusFromKeys();
+    await rebuildGoalTaskList();
   } catch (error) {
     console.error('获取任务失败', error);
     taskList.value = [];
     goalTaskList.value = []; // 兜底清空分组列表
+  }
+}
+
+async function applyCheckinStatusFromKeys() {
+  const itemKeyList = taskList.value
+      .map(t => t && t.showExtra && t.showExtra.itemKey)
+      .filter(Boolean);
+  if (!itemKeyList.length) return;
+  try {
+    const req = {
+      targetUserId: currentMember.value.userId,
+      groupId: currentGroup.value.id,
+      taskKeys: itemKeyList
+    };
+    const records = await apiTs.checkin.listV2(req);
+    if (!Array.isArray(records)) return;
+    // 记录可按 taskKey（如有）或 taskId 与 task.showExtra.itemKey 匹配
+    const recordMap = new Map();
+    records.forEach((r) => {
+      const key = r && (r.taskKey || (r.taskId != null ? String(r.taskId) : null));
+      if (!key) return;
+      const exist = recordMap.get(key);
+      const cnt = (r.extra && r.extra.count) || 0;
+      const existCnt = (exist && exist.extra && exist.extra.count) || 0;
+      if (!exist || cnt > existCnt) recordMap.set(key, r);
+    });
+    taskList.value.forEach(task => {
+      const itemKey = task && task.showExtra && task.showExtra.itemKey;
+      let record = recordMap.get(itemKey);
+      // 兜底：itemKey 形如 "${taskId}:${period}"，按 taskId 再尝试一次
+      if (!record && itemKey && itemKey.indexOf(':') > 0) {
+        record = recordMap.get(itemKey.split(':')[0]);
+      }
+      const totalCount = (task.extra && task.extra.totalCount) || 1;
+      task.isCompleted = record ? ((record.extra && record.extra.count) || 0) >= totalCount : false;
+      task.completedTime = record ? record.completeTime : null;
+      task.recordExtra = record ? record.extra : {};
+    });
+  } catch (e) {
+    console.warn('获取打卡记录失败，按未完成展示：', e);
   }
 }
 
