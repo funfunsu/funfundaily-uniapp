@@ -139,34 +139,6 @@
             "navigationBarTitleText": "理财计划",
             "enablePullDownRefresh": false
           }
-        },
-        {
-          "path": "pages/edit/index",
-          "style": {
-            "navigationBarTitleText": "理财计划编辑",
-            "enablePullDownRefresh": false
-          }
-        },
-        {
-          "path": "pages/detail/index",
-          "style": {
-            "navigationBarTitleText": "理财计划详情",
-            "enablePullDownRefresh": false
-          }
-        },
-        {
-          "path": "pages/realization-edit/index",
-          "style": {
-            "navigationBarTitleText": "兑现批次编辑",
-            "enablePullDownRefresh": false
-          }
-        },
-        {
-          "path": "pages/analysis/index",
-          "style": {
-            "navigationBarTitleText": "收益分析",
-            "enablePullDownRefresh": false
-          }
         }
       ]
     },

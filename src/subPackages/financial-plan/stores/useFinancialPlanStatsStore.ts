@@ -60,15 +60,13 @@ function cloneProgress(progress: ProgressSnapshot): ProgressSnapshot {
   }
 }
 
-/** 根据当前本地标的列表，计算目标盈利总和。 */
+/** 标的目标收益已由批次推导，本地不再尝试本地估算；保留接口位返回 0。 */
 function resolveLocalTargetProfit(): number {
-  const assetStore = usePlanAssetStore()
-  return assetStore.assetTargetProfit
+  return 0
 }
 
 /** 构建一个本地预估的计划统计摘要。 */
 function buildLocalSummary(planId: string): ProfitSummary {
-  const assetStore = usePlanAssetStore()
   const targetProfit = resolveLocalTargetProfit()
   const actualProfit = 0
 
@@ -77,7 +75,7 @@ function buildLocalSummary(planId: string): ProfitSummary {
     targetProfit,
     actualProfit,
     realizedQuantity: 0,
-    plannedQuantity: assetStore.totalPlannedQuantity,
+    plannedQuantity: 0,
     completionRate: targetProfit > 0 ? Number(((actualProfit / targetProfit) * 100).toFixed(2)) : 0,
     completedBatchCount: 0,
     incompleteBatchCount: 0,
@@ -156,7 +154,6 @@ export const useFinancialPlanStatsStore = defineStore('financialPlanStats', {
       }
 
       const targetProfit = resolveLocalTargetProfit()
-      const plannedQuantity = assetStore.totalPlannedQuantity
       const actualProfit = this.summary?.actualProfit ?? 0
 
       if (this.summary) {
@@ -164,7 +161,6 @@ export const useFinancialPlanStatsStore = defineStore('financialPlanStats', {
           ...this.summary,
           planId: resolvedPlanId,
           targetProfit,
-          plannedQuantity,
           completionRate: targetProfit > 0 ? Number(((actualProfit / targetProfit) * 100).toFixed(2)) : 0,
         }
       } else {

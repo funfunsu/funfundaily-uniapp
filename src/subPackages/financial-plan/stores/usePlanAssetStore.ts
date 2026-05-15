@@ -9,48 +9,20 @@ import type {
   Api4SaveFinancialPlanAssetsResponse,
   Api5UpdateFinancialPlanAssetParamsRequest,
   Api5UpdateFinancialPlanAssetParamsResponse,
-  FinancialPlanAsset,
 } from '../../../../../api/financial-plan'
+import type {
+  FinancialPlanAsset,
+} from '../../../../../api/financial-plan-types'
 
-/** 计算计划标的的目标盈利。 */
-function calculateTargetProfit(asset: Pick<FinancialPlanAsset, 'planBuyPrice' | 'planSellPrice' | 'planQuantity'>): number {
-  const buyPrice = Number(asset.planBuyPrice)
-  const sellPrice = Number(asset.planSellPrice)
-  const quantity = Number(asset.planQuantity)
-
-  if (!Number.isFinite(buyPrice) || !Number.isFinite(sellPrice) || !Number.isFinite(quantity)) {
-    return 0
-  }
-
-  return Number(((sellPrice - buyPrice) * quantity).toFixed(8))
-}
-
-/** 计算完成度，保留两位小数。 */
-function calculateCompletionRate(actualProfit: number, targetProfit: number): number {
-  if (!Number.isFinite(actualProfit) || !Number.isFinite(targetProfit) || targetProfit === 0) {
-    return 0
-  }
-
-  return Number(((actualProfit / targetProfit) * 100).toFixed(2))
-}
-
-/** 判断当前运行环境是否支持 uni 提示。 */
 function hasUniToast(): boolean {
   return typeof uni !== 'undefined' && typeof uni.showToast === 'function'
 }
 
-/** 统一处理理财计划标的 store 错误。 */
 function handlePlanAssetStoreError(error: unknown): null {
   const message = resolveFinancialPlanErrorPrompt(error, '计划标的操作失败，请稍后重试')
-
   if (hasUniToast()) {
-    uni.showToast({
-      title: message,
-      icon: 'none',
-      duration: 2500,
-    })
+    uni.showToast({ title: message, icon: 'none', duration: 2500 })
   }
-
   console.warn('PlanAssetStore error:', error)
   return null
 }
@@ -63,52 +35,15 @@ export const usePlanAssetStore = defineStore('planAsset', {
   }),
 
   getters: {
-    /** 当前计划标的数量。 */
     assetCount: (state): number => state.assetList.length,
-
-    /** 当前计划的计划数量总和。 */
-    totalPlannedQuantity: (state): number =>
-      state.assetList.reduce((sum, asset) => sum + Number(asset.planQuantity || 0), 0),
-
-    /** 当前计划的目标盈利总和。 */
-    assetTargetProfit: (state): number =>
-      state.assetList.reduce((sum, asset) => sum + Number(asset.targetProfit || 0), 0),
   },
 
   actions: {
-    /** 设置当前正在编辑的计划标的。 */
     setEditingAsset(asset: FinancialPlanAsset | null): void {
       this.editingAsset = asset ? { ...asset } : null
     },
 
-    /** 计算并更新单个计划标的的目标盈利。 */
-    recalculateTargetProfit(
-      assetId: string,
-      patch?: Partial<Pick<FinancialPlanAsset, 'planBuyPrice' | 'planSellPrice' | 'planQuantity'>>,
-    ): FinancialPlanAsset | null {
-      const currentAsset = this.assetList.find((item) => item.assetId === assetId)
-      if (!currentAsset) {
-        return null
-      }
-
-      const nextAsset: FinancialPlanAsset = {
-        ...currentAsset,
-        ...patch,
-      }
-      nextAsset.targetProfit = calculateTargetProfit(nextAsset)
-      nextAsset.completionRate = calculateCompletionRate(nextAsset.actualProfit, nextAsset.targetProfit)
-
-      const index = this.assetList.findIndex((item) => item.assetId === assetId)
-      this.assetList.splice(index, 1, nextAsset)
-
-      if (this.editingAsset && this.editingAsset.assetId === assetId) {
-        this.editingAsset = { ...nextAsset }
-      }
-
-      return nextAsset
-    },
-
-    /** 保存计划标的并同步到本地状态。 */
+    /** 批量 upsert 标的，并替换 assetList。 */
     async saveAssets(
       planId: string,
       request: Api4SaveFinancialPlanAssetsRequest,
@@ -127,13 +62,10 @@ export const usePlanAssetStore = defineStore('planAsset', {
     },
 
     /**
-     * 单独保存一个标的（指定 planId），仅更新本行：
-     * 复用 API-4 的 upsert 语义，但只把响应里对应的那一项合并回 assetList，
-     * 不影响其他尚未持久化的 temp- 行。
+     * 单独保存一个标的：API-4 upsert 语义；只把响应里对应那一项合并回本地列表，
+     * 保留其他 temp- 行的本地编辑。
      *
-     * @param planId          计划主键
-     * @param item            待保存项（assetId 缺失代表新增）
-     * @param originalAssetId 编辑器里这一行当前的 assetId（含 temp- 前缀）
+     * 以 (stockName, market) 作为响应里查找匹配项的键。
      */
     async saveSingleAsset(
       planId: string,
@@ -144,12 +76,11 @@ export const usePlanAssetStore = defineStore('planAsset', {
       try {
         const response = await financialPlanApiClient.saveAssets(planId, { items: [item] })
         const persisted = response.data.items.find(
-          (saved) => saved.assetCode === item.assetCode && saved.assetType === item.assetType,
+          (saved) => saved.stockName === item.stockName && saved.market === item.market,
         )
         if (!persisted) {
           return null
         }
-        // 仅替换被保存的那一行，保留其他 temp- 行用户的本地编辑。
         const targetId = item.assetId || originalAssetId
         this.assetList = this.assetList.map((a) =>
           a.assetId === targetId ? { ...persisted } : a,
@@ -165,7 +96,7 @@ export const usePlanAssetStore = defineStore('planAsset', {
       }
     },
 
-    /** 更新单个计划标的的目标参数并刷新本地缓存。 */
+    /** 调整单个标的的目标利润 / 股票名 / 市场。 */
     async updateAssetParams(
       planId: string,
       assetId: string,
@@ -176,19 +107,15 @@ export const usePlanAssetStore = defineStore('planAsset', {
         const response = await financialPlanApiClient.updateAssetParams(planId, assetId, request)
         const result = response.data
         const currentAsset = this.assetList.find((item) => item.assetId === assetId)
-
         if (currentAsset) {
-          currentAsset.planBuyPrice = result.planBuyPrice
-          currentAsset.planSellPrice = result.planSellPrice
-          currentAsset.planQuantity = result.planQuantity
+          currentAsset.stockName = result.stockName
+          currentAsset.market = result.market
           currentAsset.targetProfit = result.targetProfit
-          currentAsset.completionRate = calculateCompletionRate(currentAsset.actualProfit, currentAsset.targetProfit)
+          currentAsset.version = result.version
         }
-
-        if (this.editingAsset && this.editingAsset.assetId === assetId) {
-          this.editingAsset = currentAsset ? { ...currentAsset } : null
+        if (this.editingAsset && this.editingAsset.assetId === assetId && currentAsset) {
+          this.editingAsset = { ...currentAsset }
         }
-
         return result
       } catch (error) {
         return handlePlanAssetStoreError(error)
@@ -197,19 +124,15 @@ export const usePlanAssetStore = defineStore('planAsset', {
       }
     },
 
-    /** 从本地列表中移除一个标的。 */
     removeLocalAsset(assetId: string): boolean {
       const index = this.assetList.findIndex((item) => item.assetId === assetId)
       if (index < 0) {
         return false
       }
-
       this.assetList.splice(index, 1)
-
       if (this.editingAsset && this.editingAsset.assetId === assetId) {
         this.editingAsset = null
       }
-
       return true
     },
   },

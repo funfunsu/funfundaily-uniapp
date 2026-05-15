@@ -25,6 +25,10 @@ import {
   api9GetFinancialPlanDetailUrl,
   api10GetFinancialPlanDashboardMethod,
   api10GetFinancialPlanDashboardUrl,
+  api12ListBatchOperationsMethod,
+  api12ListBatchOperationsUrl,
+  api13UpdateRealizationBatchMethod,
+  api13UpdateRealizationBatchUrl,
   financialPlanErrorCode,
   type Api1FinancialPlanQueryRequest,
   type Api1FinancialPlanQueryResponse,
@@ -50,6 +54,8 @@ import {
   type FinancialPlanApiContract,
   type FinancialPlanErrorCode,
 } from '../../../../../api/financial-plan'
+import type { RealizationOperation, RealizationBatch } from '../../../../../api/financial-plan-types'
+import type { Api13UpdateRealizationBatchRequest } from '../../../../../api/financial-plan'
 
 const financialPlanErrorCodeSet = new Set<string>(Object.values(financialPlanErrorCode))
 
@@ -378,6 +384,28 @@ export function createFinancialPlanApiClient(
       request,
     )
 
+  /** API-12：列出某批次的全部买卖操作明细，按时间正序。 */
+  const listBatchOperations = (
+    planId: string,
+    batchId: string,
+  ): Promise<ApiEnvelopeWithTrace<RealizationOperation[]>> =>
+    requestWithRetry<RealizationOperation[]>(
+      api12ListBatchOperationsMethod,
+      buildUrl(api12ListBatchOperationsUrl, { planId, batchId }),
+    )
+
+  /** API-13：编辑兑现批次（不可变更 batchType）。 */
+  const updateRealizationBatch = (
+    planId: string,
+    batchId: string,
+    request: Api13UpdateRealizationBatchRequest,
+  ): Promise<ApiEnvelopeWithTrace<RealizationBatch>> =>
+    requestWithRetry<RealizationBatch>(
+      api13UpdateRealizationBatchMethod,
+      buildUrl(api13UpdateRealizationBatchUrl, { planId, batchId }),
+      request,
+    )
+
   return {
     queryPlans,
     createPlan,
@@ -390,6 +418,8 @@ export function createFinancialPlanApiClient(
     getPlanDetail,
     getDashboard,
     archivePlan,
+    listBatchOperations,
+    updateRealizationBatch,
   }
 }
 
