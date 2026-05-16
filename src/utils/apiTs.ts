@@ -213,6 +213,39 @@ const apiTs = {
             '/api/json-data/hanzi-writer/get',
             data
         ),
+    },
+    // 积分兑换相关接口
+    pointExchange: {
+        // 获取商品列表
+        listProducts: (data: any): Promise<any> => api.get<any>(
+            '/api/point/product/list',
+            data
+        ),
+        // 创建商品
+        createProduct: (data: any): Promise<any> => api.post<any>(
+            '/api/point/product',
+            data
+        ),
+        // 更新商品
+        updateProduct: (id: number, data: any): Promise<any> => api.put<any>(
+            `/api/point/product/${id}`,
+            data
+        ),
+        // 删除商品
+        removeProduct: (id: number, groupId: number): Promise<any> => api.delete<any>(
+            `/api/point/product/${id}`,
+            { groupId }
+        ),
+        // 发起兑换
+        exchange: (data: any): Promise<any> => api.post<any>(
+            '/api/point/exchange',
+            data
+        ),
+        // 查询兑换记录
+        queryRecords: (data: any): Promise<any> => api.get<any>(
+            '/api/point/exchange/records',
+            data
+        )
     }
 
 
