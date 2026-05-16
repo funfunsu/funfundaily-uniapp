@@ -143,12 +143,22 @@
       ]
     },
     {
+      "root": "subPackages/event",
+      "pages": [
+        {
+          "path": "pages/event/index",
+          "style": {
+            "navigationBarTitleText": "记录事件",
+            "enablePullDownRefresh": false
+          }
+        }
+      ]
+    },
+    {
       "root": "subPackages/study-tools",
-      // ← 子包根路径
       "pages": [
         {
           "path": "pages/writing/stroke-order",
-          // ← 页面路径（相对于 root）
           "style": {
             "navigationBarTitleText": "笔顺学习"
           }
