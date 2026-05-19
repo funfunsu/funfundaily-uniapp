@@ -553,7 +553,7 @@ import {
   batchDirection,
   timeRangeType as timeRangeTypeEnum,
   planType as planTypeEnum,
-} from '../../../../../../api/financial-plan-types'
+} from '../../api/financial-plan-types'
 import type {
   AssetMarket,
   BatchType,
@@ -562,11 +562,11 @@ import type {
   RealizationBatch,
   RealizationOperation,
   TimeRangeType,
-} from '../../../../../../api/financial-plan-types'
+} from '../../api/financial-plan-types'
 import type {
   Api2CreateFinancialPlanRequest,
   Api3UpdateFinancialPlanRequest,
-} from '../../../../../../api/financial-plan'
+} from '../../api/financial-plan'
 import { financialPlanApiClient } from '../../api'
 
 const planStore = useFinancialPlanStore()

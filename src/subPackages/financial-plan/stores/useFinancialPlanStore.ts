@@ -12,12 +12,12 @@ import type {
   Api2CreateFinancialPlanRequest,
   Api3UpdateFinancialPlanRequest,
   Api9GetFinancialPlanDetailResponse,
-} from '../../../../../api/financial-plan'
+} from '../api/financial-plan'
 import type {
   FinancialPlan,
   FinancialPlanListItem,
   PlanStatus,
-} from '../../../../../api/financial-plan-types'
+} from '../api/financial-plan-types'
 
 const financialPlanQueryStorageKey = 'financial-plan-query'
 const defaultPageNo = 1

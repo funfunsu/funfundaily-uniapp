@@ -9,10 +9,10 @@ import type {
   Api4SaveFinancialPlanAssetsResponse,
   Api5UpdateFinancialPlanAssetParamsRequest,
   Api5UpdateFinancialPlanAssetParamsResponse,
-} from '../../../../../api/financial-plan'
+} from '../api/financial-plan'
 import type {
   FinancialPlanAsset,
-} from '../../../../../api/financial-plan-types'
+} from '../api/financial-plan-types'
 
 function hasUniToast(): boolean {
   return typeof uni !== 'undefined' && typeof uni.showToast === 'function'

@@ -15,11 +15,11 @@ import type {
   Api8RecordRealizationSellResponse,
   Api9GetFinancialPlanDetailResponse,
   Api13UpdateRealizationBatchRequest,
-} from '../../../../../api/financial-plan'
+} from '../api/financial-plan'
 import type {
   RealizationBatch,
   RealizationOperation,
-} from '../../../../../api/financial-plan-types'
+} from '../api/financial-plan-types'
 
 function hasUniToast(): boolean {
   return typeof uni !== 'undefined' && typeof uni.showToast === 'function'

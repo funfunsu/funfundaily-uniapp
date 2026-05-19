@@ -1,4 +1,4 @@
-import { financialPlanErrorCode, type FinancialPlanErrorCode } from '../../../../../api/financial-plan'
+import { financialPlanErrorCode, type FinancialPlanErrorCode } from '../api/financial-plan'
 import { FinancialPlanApiError } from '../api'
 
 /**
