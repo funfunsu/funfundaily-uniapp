@@ -189,6 +189,11 @@ const apiTs = {
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
         accept: (token: string): Promise<any> => api.post(`/api/share/accept/${token}`),
     },
+    invitation: {
+        list: (groupId: number | string): Promise<any[]> => api.get<any[]>('/api/invitation/list', { groupId }),
+        save: (data: any): Promise<any> => api.post<any>('/api/invitation/save', data),
+        delete: (id: number | string): Promise<any> => api.delete<any>(`/api/invitation/${id}`),
+    },
     universal_records:{
         // 添加打卡
         list: (data: any): Promise<any> => api.post<any>(

@@ -155,6 +155,25 @@
       ]
     },
     {
+      "root": "subPackages/invitation",
+      "pages": [
+        {
+          "path": "pages/list",
+          "style": {
+            "navigationBarTitleText": "邀请函",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/preview",
+          "style": {
+            "navigationBarTitleText": "邀请函",
+            "enablePullDownRefresh": false
+          }
+        }
+      ]
+    },
+    {
       "root": "subPackages/study-tools",
       "pages": [
         {
