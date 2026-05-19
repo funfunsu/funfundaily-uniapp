@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { financialPlanErrorCode } from '../../../../../api/financial-plan'
+import { financialPlanErrorCode } from '../api/financial-plan'
 import { FinancialPlanApiError } from '../api'
 import {
   financialPlanErrorPromptMap,
