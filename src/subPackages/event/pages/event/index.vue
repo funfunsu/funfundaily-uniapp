@@ -110,76 +110,72 @@
     </drawer-right-btn>
 
     <!-- 事件详情弹窗 -->
-    <view v-if="showDetailPopup" class="popup-mask" @click="closeDetailPopup">
-      <view class="detail-popup" @click.stop>
-        <view class="detail-header">
-          <text class="detail-title">{{ selectedEvent?.itemTitle }}</text>
-          <text class="detail-close" @click="closeDetailPopup">×</text>
+    <BottomSheet
+      :visible="showDetailPopup"
+      :title="selectedEvent?.itemTitle || '事件详情'"
+      :show-footer="false"
+      @close="closeDetailPopup"
+    >
+      <view class="detail-content">
+        <view class="detail-item">
+          <text class="detail-label">开始时间</text>
+          <text class="detail-value">{{ formatEventTime(selectedEvent?.startTime || selectedEvent?.repeatStartDay) }}</text>
         </view>
-        <view class="detail-content">
-          <view class="detail-item">
-            <text class="detail-label">开始时间:</text>
-            <text class="detail-value">{{ formatEventTime(selectedEvent?.startTime || selectedEvent?.repeatStartDay) }}</text>
-          </view>
-          <view class="detail-item">
-            <text class="detail-label">已开始:</text>
-            <text class="detail-value">{{ selectedEvent?.daysDesc }}</text>
-          </view>
-          <view class="detail-item" v-if="selectedEvent?.parentId">
-            <text class="detail-label">所属目标:</text>
-            <text class="detail-value">{{ getGoalName(selectedEvent?.parentId) }}</text>
-          </view>
+        <view class="detail-item">
+          <text class="detail-label">已开始</text>
+          <text class="detail-value detail-value--accent">{{ selectedEvent?.daysDesc }}</text>
         </view>
-        <view class="detail-footer">
-          <button class="detail-btn edit-detail-btn" @click="editEvent(selectedEvent)">
-            编辑事件
-          </button>
-          <button class="detail-btn share-detail-btn" @click="shareEvent(selectedEvent)">
-            分享到朋友圈
-          </button>
+        <view class="detail-item" v-if="selectedEvent?.parentId">
+          <text class="detail-label">所属目标</text>
+          <text class="detail-value">{{ getGoalName(selectedEvent?.parentId) }}</text>
         </view>
       </view>
-    </view>
+      <view class="detail-actions">
+        <button class="detail-action-btn detail-action-btn--ghost" @click="editEvent(selectedEvent)">
+          ✏️ 编辑事件
+        </button>
+        <button class="detail-action-btn detail-action-btn--primary" @click="onShareFromDetail(selectedEvent)">
+          📷 拍照分享
+        </button>
+      </view>
+    </BottomSheet>
 
     <!-- 添加/编辑事件弹窗 -->
-    <view v-if="isShowAddEventPopup" class="popup-mask" @click="closeAddEventPopup">
-      <view class="popup-content" @click.stop>
-        <view class="popup-header">
-          <text class="popup-title">{{ editingEvent ? '编辑事件' : '添加新事件' }}</text>
-          <text class="popup-close" @click="closeAddEventPopup">×</text>
-        </view>
-        <view class="popup-form">
-          <view class="form-item">
-            <text class="form-label">事件名称</text>
-            <input
-                v-model="eventForm.name"
-                class="form-input"
-                placeholder="请输入事件名称（必填）"
-                type="text"
-            />
-          </view>
-          <view class="form-item">
-            <DatePicker
-                v-model="eventForm.datetime"
-                mode="date"
-                label="事件时间"
-                placeholder="请选择事件时间（必填）"
-                @confirm="onDatetimeConfirm"
-            />
-          </view>
-          <GoalSelect
-              v-model="eventForm.parentId"
-              :goal-list="goalList"
-          />
-        </view>
-        <view class="popup-footer">
-          <button class="btn cancel-btn" @click="closeAddEventPopup">取消</button>
-          <button class="btn confirm-btn" @click="submitEventForm">
-            {{ editingEvent ? '保存修改' : '确认保存' }}
-          </button>
-        </view>
+    <BottomSheet
+      :visible="isShowAddEventPopup"
+      :title="editingEvent ? '编辑事件' : '添加新事件'"
+      accent="primary"
+      :confirm-text="editingEvent ? '保存修改' : '确认保存'"
+      @close="closeAddEventPopup"
+      @confirm="submitEventForm"
+    >
+      <view class="field">
+        <text class="field__label">事件名称</text>
+        <input
+          v-model="eventForm.name"
+          class="field__input"
+          placeholder="请输入事件名称（必填）"
+          type="text"
+        />
       </view>
-    </view>
+      <view class="field">
+        <text class="field__label">事件时间</text>
+        <DatePicker
+          v-model="eventForm.datetime"
+          mode="date"
+          placeholder="请选择事件时间"
+          title="选择事件时间"
+          @confirm="onDatetimeConfirm"
+        />
+      </view>
+      <view class="field">
+        <text class="field__label">所属目标</text>
+        <GoalSelect
+          v-model="eventForm.parentId"
+          :goal-list="goalList"
+        />
+      </view>
+    </BottomSheet>
 
     <!-- 分享弹窗 -->
     <view v-if="showSharePopup" class="popup-mask" @click="closeSharePopup">
@@ -221,6 +217,7 @@ import {getStoredData, getStoredKey, STORAGE_KEYS} from "../../../../utils/stora
 import GoalSelect from "../../../../components/fun-components/goal-select.vue";
 import ScheduleBottomBar from "../../../../components/schedule-bottom-bar.vue";
 import WatermarkCamera from "../../../../components/fun-components/WatermarkCamera.vue";
+import BottomSheet from "../../../../components/fun-components/bottom-sheet.vue";
 import DrawerRightBtn from "../../../../components/fun-components/drawer-btn/drawer-right-btn.vue";
 import DrawerBtnItem from "../../../../components/fun-components/drawer-btn/drawer-btn-item.vue";
 import { performRedirect } from "../../../../utils/router";
@@ -344,6 +341,13 @@ function shareEvent(event) {
   generateShareImage(event);
   showSharePopup.value = true;
   closeDetailPopup();
+}
+
+// 从详情弹窗直接进入水印拍照
+function onShareFromDetail(event) {
+  if (!event) return
+  closeDetailPopup()
+  openWatermarkCamera(event)
 }
 
 // 关闭分享弹窗
@@ -1095,7 +1099,7 @@ const onDatetimeConfirm = (value) => {
   line-height: 1;
 }
 
-/* 弹窗遮罩 */
+/* 分享弹窗仍保留旧 popup-mask 实现，BottomSheet 已接管编辑/详情弹窗 */
 .popup-mask {
   position: fixed;
   top: 0;
@@ -1111,186 +1115,76 @@ const onDatetimeConfirm = (value) => {
   box-sizing: border-box;
 }
 
-/* 弹窗内容 */
-.popup-content {
-  width: 100%;
-  max-width: 500rpx;
-  background: white;
-  border-radius: 20rpx;
-  overflow: hidden;
-  box-shadow: 0 20rpx 40rpx rgba(0, 0, 0, 0.2);
-}
-
-.popup-header {
-  padding: 30rpx;
-  border-bottom: 1rpx solid #e5e6eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.popup-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #1d2129;
-}
-
-.popup-close {
-  font-size: 40rpx;
-  color: #86909c;
-  line-height: 1;
-}
-
-.popup-form {
-  padding: 30rpx;
-}
-
-.form-item {
-  margin-bottom: 30rpx;
-}
-
-.form-label {
-  display: block;
-  font-size: 28rpx;
-  color: #333;
-  margin-bottom: 15rpx;
-  font-weight: 500;
-}
-
-.form-input {
-  width: 100%;
-  height: 80rpx;
-  line-height: 80rpx;
-  padding: 0 20rpx;
-  border: 2rpx solid #e5e6eb;
-  border-radius: 12rpx;
-  font-size: 28rpx;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
-}
-
-.form-input:focus {
-  border-color: #007AFF;
-  box-shadow: 0 0 0 4rpx rgba(0, 122, 255, 0.1);
-}
-
-.popup-footer {
-  padding: 0 30rpx 30rpx;
-  display: flex;
-  gap: 20rpx;
-}
-
-.btn {
-  flex: 1;
-  height: 90rpx;
-  line-height: 90rpx;
-  border-radius: 12rpx;
-  font-size: 32rpx;
-  border: none;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.cancel-btn {
-  background: #f5f5f5;
-  color: #666;
-}
-
-.confirm-btn {
-  background: linear-gradient(135deg, #007AFF 0%, #0056b3 100%);
-  color: white;
-}
-
-.btn:hover {
-  transform: translateY(-2rpx);
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
-}
-
-/* 详情弹窗 */
-.detail-popup {
-  width: 100%;
-  max-width: 500rpx;
-  background: white;
-  border-radius: 20rpx;
-  overflow: hidden;
-  box-shadow: 0 20rpx 40rpx rgba(0, 0, 0, 0.2);
-}
-
-.detail-header {
-  padding: 30rpx;
-  border-bottom: 1rpx solid #e5e6eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-}
-
-.detail-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #1d2129;
-  flex: 1;
-}
-
-.detail-close {
-  font-size: 40rpx;
-  color: #86909c;
-  line-height: 1;
-}
-
+/* 详情弹窗内容（套在 BottomSheet 内）*/
 .detail-content {
-  padding: 30rpx;
+  padding: 4rpx 0 16rpx;
 }
 
 .detail-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #f0f2f5;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
 }
 
 .detail-label {
-  font-size: 28rpx;
-  color: #86909c;
+  font-size: 26rpx;
+  color: #94a3b8;
   font-weight: 500;
 }
 
 .detail-value {
   font-size: 28rpx;
-  color: #1d2129;
+  color: #0f172a;
   font-weight: 500;
   text-align: right;
   flex: 1;
   margin-left: 20rpx;
 }
 
-.detail-footer {
-  padding: 30rpx;
+.detail-value--accent {
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.detail-actions {
   display: flex;
-  gap: 20rpx;
-  border-top: 1rpx solid #e5e6eb;
+  gap: 14rpx;
+  margin-top: 20rpx;
 }
 
-.detail-btn {
+.detail-action-btn {
   flex: 1;
-  height: 90rpx;
-  line-height: 90rpx;
-  border-radius: 12rpx;
-  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
   border: none;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.edit-detail-btn {
-  background: #f5f5f5;
-  color: #666;
+.detail-action-btn::after {
+  border: none;
 }
 
-.share-detail-btn {
-  background: linear-gradient(135deg, #007AFF 0%, #0056b3 100%);
-  color: white;
+.detail-action-btn--ghost {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.detail-action-btn--primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #fff;
 }
 
 /* 分享弹窗 */

@@ -1,14 +1,24 @@
 <template>
   <view class="page-container">
     <view class="page-header">
-      <text class="page-title">理财计划</text>
-      <text class="page-subtitle">让收益稳步发生</text>
+      <view class="page-header__row">
+        <view>
+          <text class="page-title">理财计划</text>
+          <text class="page-subtitle">让收益稳步发生</text>
+        </view>
+        <text v-if="sortedPlanList.length > 0" class="page-counter">
+          共 {{ sortedPlanList.length }} 个计划
+        </text>
+      </view>
     </view>
 
     <view class="content-container">
-      <view v-if="loading && sortedPlanList.length === 0" class="empty-state">加载中...</view>
+      <view v-if="loading && sortedPlanList.length === 0" class="empty-state">
+        <text class="empty-state__title">加载中…</text>
+      </view>
       <view v-else-if="sortedPlanList.length === 0" class="empty-state">
-        <text>暂无理财计划，点击下方「新建计划」开始</text>
+        <text class="empty-state__title">还没有任何理财计划</text>
+        <text class="empty-state__hint">点击底部「新建计划」开始</text>
       </view>
 
       <view v-else class="plan-list">
@@ -16,31 +26,45 @@
           v-for="plan in sortedPlanList"
           :key="plan.planId"
           class="plan-card"
-          :class="{ 'plan-card--expanded': expandedPlanId === plan.planId, 'plan-card--archived': !isPlanEditable(plan) }"
+          :class="{
+            'plan-card--expanded': expandedPlanId === plan.planId,
+            'plan-card--archived': !isPlanEditable(plan),
+          }"
         >
-          <view class="plan-card__header" @click="togglePlan(plan.planId)">
-            <view class="plan-card__head-left">
-              <text class="plan-card__name">{{ plan.planName }}</text>
-              <text class="plan-card__meta">{{ resolveDateRangeLabel(plan) }}</text>
+          <view class="plan-card__head" @click="togglePlan(plan.planId)">
+            <view class="plan-card__head-row">
+              <view class="plan-card__head-left">
+                <text class="plan-card__name">{{ plan.planName }}</text>
+                <text class="plan-card__meta">{{ resolveDateRangeLabel(plan) }}</text>
+              </view>
+              <view class="plan-card__head-right">
+                <text class="plan-card__status" :class="resolveStatusClass(plan)">
+                  {{ resolveStatusLabel(plan) }}
+                </text>
+                <text class="plan-card__caret">{{ expandedPlanId === plan.planId ? '▾' : '▸' }}</text>
+              </view>
             </view>
-            <view class="plan-card__head-right">
-              <text class="plan-card__status" :class="resolveStatusClass(plan)">{{ resolveStatusLabel(plan) }}</text>
-              <text
-                v-if="isPlanEditable(plan) && expandedPlanId === plan.planId"
-                class="header-link"
-                @click.stop="openEditPlanModal(plan.planId)"
-              >编辑</text>
-              <text
-                v-if="expandedPlanId === plan.planId"
-                class="header-link header-link--danger"
-                @click.stop="handleArchivePlan(plan)"
-              >{{ plan.status === 'ARCHIVED' ? '恢复' : '归档' }}</text>
-              <text class="plan-card__caret">{{ expandedPlanId === plan.planId ? '▾' : '▸' }}</text>
+
+            <view v-if="planDetails[plan.planId]" class="plan-card__progress">
+              <view class="progress-bar">
+                <view
+                  class="progress-bar__fill"
+                  :class="profitToneClass(planDetails[plan.planId].summary?.actualProfit)"
+                  :style="{ width: progressBarWidth(planDetails[plan.planId].summary?.completionRate) }"
+                />
+              </view>
+              <text class="progress-bar__legend">
+                <text :class="profitToneClass(planDetails[plan.planId].summary?.actualProfit)">
+                  ¥{{ formatProfit(planDetails[plan.planId].summary?.actualProfit) }}
+                </text>
+                <text class="muted"> / ¥{{ formatNumber(planDetails[plan.planId].summary?.targetProfit) }} ·
+                  {{ formatPercent(planDetails[plan.planId].summary?.completionRate) }}</text>
+              </text>
             </view>
           </view>
 
           <view v-if="expandedPlanId === plan.planId" class="plan-card__body">
-            <view v-if="!planDetails[plan.planId]" class="loading-text">详情加载中...</view>
+            <view v-if="!planDetails[plan.planId]" class="loading-text">详情加载中…</view>
 
             <view v-else>
               <view class="metric-row">
@@ -49,272 +73,124 @@
                   <text class="metric__value">¥{{ formatNumber(planDetails[plan.planId].summary?.targetProfit) }}</text>
                 </view>
                 <view class="metric">
-                  <text class="metric__label">已计划盈利</text>
+                  <text class="metric__label">已计划</text>
                   <text class="metric__value">¥{{ formatNumber(planDetails[plan.planId].summary?.plannedProfit) }}</text>
-                  <text class="metric__sub">计划完成度 {{ formatPercent(planDetails[plan.planId].summary?.plannedCompletionRate) }}</text>
-                  <text
-                    v-for="b in resolvePlanMarketBreakdowns(plan.planId)"
-                    :key="`plan-${plan.planId}-planned-${b.market}`"
-                    class="metric__sub metric__sub--breakdown"
-                  >{{ b.currency }} {{ formatNumber(b.plannedNative) }} ×{{ b.rate }}</text>
+                  <text class="metric__sub">完成 {{ formatPercent(planDetails[plan.planId].summary?.plannedCompletionRate) }}</text>
                 </view>
                 <view class="metric">
-                  <text class="metric__label">已实现盈利</text>
-                  <text class="metric__value" :class="profitToneClass(planDetails[plan.planId].summary?.actualProfit)">¥{{ formatProfit(planDetails[plan.planId].summary?.actualProfit) }}</text>
-                  <text class="metric__sub">实际完成度 {{ formatPercent(planDetails[plan.planId].summary?.completionRate) }}</text>
+                  <text class="metric__label">已实现</text>
                   <text
-                    v-for="b in resolvePlanMarketBreakdowns(plan.planId)"
-                    :key="`plan-${plan.planId}-actual-${b.market}`"
-                    class="metric__sub metric__sub--breakdown"
-                  >{{ b.currency }} {{ formatProfit(b.actualNative) }} ×{{ b.rate }}</text>
+                    class="metric__value"
+                    :class="profitToneClass(planDetails[plan.planId].summary?.actualProfit)"
+                  >¥{{ formatProfit(planDetails[plan.planId].summary?.actualProfit) }}</text>
+                  <text class="metric__sub">完成 {{ formatPercent(planDetails[plan.planId].summary?.completionRate) }}</text>
                 </view>
               </view>
 
-              <view class="section">
-                <view class="section__title-row">
-                  <text class="section__title">计划标的</text>
+              <view
+                v-if="resolvePlanMarketBreakdowns(plan.planId).length > 0"
+                class="breakdown-row"
+              >
+                <view
+                  v-for="b in resolvePlanMarketBreakdowns(plan.planId)"
+                  :key="`bd-${plan.planId}-${b.market}`"
+                  class="breakdown-chip"
+                >
+                  <text class="breakdown-chip__currency">{{ b.currency }}</text>
+                  <text class="breakdown-chip__amount">
+                    <text :class="profitToneClass(b.actualNative)">{{ formatProfit(b.actualNative) }}</text>
+                    <text class="muted"> / {{ formatNumber(b.plannedNative) }}</text>
+                  </text>
+                  <text class="breakdown-chip__rate">×{{ b.rate }}</text>
+                </view>
+              </view>
+
+              <view class="plan-actions">
+                <button
+                  v-if="isPlanEditable(plan)"
+                  class="btn btn--primary"
+                  @click.stop="openAddAssetSheet(plan.planId)"
+                >+ 标的</button>
+                <button
+                  v-if="isPlanEditable(plan)"
+                  class="btn btn--ghost"
+                  @click.stop="openEditPlanModal(plan.planId)"
+                >编辑计划</button>
+                <button
+                  class="btn btn--ghost"
+                  @click.stop="handleArchivePlan(plan)"
+                >{{ plan.status === 'ARCHIVED' ? '恢复' : '归档' }}</button>
+              </view>
+
+              <view v-if="planDetails[plan.planId].assets.length === 0" class="empty-mini">
+                暂无标的，点击「+ 标的」添加
+              </view>
+
+              <view
+                v-for="asset in planDetails[plan.planId].assets"
+                :key="asset.assetId"
+                class="asset-card"
+              >
+                <view class="asset-card__head">
+                  <view class="asset-card__head-left">
+                    <view class="asset-card__title-row">
+                      <text
+                        class="market-chip"
+                        :class="resolveMarketChipClass(asset.market)"
+                      >{{ resolveMarketLabel(asset.market) }}</text>
+                      <text class="asset-card__name">{{ asset.stockName }}</text>
+                    </view>
+                    <text class="asset-card__meta">
+                      <text class="currency-tag">{{ resolveMarketCurrencyCode(asset.market) }}</text>
+                      目标 {{ formatNumber(asset.targetProfit) }}
+                      · 已计划 {{ formatNumber(resolveAssetPlannedProfitRaw(plan.planId, asset.assetId)) }}
+                      · 已实现
+                      <text
+                        :class="profitToneClass(resolveAssetActualProfitRaw(plan.planId, asset.assetId))"
+                      >{{ formatProfit(resolveAssetActualProfitRaw(plan.planId, asset.assetId)) }}</text>
+                    </text>
+                    <text class="asset-card__rate">
+                      计划 {{ formatPercent(resolveAssetPlannedRate(plan.planId, asset.assetId)) }}
+                      · 实际 {{ formatPercent(resolveAssetActualRate(plan.planId, asset.assetId)) }}
+                    </text>
+                  </view>
                   <button
                     v-if="isPlanEditable(plan)"
-                    class="row-btn row-btn--primary"
-                    @click.stop="toggleAddAssetForm(plan.planId)"
-                  >{{ showAddAssetFormFor === plan.planId ? '取消' : '+ 标的' }}</button>
+                    class="btn btn--mini btn--primary"
+                    @click.stop="openAddBatchSheet(plan.planId, asset.assetId)"
+                  >+ 批次</button>
                 </view>
 
-                <view v-if="showAddAssetFormFor === plan.planId" class="inline-form">
-                  <view class="inline-form__grid">
-                    <view class="inline-field">
-                      <text class="inline-field__label">股票名称</text>
-                      <input class="inline-input" v-model="newAssetForm.stockName" placeholder="例如：腾讯控股" />
-                    </view>
-                    <view class="inline-field">
-                      <text class="inline-field__label">所属市场</text>
-                      <picker :range="marketOptions" range-key="label" @change="onNewAssetMarketChange">
-                        <view class="inline-picker">{{ resolveMarketLabel(newAssetForm.market) }}</view>
-                      </picker>
-                    </view>
-                    <view class="inline-field">
-                      <text class="inline-field__label">目标盈利</text>
-                      <input class="inline-input" v-model="newAssetForm.targetProfit" type="number" placeholder="0.00" />
-                    </view>
-                  </view>
-                  <view class="inline-form__actions">
-                    <button class="row-btn" @click.stop="closeAddAssetForm">取消</button>
-                    <button class="row-btn row-btn--primary" @click.stop="handleSubmitAddAsset(plan.planId)">保存</button>
-                  </view>
+                <view v-if="batchesByAsset(plan.planId, asset.assetId).length === 0" class="empty-mini empty-mini--sub">
+                  暂无批次
                 </view>
-
-                <view v-if="planDetails[plan.planId].assets.length === 0" class="empty-mini">暂无标的</view>
 
                 <view
-                  v-for="asset in planDetails[plan.planId].assets"
-                  :key="asset.assetId"
-                  class="asset-block"
+                  v-for="batch in batchesByAsset(plan.planId, asset.assetId)"
+                  :key="batch.batchId"
+                  class="batch-row"
                 >
-                  <view class="asset-row">
-                    <view class="asset-row__info">
-                      <text class="asset-row__name">
-                        <text class="market-chip" :class="resolveMarketChipClass(asset.market)">{{ resolveMarketLabel(asset.market) }}</text>
-                        {{ asset.stockName }}
-                      </text>
-                      <text class="asset-row__meta">
-                        <text class="currency-tag">{{ resolveMarketCurrencyCode(asset.market) }}</text>
-                        目标 <text class="positive">{{ formatNumber(asset.targetProfit) }}</text>
-                        · 已计划 <text class="positive">{{ formatNumber(resolveAssetPlannedProfitRaw(plan.planId, asset.assetId)) }}</text>
-                        · 已实现 <text :class="profitToneClass(resolveAssetActualProfitRaw(plan.planId, asset.assetId))">{{ formatProfit(resolveAssetActualProfitRaw(plan.planId, asset.assetId)) }}</text>
-                      </text>
-                      <text class="asset-row__rate">
-                        计划完成度 {{ formatPercent(resolveAssetPlannedRate(plan.planId, asset.assetId)) }}
-                        · 实际完成度 {{ formatPercent(resolveAssetActualRate(plan.planId, asset.assetId)) }}
-                      </text>
+                  <view class="batch-row__main">
+                    <view class="batch-row__title-line">
+                      <text class="batch-row__name">{{ resolveBatchTitle(batch) }}</text>
+                      <text
+                        class="status-badge"
+                        :class="resolveStageToneClass(batch.stageStatus)"
+                      >{{ resolveStageLabel(batch.stageStatus) }}</text>
                     </view>
-                    <view class="row-actions">
-                      <button
-                        v-if="isPlanEditable(plan)"
-                        class="row-btn row-btn--primary"
-                        @click.stop="toggleAddBatchForm(asset.assetId)"
-                      >{{ showAddBatchFormFor === asset.assetId ? '取消' : '+ 批次' }}</button>
-                    </view>
-                  </view>
+                    <text v-if="batch.batchType === 'DERIVATIVE'" class="batch-row__type">
+                      {{ resolveBatchTypeLabel(batch.batchType) }} · {{ resolveDirectionLabel(batch.direction) }}
+                      <text v-if="batch.expirationDate"> · 到期 {{ batch.expirationDate }}</text>
+                    </text>
+                    <text class="batch-row__summary">
+                      数量 {{ batch.quantity }} · 预期 {{ formatNumber(batch.planBuyPrice) }} → {{ formatNumber(batch.planSellPrice) }}
+                    </text>
+                    <text class="batch-row__profit">
+                      目标 <text class="positive">{{ formatNumber(computeBatchTargetProfit(batch)) }}</text>
+                      · 已实现
+                      <text :class="profitToneClass(batch.actualProfit)">{{ formatProfit(batch.actualProfit) }}</text>
+                    </text>
 
-                  <view v-if="showAddBatchFormFor === asset.assetId" class="inline-form inline-form--asset">
-                    <view class="inline-form__grid">
-                      <view class="inline-field">
-                        <text class="inline-field__label">批次类型</text>
-                        <picker :range="batchTypeOptions" range-key="label" @change="onNewBatchTypeChange">
-                          <view class="inline-picker">{{ resolveBatchTypeLabel(newBatchForm.batchType) }}</view>
-                        </picker>
-                      </view>
-                      <view class="inline-field" v-if="newBatchForm.batchType === 'DERIVATIVE'">
-                        <text class="inline-field__label">方向</text>
-                        <picker :range="directionOptions" range-key="label" @change="onNewBatchDirectionChange">
-                          <view class="inline-picker">{{ resolveDirectionLabel(newBatchForm.direction) }}</view>
-                        </picker>
-                      </view>
-                      <view class="inline-field">
-                        <text class="inline-field__label">数量</text>
-                        <input class="inline-input" v-model="newBatchForm.quantity" type="number" placeholder="数量" />
-                      </view>
-                      <view class="inline-field">
-                        <text class="inline-field__label">预期买入价</text>
-                        <input class="inline-input" v-model="newBatchForm.planBuyPrice" type="number" placeholder="0.00" />
-                      </view>
-                      <view class="inline-field">
-                        <text class="inline-field__label">预期卖出价</text>
-                        <input class="inline-input" v-model="newBatchForm.planSellPrice" type="number" placeholder="0.00" />
-                      </view>
-                      <view class="inline-field" v-if="newBatchForm.batchType === 'DERIVATIVE'">
-                        <text class="inline-field__label">到期日</text>
-                        <input class="inline-input" v-model="newBatchForm.expirationDate" placeholder="YYYY-MM-DD" />
-                      </view>
-                    </view>
-                    <view class="inline-form__actions">
-                      <button class="row-btn" @click.stop="closeAddBatchForm">取消</button>
-                      <button
-                        class="row-btn row-btn--primary"
-                        @click.stop="handleSubmitAddBatch(plan.planId, asset.assetId)"
-                      >保存</button>
-                    </view>
-                  </view>
-
-                  <view
-                    v-for="batch in batchesByAsset(plan.planId, asset.assetId)"
-                    :key="batch.batchId"
-                    class="batch-block"
-                  >
-                    <view class="batch-row">
-                      <view class="batch-row__info">
-                        <text class="batch-row__name">
-                          {{ resolveBatchTitle(batch) }}
-                          <text class="status-badge" :class="resolveStageToneClass(batch.stageStatus)">
-                            {{ resolveStageLabel(batch.stageStatus) }}
-                          </text>
-                        </text>
-                        <text v-if="batch.batchType === 'DERIVATIVE'" class="batch-row__type">
-                          {{ resolveBatchTypeLabel(batch.batchType) }}·{{ resolveDirectionLabel(batch.direction) }}
-                          <text v-if="batch.expirationDate"> · 到期 {{ batch.expirationDate }}</text>
-                        </text>
-                        <text class="batch-row__summary">
-                          数量 {{ batch.quantity }}
-                          · 预期 {{ formatNumber(batch.planBuyPrice) }}→{{ formatNumber(batch.planSellPrice) }}
-                          · 目标 <text class="positive">{{ formatNumber(computeBatchTargetProfit(batch)) }}</text>
-                          · 已实现 <text :class="profitToneClass(batch.actualProfit)">{{ formatProfit(batch.actualProfit) }}</text>
-                        </text>
-                      </view>
-                      <view class="row-actions">
-                        <button
-                          v-if="isPlanEditable(plan)"
-                          class="row-btn"
-                          @click.stop="toggleEditBatchForm(batch)"
-                        >编辑</button>
-                        <button
-                          v-if="isPlanEditable(plan)"
-                          class="row-btn"
-                          @click.stop="toggleBuyForm(batch.batchId)"
-                        >买入</button>
-                        <button
-                          v-if="isPlanEditable(plan)"
-                          class="row-btn"
-                          :disabled="batch.stageStatus === 'PENDING_BUY' || batch.stageStatus === 'COMPLETED'"
-                          @click.stop="toggleSellForm(batch.batchId)"
-                        >卖出</button>
-                      </view>
-                    </view>
-
-                    <view v-if="showEditBatchFormFor === batch.batchId" class="inline-form inline-form--batch">
-                      <view class="inline-form__grid">
-                        <view class="inline-field" v-if="batch.batchType === 'DERIVATIVE'">
-                          <text class="inline-field__label">方向</text>
-                          <picker :range="directionOptions" range-key="label" @change="onEditBatchDirectionChange">
-                            <view class="inline-picker">{{ resolveDirectionLabel(editBatchForm.direction) }}</view>
-                          </picker>
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">数量</text>
-                          <input class="inline-input" v-model="editBatchForm.quantity" type="number" placeholder="数量" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">预期买入价</text>
-                          <input class="inline-input" v-model="editBatchForm.planBuyPrice" type="number" placeholder="0.00" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">预期卖出价</text>
-                          <input class="inline-input" v-model="editBatchForm.planSellPrice" type="number" placeholder="0.00" />
-                        </view>
-                        <view class="inline-field" v-if="batch.batchType === 'DERIVATIVE'">
-                          <text class="inline-field__label">到期日</text>
-                          <input class="inline-input" v-model="editBatchForm.expirationDate" placeholder="YYYY-MM-DD" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">名称</text>
-                          <input class="inline-input" v-model="editBatchForm.batchName" placeholder="批次名称（可选）" />
-                        </view>
-                      </view>
-                      <view class="inline-form__actions">
-                        <button class="row-btn" @click.stop="closeEditBatchForm">取消</button>
-                        <button
-                          class="row-btn row-btn--primary"
-                          @click.stop="handleSubmitEditBatch(plan.planId, batch.batchId)"
-                        >保存</button>
-                      </view>
-                    </view>
-
-                    <view v-if="showBuyFormFor === batch.batchId" class="inline-form inline-form--batch">
-                      <view class="inline-form__grid">
-                        <view class="inline-field">
-                          <text class="inline-field__label">日期</text>
-                          <input class="inline-input" v-model="opForm.tradeDate" placeholder="YYYY-MM-DD" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">买入价</text>
-                          <input class="inline-input" v-model="opForm.price" type="number" placeholder="0.00" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">数量</text>
-                          <input class="inline-input" v-model="opForm.quantity" type="number" placeholder="0" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">手续费</text>
-                          <input class="inline-input" v-model="opForm.fee" type="number" placeholder="0" />
-                        </view>
-                      </view>
-                      <view class="inline-form__actions">
-                        <button class="row-btn" @click.stop="closeOpForm">取消</button>
-                        <button
-                          class="row-btn row-btn--primary"
-                          @click.stop="handleSubmitBuy(plan.planId, batch.batchId)"
-                        >保存</button>
-                      </view>
-                    </view>
-
-                    <view v-if="showSellFormFor === batch.batchId" class="inline-form inline-form--batch">
-                      <view class="inline-form__grid">
-                        <view class="inline-field">
-                          <text class="inline-field__label">日期</text>
-                          <input class="inline-input" v-model="opForm.tradeDate" placeholder="YYYY-MM-DD" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">卖出价</text>
-                          <input class="inline-input" v-model="opForm.price" type="number" placeholder="0.00" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">数量</text>
-                          <input class="inline-input" v-model="opForm.quantity" type="number" placeholder="0" />
-                        </view>
-                        <view class="inline-field">
-                          <text class="inline-field__label">手续费</text>
-                          <input class="inline-input" v-model="opForm.fee" type="number" placeholder="0" />
-                        </view>
-                      </view>
-                      <view class="inline-form__actions">
-                        <button class="row-btn" @click.stop="closeOpForm">取消</button>
-                        <button
-                          class="row-btn row-btn--primary"
-                          @click.stop="handleSubmitSell(plan.planId, batch.batchId)"
-                        >保存</button>
-                      </view>
-                    </view>
-
-                    <!-- 操作明细：紧凑两列 grid，避免一行一条占用过多空间 -->
                     <view v-if="batchOperations(batch.batchId).length > 0" class="op-grid">
                       <view
                         v-for="op in batchOperations(batch.batchId)"
@@ -323,9 +199,29 @@
                         :class="op.operationType === 'BUY' ? 'op-cell--buy' : 'op-cell--sell'"
                       >
                         <text class="op-cell__type">{{ op.operationType === 'BUY' ? '买' : '卖' }}</text>
-                        <text class="op-cell__line">{{ op.tradeDate }} · {{ formatNumber(op.price) }} × {{ op.quantity }}<text v-if="op.fee && Number(op.fee) > 0"> · 费 {{ formatNumber(op.fee) }}</text></text>
+                        <text class="op-cell__line">
+                          {{ op.tradeDate }} · {{ formatNumber(op.price) }} × {{ op.quantity }}<text
+                            v-if="op.fee && Number(op.fee) > 0"
+                          > · 费 {{ formatNumber(op.fee) }}</text>
+                        </text>
                       </view>
                     </view>
+                  </view>
+
+                  <view v-if="isPlanEditable(plan)" class="batch-row__actions">
+                    <button
+                      class="btn btn--mini btn--ghost"
+                      @click.stop="openEditBatchSheet(plan.planId, batch)"
+                    >编辑</button>
+                    <button
+                      class="btn btn--mini btn--success"
+                      @click.stop="openBuySheet(plan.planId, batch.batchId)"
+                    >买入</button>
+                    <button
+                      class="btn btn--mini btn--danger"
+                      :disabled="batch.stageStatus === 'PENDING_BUY' || batch.stageStatus === 'COMPLETED'"
+                      @click.stop="openSellSheet(plan.planId, batch.batchId)"
+                    >卖出</button>
                   </view>
                 </view>
               </view>
@@ -335,49 +231,298 @@
       </view>
     </view>
 
-    <!-- 新建 / 编辑 理财计划弹窗 -->
-    <view v-if="showPlanModal" class="modal-mask" @click.self="closePlanModal">
-      <view class="modal-panel">
-        <view class="modal-header">
-          <text class="modal-title">{{ planModalMode === 'create' ? '新建理财计划' : '编辑理财计划' }}</text>
+    <!-- ===== 新建 / 编辑 计划 ===== -->
+    <view v-if="showPlanModal" class="sheet-mask" @click="closePlanModal">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-grabber"></view>
+        <view class="sheet-header">
+          <text class="sheet-title">{{ planModalMode === 'create' ? '新建理财计划' : '编辑理财计划' }}</text>
+          <text class="sheet-close" @click="closePlanModal">×</text>
         </view>
-        <view class="modal-body">
-          <view class="modal-field">
-            <text class="modal-label">计划名称</text>
-            <input class="modal-input" v-model="planFormState.planName" placeholder="例如：2026 家庭计划" />
+        <view class="sheet-body">
+          <view class="field">
+            <text class="field__label">计划名称</text>
+            <input class="field__input" v-model="planFormState.planName" placeholder="例如：2026 家庭计划" />
           </view>
-          <view class="modal-field">
-            <text class="modal-label">时间范围</text>
+          <view class="field">
+            <text class="field__label">时间范围</text>
             <picker :range="timeRangeOptions" range-key="label" @change="onPlanTimeRangeChange">
-              <view class="modal-picker">{{ resolveTimeRangeLabel(planFormState.timeRangeType) }}</view>
+              <view class="field__picker">
+                <text>{{ resolveTimeRangeLabel(planFormState.timeRangeType) }}</text>
+                <text class="field__picker-arrow">▾</text>
+              </view>
             </picker>
           </view>
-          <view class="modal-field" v-if="planFormState.timeRangeType === 'YEAR'">
-            <text class="modal-label">年度</text>
-            <input class="modal-input" v-model="planFormState.fiscalYear" type="number" placeholder="例如 2026" />
+          <view v-if="planFormState.timeRangeType === 'YEAR'" class="field">
+            <text class="field__label">年度</text>
+            <input class="field__input" v-model="planFormState.fiscalYear" type="number" placeholder="例如 2026" />
           </view>
-          <view v-else class="modal-field-row">
-            <view class="modal-field">
-              <text class="modal-label">开始日期</text>
-              <input class="modal-input" v-model="planFormState.startDate" placeholder="YYYY-MM-DD" />
+          <view v-else class="field-row">
+            <view class="field">
+              <text class="field__label">开始日期</text>
+              <DatePicker
+                v-model="planFormState.startDate"
+                mode="date"
+                placeholder="请选择"
+                title="选择开始日期"
+              />
             </view>
-            <view class="modal-field">
-              <text class="modal-label">结束日期</text>
-              <input class="modal-input" v-model="planFormState.endDate" placeholder="YYYY-MM-DD" />
+            <view class="field">
+              <text class="field__label">结束日期</text>
+              <DatePicker
+                v-model="planFormState.endDate"
+                mode="date"
+                placeholder="请选择"
+                title="选择结束日期"
+              />
             </view>
           </view>
-          <view class="modal-field">
-            <text class="modal-label">目标盈利</text>
-            <input class="modal-input" v-model="planFormState.targetProfit" type="number" placeholder="0.00" />
+          <view class="field">
+            <text class="field__label">目标盈利</text>
+            <input class="field__input" v-model="planFormState.targetProfit" type="number" placeholder="0.00" />
           </view>
-          <view class="modal-field">
-            <text class="modal-label">备注</text>
-            <textarea class="modal-textarea" v-model="planFormState.remark" placeholder="可选" />
+          <view class="field">
+            <text class="field__label">备注</text>
+            <textarea class="field__textarea" v-model="planFormState.remark" placeholder="可选" />
           </view>
         </view>
-        <view class="modal-actions">
-          <button class="row-btn" @click="closePlanModal">取消</button>
-          <button class="row-btn row-btn--primary" @click="handleSubmitPlan">保存</button>
+        <view class="sheet-actions">
+          <button class="btn btn--ghost btn--lg" @click="closePlanModal">取消</button>
+          <button class="btn btn--primary btn--lg" @click="handleSubmitPlan">保存</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 新增标的 ===== -->
+    <view v-if="showAddAssetFormFor" class="sheet-mask" @click="closeAddAssetForm">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-grabber"></view>
+        <view class="sheet-header">
+          <text class="sheet-title">新增标的</text>
+          <text class="sheet-close" @click="closeAddAssetForm">×</text>
+        </view>
+        <view class="sheet-body">
+          <view class="field">
+            <text class="field__label">股票名称</text>
+            <input class="field__input" v-model="newAssetForm.stockName" placeholder="例如：腾讯控股" />
+          </view>
+          <view class="field">
+            <text class="field__label">所属市场</text>
+            <picker :range="marketOptions" range-key="label" @change="onNewAssetMarketChange">
+              <view class="field__picker">
+                <text>{{ resolveMarketLabel(newAssetForm.market) }}</text>
+                <text class="field__picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="field">
+            <text class="field__label">目标盈利</text>
+            <input class="field__input" v-model="newAssetForm.targetProfit" type="number" placeholder="0.00" />
+          </view>
+        </view>
+        <view class="sheet-actions">
+          <button class="btn btn--ghost btn--lg" @click="closeAddAssetForm">取消</button>
+          <button
+            class="btn btn--primary btn--lg"
+            @click="handleSubmitAddAsset(showAddAssetFormFor || '')"
+          >保存</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 新增批次 ===== -->
+    <view v-if="showAddBatchFormFor" class="sheet-mask" @click="closeAddBatchForm">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-grabber"></view>
+        <view class="sheet-header">
+          <text class="sheet-title">新增批次</text>
+          <text class="sheet-close" @click="closeAddBatchForm">×</text>
+        </view>
+        <view class="sheet-body">
+          <view class="field">
+            <text class="field__label">批次类型</text>
+            <picker :range="batchTypeOptions" range-key="label" @change="onNewBatchTypeChange">
+              <view class="field__picker">
+                <text>{{ resolveBatchTypeLabel(newBatchForm.batchType) }}</text>
+                <text class="field__picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view v-if="newBatchForm.batchType === 'DERIVATIVE'" class="field">
+            <text class="field__label">方向</text>
+            <picker :range="directionOptions" range-key="label" @change="onNewBatchDirectionChange">
+              <view class="field__picker">
+                <text>{{ resolveDirectionLabel(newBatchForm.direction) }}</text>
+                <text class="field__picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="field-row">
+            <view class="field">
+              <text class="field__label">数量</text>
+              <input class="field__input" v-model="newBatchForm.quantity" type="number" placeholder="数量" />
+            </view>
+            <view v-if="newBatchForm.batchType === 'DERIVATIVE'" class="field">
+              <text class="field__label">到期日</text>
+              <DatePicker
+                v-model="newBatchForm.expirationDate"
+                mode="date"
+                placeholder="请选择"
+                title="选择到期日"
+              />
+            </view>
+          </view>
+          <view class="field-row">
+            <view class="field">
+              <text class="field__label">预期买入价</text>
+              <input class="field__input" v-model="newBatchForm.planBuyPrice" type="number" placeholder="0.00" />
+            </view>
+            <view class="field">
+              <text class="field__label">预期卖出价</text>
+              <input class="field__input" v-model="newBatchForm.planSellPrice" type="number" placeholder="0.00" />
+            </view>
+          </view>
+        </view>
+        <view class="sheet-actions">
+          <button class="btn btn--ghost btn--lg" @click="closeAddBatchForm">取消</button>
+          <button
+            class="btn btn--primary btn--lg"
+            @click="handleSubmitAddBatch(sheetPlanId, showAddBatchFormFor || '')"
+          >保存</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 编辑批次 ===== -->
+    <view v-if="showEditBatchFormFor" class="sheet-mask" @click="closeEditBatchForm">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-grabber"></view>
+        <view class="sheet-header">
+          <text class="sheet-title">编辑批次</text>
+          <text class="sheet-close" @click="closeEditBatchForm">×</text>
+        </view>
+        <view class="sheet-body">
+          <view v-if="editBatchTargetIsDerivative" class="field">
+            <text class="field__label">方向</text>
+            <picker :range="directionOptions" range-key="label" @change="onEditBatchDirectionChange">
+              <view class="field__picker">
+                <text>{{ resolveDirectionLabel(editBatchForm.direction) }}</text>
+                <text class="field__picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="field-row">
+            <view class="field">
+              <text class="field__label">数量</text>
+              <input class="field__input" v-model="editBatchForm.quantity" type="number" placeholder="数量" />
+            </view>
+            <view v-if="editBatchTargetIsDerivative" class="field">
+              <text class="field__label">到期日</text>
+              <DatePicker
+                v-model="editBatchForm.expirationDate"
+                mode="date"
+                placeholder="请选择"
+                title="选择到期日"
+              />
+            </view>
+          </view>
+          <view class="field-row">
+            <view class="field">
+              <text class="field__label">预期买入价</text>
+              <input class="field__input" v-model="editBatchForm.planBuyPrice" type="number" placeholder="0.00" />
+            </view>
+            <view class="field">
+              <text class="field__label">预期卖出价</text>
+              <input class="field__input" v-model="editBatchForm.planSellPrice" type="number" placeholder="0.00" />
+            </view>
+          </view>
+          <view class="field">
+            <text class="field__label">名称</text>
+            <input class="field__input" v-model="editBatchForm.batchName" placeholder="批次名称（可选）" />
+          </view>
+        </view>
+        <view class="sheet-actions">
+          <button class="btn btn--ghost btn--lg" @click="closeEditBatchForm">取消</button>
+          <button
+            class="btn btn--primary btn--lg"
+            @click="handleSubmitEditBatch(sheetPlanId, showEditBatchFormFor || '')"
+          >保存</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 买入 ===== -->
+    <view v-if="showBuyFormFor" class="sheet-mask" @click="closeOpForm">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-grabber"></view>
+        <view class="sheet-header">
+          <text class="sheet-title sheet-title--success">买入</text>
+          <text class="sheet-close" @click="closeOpForm">×</text>
+        </view>
+        <view class="sheet-body">
+          <view class="field">
+            <text class="field__label">交易日期</text>
+            <DatePicker v-model="opForm.tradeDate" mode="date" placeholder="请选择" title="选择交易日期" />
+          </view>
+          <view class="field-row">
+            <view class="field">
+              <text class="field__label">买入价</text>
+              <input class="field__input" v-model="opForm.price" type="number" placeholder="0.00" />
+            </view>
+            <view class="field">
+              <text class="field__label">数量</text>
+              <input class="field__input" v-model="opForm.quantity" type="number" placeholder="0" />
+            </view>
+          </view>
+          <view class="field">
+            <text class="field__label">手续费</text>
+            <input class="field__input" v-model="opForm.fee" type="number" placeholder="0" />
+          </view>
+        </view>
+        <view class="sheet-actions">
+          <button class="btn btn--ghost btn--lg" @click="closeOpForm">取消</button>
+          <button
+            class="btn btn--success btn--lg"
+            @click="handleSubmitBuy(sheetPlanId, showBuyFormFor || '')"
+          >确认买入</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 卖出 ===== -->
+    <view v-if="showSellFormFor" class="sheet-mask" @click="closeOpForm">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-grabber"></view>
+        <view class="sheet-header">
+          <text class="sheet-title sheet-title--danger">卖出</text>
+          <text class="sheet-close" @click="closeOpForm">×</text>
+        </view>
+        <view class="sheet-body">
+          <view class="field">
+            <text class="field__label">交易日期</text>
+            <DatePicker v-model="opForm.tradeDate" mode="date" placeholder="请选择" title="选择交易日期" />
+          </view>
+          <view class="field-row">
+            <view class="field">
+              <text class="field__label">卖出价</text>
+              <input class="field__input" v-model="opForm.price" type="number" placeholder="0.00" />
+            </view>
+            <view class="field">
+              <text class="field__label">数量</text>
+              <input class="field__input" v-model="opForm.quantity" type="number" placeholder="0" />
+            </view>
+          </view>
+          <view class="field">
+            <text class="field__label">手续费</text>
+            <input class="field__input" v-model="opForm.fee" type="number" placeholder="0" />
+          </view>
+        </view>
+        <view class="sheet-actions">
+          <button class="btn btn--ghost btn--lg" @click="closeOpForm">取消</button>
+          <button
+            class="btn btn--danger btn--lg"
+            @click="handleSubmitSell(sheetPlanId, showSellFormFor || '')"
+          >确认卖出</button>
         </view>
       </view>
     </view>
@@ -397,6 +542,7 @@ import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 
 import scheduleBottomBar from '../../../../components/schedule-bottom-bar.vue'
+import DatePicker from '../../../../components/fun-components/date-picker.vue'
 import { useFinancialPlanStore } from '../../stores/useFinancialPlanStore'
 import { useRealizationStore } from '../../stores/useRealizationStore'
 import { ensureCurrentGroup, ensureCurrentMember } from '../../../../utils/currentGroupResolver'
@@ -415,7 +561,6 @@ import type {
   FinancialPlanListItem,
   RealizationBatch,
   RealizationOperation,
-  PlanStatus,
   TimeRangeType,
 } from '../../../../../../api/financial-plan-types'
 import type {
@@ -448,7 +593,14 @@ const sortedPlanList = computed(() => {
   })
 })
 
-// ===== inline form 状态 =====
+// ===== sheet 状态 =====
+/**
+ * 因为所有 form 都从 inline 改成了底部 Sheet，离开了原本所在的 v-for 上下文，
+ * 提交时还需要 planId / assetId / batchId。下面的 ref 保存"当前打开的 Sheet"对应的
+ * planId，配合各 form 自带的 target ref（showXxxFor）一并使用。
+ */
+const sheetPlanId = ref<string>('')
+
 const showAddAssetFormFor = ref<string | null>(null)
 const newAssetForm = reactive({
   stockName: '',
@@ -469,6 +621,9 @@ const newBatchForm = reactive({
 const showBuyFormFor = ref<string | null>(null)
 const showSellFormFor = ref<string | null>(null)
 const showEditBatchFormFor = ref<string | null>(null)
+/** 编辑批次时记住该批次是否衍生品，决定要不要展示方向 / 到期日字段。 */
+const editBatchTargetIsDerivative = ref(false)
+
 const opForm = reactive({
   tradeDate: todayDateString(),
   price: '',
@@ -905,13 +1060,10 @@ async function handleArchivePlan(plan: FinancialPlanListItem): Promise<void> {
   await fetchPlans()
 }
 
-// ===== Asset inline form =====
+// ===== Asset sheet =====
 
-function toggleAddAssetForm(planId: string): void {
-  if (showAddAssetFormFor.value === planId) {
-    closeAddAssetForm()
-    return
-  }
+function openAddAssetSheet(planId: string): void {
+  sheetPlanId.value = planId
   showAddAssetFormFor.value = planId
   newAssetForm.stockName = ''
   newAssetForm.market = 'CN'
@@ -958,13 +1110,10 @@ async function handleSubmitAddAsset(planId: string): Promise<void> {
   }
 }
 
-// ===== Batch inline form =====
+// ===== Batch sheets =====
 
-function toggleAddBatchForm(assetId: string): void {
-  if (showAddBatchFormFor.value === assetId) {
-    closeAddBatchForm()
-    return
-  }
+function openAddBatchSheet(planId: string, assetId: string): void {
+  sheetPlanId.value = planId
   showAddBatchFormFor.value = assetId
   newBatchForm.batchType = 'EQUITY'
   newBatchForm.direction = undefined
@@ -1032,24 +1181,20 @@ async function handleSubmitAddBatch(planId: string, assetId: string): Promise<vo
   }
 }
 
-// ===== Buy / Sell inline form =====
+// ===== Buy / Sell sheets =====
 
-function toggleBuyForm(batchId: string): void {
-  if (showBuyFormFor.value === batchId) {
-    closeOpForm()
-    return
-  }
+function openBuySheet(planId: string, batchId: string): void {
+  sheetPlanId.value = planId
   showSellFormFor.value = null
+  showEditBatchFormFor.value = null
   showBuyFormFor.value = batchId
   resetOpForm()
 }
 
-function toggleSellForm(batchId: string): void {
-  if (showSellFormFor.value === batchId) {
-    closeOpForm()
-    return
-  }
+function openSellSheet(planId: string, batchId: string): void {
+  sheetPlanId.value = planId
   showBuyFormFor.value = null
+  showEditBatchFormFor.value = null
   showSellFormFor.value = batchId
   resetOpForm()
 }
@@ -1095,16 +1240,14 @@ async function handleSubmitBuy(planId: string, batchId: string): Promise<void> {
   }
 }
 
-// ===== 批次编辑 inline form =====
+// ===== 批次编辑 sheet =====
 
-function toggleEditBatchForm(batch: RealizationBatch): void {
-  if (showEditBatchFormFor.value === batch.batchId) {
-    closeEditBatchForm()
-    return
-  }
+function openEditBatchSheet(planId: string, batch: RealizationBatch): void {
+  sheetPlanId.value = planId
   showBuyFormFor.value = null
   showSellFormFor.value = null
   showEditBatchFormFor.value = String(batch.batchId)
+  editBatchTargetIsDerivative.value = batch.batchType === 'DERIVATIVE'
   editBatchForm.batchName = batch.batchName || ''
   editBatchForm.direction = batch.direction
   editBatchForm.quantity = String(batch.quantity ?? '')
@@ -1275,6 +1418,14 @@ function formatPercent(value: number | string | undefined | null): string {
   return `${(num * 100).toFixed(1)}%`
 }
 
+/** 进度条宽度（0%~100% 之间）。 */
+function progressBarWidth(rate: number | string | undefined | null): string {
+  const num = Number(rate)
+  if (!Number.isFinite(num) || num <= 0) return '0%'
+  const pct = Math.min(num * 100, 100)
+  return `${pct.toFixed(1)}%`
+}
+
 /** 正盈利 / 负盈利的色彩 class。 */
 function profitToneClass(value: number | string | undefined | null): string {
   const num = Number(value)
@@ -1292,44 +1443,84 @@ onShow(() => {
 </script>
 
 <style scoped>
+/* ===== Design tokens =====
+ * 整页配色统一收敛在以下几个 token 上：
+ *   --bg               页面背景
+ *   --card             卡片背景
+ *   --primary          主操作色（indigo 600）
+ *   --success/danger   买入 / 卖出 / 收益正负色
+ *   --text-*           文本灰阶
+ */
 .page-container {
   min-height: 100vh;
-  padding-bottom: 200rpx;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+  padding-bottom: 220rpx;
+  background: linear-gradient(180deg, #f6f8fc 0%, #eef2ff 100%);
 }
 
+/* ===== Page header ===== */
 .page-header {
-  padding: 36rpx 28rpx 16rpx;
+  padding: 40rpx 28rpx 12rpx;
+}
+
+.page-header__row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .page-title {
   display: block;
   color: #0f172a;
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: 700;
+  letter-spacing: 0.5rpx;
 }
 
 .page-subtitle {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   color: #64748b;
   font-size: 24rpx;
 }
 
-.content-container {
-  padding: 0 24rpx;
+.page-counter {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  font-size: 22rpx;
 }
 
+.content-container {
+  padding: 16rpx 24rpx 0;
+}
+
+/* ===== Empty state ===== */
 .empty-state {
   margin: 80rpx auto;
-  padding: 56rpx 24rpx;
+  padding: 64rpx 24rpx;
   text-align: center;
-  color: #64748b;
   background: #ffffff;
   border-radius: 28rpx;
-  box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14rpx 36rpx rgba(15, 23, 42, 0.06);
 }
 
+.empty-state__title {
+  display: block;
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.empty-state__hint {
+  display: block;
+  margin-top: 10rpx;
+  color: #94a3b8;
+  font-size: 24rpx;
+}
+
+/* ===== Plan list ===== */
 .plan-list {
   display: flex;
   flex-direction: column;
@@ -1339,105 +1530,146 @@ onShow(() => {
 .plan-card {
   border-radius: 28rpx;
   background: #ffffff;
-  box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14rpx 36rpx rgba(15, 23, 42, 0.06);
   overflow: hidden;
-  /* 去掉左侧色条边框，色块仅靠状态 chip 表现 */
+  transition: box-shadow 0.2s;
+}
+
+.plan-card--expanded {
+  box-shadow: 0 22rpx 48rpx rgba(79, 70, 229, 0.12);
 }
 
 .plan-card--archived {
-  opacity: 0.78;
+  opacity: 0.7;
 }
 
-.plan-card__header {
+.plan-card__head {
+  padding: 24rpx 26rpx 18rpx;
+}
+
+.plan-card__head-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 24rpx 26rpx;
+  align-items: flex-start;
+  gap: 14rpx;
 }
 
 .plan-card__head-left {
   flex: 1;
+  min-width: 0;
 }
 
 .plan-card__name {
   display: block;
   color: #0f172a;
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .plan-card__meta {
   display: block;
   margin-top: 6rpx;
-  color: #64748b;
+  color: #94a3b8;
   font-size: 22rpx;
+  font-feature-settings: 'tnum';
 }
 
 .plan-card__head-right {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 10rpx;
 }
 
 .plan-card__status {
-  padding: 6rpx 14rpx;
+  padding: 6rpx 16rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
+  font-weight: 500;
 }
 
 .status--active {
-  background: #ecfdf5;
+  background: rgba(16, 185, 129, 0.12);
   color: #047857;
 }
 .status--ended {
-  background: #f1f5f9;
+  background: rgba(148, 163, 184, 0.18);
   color: #475569;
 }
 .status--archived {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: rgba(244, 114, 182, 0.14);
+  color: #be185d;
 }
 
 .plan-card__caret {
   color: #94a3b8;
-  font-size: 28rpx;
+  font-size: 30rpx;
 }
 
-.header-link {
-  padding: 4rpx 12rpx;
+/* Progress strip in card head */
+.plan-card__progress {
+  margin-top: 16rpx;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12rpx;
   border-radius: 999rpx;
   background: #eef2ff;
-  color: #2563eb;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  border-radius: 999rpx;
+  transition: width 0.3s;
+}
+
+.progress-bar__fill.positive {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+.progress-bar__fill.negative {
+  background: linear-gradient(90deg, #f87171, #dc2626);
+}
+.progress-bar__fill.muted {
+  background: linear-gradient(90deg, #c7d2fe, #a5b4fc);
+}
+
+.progress-bar__legend {
+  display: block;
+  margin-top: 8rpx;
   font-size: 22rpx;
+  font-feature-settings: 'tnum';
 }
 
-.header-link--danger {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
+/* ===== Plan body ===== */
 .plan-card__body {
   padding: 0 26rpx 24rpx;
+  border-top: 1rpx solid #f1f5f9;
+  padding-top: 18rpx;
 }
 
 .loading-text {
-  padding: 28rpx;
+  padding: 36rpx;
   text-align: center;
   color: #64748b;
   font-size: 24rpx;
 }
 
+/* ===== Metric row ===== */
 .metric-row {
   display: flex;
-  gap: 14rpx;
-  margin-bottom: 18rpx;
+  gap: 12rpx;
+  margin-bottom: 14rpx;
 }
 
 .metric {
   flex: 1;
-  padding: 18rpx;
-  border-radius: 20rpx;
-  background: #f8fbff;
+  padding: 18rpx 16rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .metric__label {
@@ -1448,10 +1680,11 @@ onShow(() => {
 
 .metric__value {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   color: #0f172a;
-  font-size: 28rpx;
-  font-weight: 600;
+  font-size: 30rpx;
+  font-weight: 700;
+  font-feature-settings: 'tnum';
 }
 
 .metric__sub {
@@ -1461,96 +1694,121 @@ onShow(() => {
   font-size: 20rpx;
 }
 
-.metric__sub--breakdown {
-  color: #94a3b8;
-  font-size: 18rpx;
+/* ===== Breakdown chips ===== */
+.breakdown-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.breakdown-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(241, 245, 249, 0.8);
+  font-size: 21rpx;
   font-feature-settings: 'tnum';
 }
 
-.currency-tag {
-  display: inline-block;
-  margin-right: 8rpx;
-  padding: 2rpx 8rpx;
-  border-radius: 6rpx;
-  background: #eef2ff;
-  color: #475569;
-  font-size: 20rpx;
-}
-
-.section {
-  margin-top: 10rpx;
-  padding-top: 14rpx;
-}
-
-.section__title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10rpx;
-}
-
-.section__title {
-  color: #0f172a;
-  font-size: 26rpx;
+.breakdown-chip__currency {
+  color: #4f46e5;
   font-weight: 600;
 }
 
+.breakdown-chip__amount {
+  color: #475569;
+}
+
+.breakdown-chip__rate {
+  color: #94a3b8;
+  font-size: 19rpx;
+}
+
+/* ===== Plan-level actions ===== */
+.plan-actions {
+  display: flex;
+  gap: 10rpx;
+  flex-wrap: wrap;
+  margin-bottom: 18rpx;
+}
+
+/* ===== Asset card ===== */
 .empty-mini {
-  padding: 14rpx;
+  margin: 16rpx 0;
+  padding: 18rpx;
   text-align: center;
   color: #94a3b8;
   font-size: 22rpx;
+  background: rgba(248, 250, 252, 0.7);
+  border-radius: 14rpx;
 }
 
-/* 标的：用轻底色 + 间距分隔，去掉边框 */
-.asset-block {
+.empty-mini--sub {
+  margin: 8rpx 0 0;
+  padding: 12rpx;
+  background: transparent;
+  font-size: 20rpx;
+}
+
+.asset-card {
   margin-top: 12rpx;
-  border-radius: 18rpx;
-  background: rgba(241, 245, 249, 0.6);
-  padding: 12rpx 14rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 20rpx;
+  background: rgba(248, 250, 252, 0.8);
 }
 
-.asset-row {
+.asset-card__head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12rpx;
-  padding: 8rpx 6rpx;
 }
 
-.asset-row__info {
+.asset-card__head-left {
   flex: 1;
   min-width: 0;
 }
 
-.asset-row__name {
-  display: block;
+.asset-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.asset-card__name {
   color: #0f172a;
   font-size: 26rpx;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.asset-row__meta {
+.asset-card__meta {
   display: block;
-  margin-top: 4rpx;
+  margin-top: 6rpx;
   color: #475569;
   font-size: 22rpx;
+  font-feature-settings: 'tnum';
 }
 
-.asset-row__rate {
+.asset-card__rate {
   display: block;
   margin-top: 2rpx;
-  color: #64748b;
+  color: #94a3b8;
   font-size: 20rpx;
 }
 
 .market-chip {
   display: inline-block;
   padding: 2rpx 10rpx;
-  margin-right: 6rpx;
   border-radius: 999rpx;
   font-size: 20rpx;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.5rpx;
 }
 .chip--us {
   background: #dbeafe;
@@ -1565,27 +1823,43 @@ onShow(() => {
   color: #b45309;
 }
 
-/* 批次：在标的色块内进一步缩进，仅左侧色条做层级提示 */
-.batch-block {
-  margin-top: 6rpx;
-  padding: 8rpx 10rpx 8rpx 14rpx;
-  border-left: 4rpx solid #c7d2fe;
+.currency-tag {
+  display: inline-block;
+  margin-right: 6rpx;
+  padding: 1rpx 8rpx;
+  border-radius: 6rpx;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 20rpx;
+  font-weight: 500;
 }
 
+/* ===== Batch row ===== */
 .batch-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12rpx;
+  margin-top: 10rpx;
+  padding: 12rpx;
+  border-left: 4rpx solid #c7d2fe;
+  background: #ffffff;
+  border-radius: 12rpx;
 }
 
-.batch-row__info {
+.batch-row__main {
   flex: 1;
   min-width: 0;
 }
 
+.batch-row__title-line {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-wrap: wrap;
+}
+
 .batch-row__name {
-  display: block;
   color: #0f172a;
   font-size: 24rpx;
   font-weight: 600;
@@ -1593,7 +1867,7 @@ onShow(() => {
 
 .batch-row__type {
   display: block;
-  margin-top: 2rpx;
+  margin-top: 4rpx;
   color: #64748b;
   font-size: 21rpx;
 }
@@ -1603,18 +1877,53 @@ onShow(() => {
   margin-top: 4rpx;
   color: #475569;
   font-size: 22rpx;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-feature-settings: 'tnum';
 }
 
-/* 操作明细：两列紧凑 grid */
+.batch-row__profit {
+  display: block;
+  margin-top: 4rpx;
+  color: #64748b;
+  font-size: 22rpx;
+  font-feature-settings: 'tnum';
+}
+
+.batch-row__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+
+.status-badge {
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 500;
+}
+.tone--completed {
+  background: #d1fae5;
+  color: #047857;
+}
+.tone--pending-sell {
+  background: #fef3c7;
+  color: #b45309;
+}
+.tone--partial {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.tone--pending-buy {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* ===== Op grid ===== */
 .op-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6rpx 12rpx;
-  margin-top: 8rpx;
-  padding-left: 4rpx;
+  gap: 6rpx;
+  margin-top: 10rpx;
 }
 
 .op-cell {
@@ -1624,14 +1933,15 @@ onShow(() => {
   padding: 4rpx 8rpx;
   border-radius: 8rpx;
   font-size: 21rpx;
+  font-feature-settings: 'tnum';
 }
 
 .op-cell--buy {
-  background: rgba(220, 252, 231, 0.55);
+  background: rgba(220, 252, 231, 0.6);
   color: #166534;
 }
 .op-cell--sell {
-  background: rgba(254, 226, 226, 0.55);
+  background: rgba(254, 226, 226, 0.6);
   color: #991b1b;
 }
 
@@ -1655,213 +1965,220 @@ onShow(() => {
   text-overflow: ellipsis;
 }
 
-.row-actions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8rpx;
-}
-
-.row-btn {
-  margin: 0;
-  padding: 6rpx 16rpx;
-  min-width: auto;
-  height: 56rpx;
-  line-height: 44rpx;
-  border-radius: 999rpx;
-  background: #eef2ff;
-  color: #334155;
-  font-size: 22rpx;
-}
-
-.row-btn[disabled] {
-  background: #f1f5f9;
-  color: #94a3b8;
-}
-
-.row-btn--primary {
-  background: linear-gradient(135deg, #1d4ed8, #2563eb);
-  color: #ffffff;
-}
-
-.status-badge {
-  margin-left: 8rpx;
-  padding: 2rpx 10rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 500;
-}
-.tone--completed {
-  background: #ecfdf5;
-  color: #047857;
-}
-.tone--pending-sell {
-  background: #fef3c7;
-  color: #b45309;
-}
-.tone--partial {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-.tone--pending-buy {
-  background: #f1f5f9;
-  color: #475569;
-}
-
+/* ===== Tone helpers ===== */
 .positive {
   color: #047857;
+  font-weight: 500;
 }
 .negative {
   color: #b91c1c;
+  font-weight: 500;
 }
 .muted {
-  color: #64748b;
+  color: #94a3b8;
 }
 
-.inline-form {
-  margin-top: 10rpx;
-  padding: 12rpx 14rpx;
-  border-radius: 14rpx;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.inline-form--asset,
-.inline-form--batch {
-  margin-left: 0;
-}
-
-.inline-form__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10rpx;
-}
-
-.inline-field {
-  flex: 1 1 220rpx;
-  min-width: 220rpx;
-}
-
-.inline-field__label {
-  display: block;
-  margin-bottom: 6rpx;
-  color: #475569;
+/* ===== Button system ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 18rpx;
+  height: 56rpx;
+  line-height: 1;
+  border: none;
+  border-radius: 999rpx;
   font-size: 22rpx;
+  font-weight: 500;
+  background: #eef2ff;
+  color: #475569;
+  transition: opacity 0.2s, transform 0.1s;
 }
 
-.inline-input,
-.inline-picker {
-  width: 100%;
-  min-height: 60rpx;
-  padding: 10rpx 14rpx;
-  box-sizing: border-box;
-  border: 1rpx solid #dbe3ef;
-  border-radius: 10rpx;
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 24rpx;
+.btn::after {
+  border: none;
 }
 
-.inline-form__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10rpx;
-  margin-top: 10rpx;
+.btn:active {
+  transform: scale(0.97);
 }
 
-/* Modal */
-.modal-mask {
+.btn[disabled] {
+  background: #f1f5f9 !important;
+  color: #cbd5e1 !important;
+}
+
+.btn--mini {
+  height: 48rpx;
+  padding: 0 14rpx;
+  font-size: 20rpx;
+}
+
+.btn--lg {
+  flex: 1;
+  height: 80rpx;
+  font-size: 26rpx;
+}
+
+.btn--primary {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+}
+
+.btn--ghost {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn--success {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #ffffff;
+}
+
+.btn--danger {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: #ffffff;
+}
+
+/* ===== Bottom sheet ===== */
+.sheet-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 200;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  z-index: 100;
 }
 
-.modal-panel {
-  width: 90%;
-  max-width: 640rpx;
-  max-height: 80vh;
+.sheet-panel {
+  width: 100%;
+  max-height: 85vh;
   background: #ffffff;
-  border-radius: 24rpx;
-  overflow: auto;
+  border-top-left-radius: 32rpx;
+  border-top-right-radius: 32rpx;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.modal-header {
-  padding: 24rpx;
-  border-bottom: 1rpx solid #f1f5f9;
+.sheet-grabber {
+  width: 80rpx;
+  height: 8rpx;
+  margin: 12rpx auto 0;
+  border-radius: 999rpx;
+  background: #e2e8f0;
 }
 
-.modal-title {
-  display: block;
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 28rpx 16rpx;
+}
+
+.sheet-title {
   color: #0f172a;
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 700;
 }
 
-.modal-body {
-  padding: 20rpx 24rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
+.sheet-title--success {
+  color: #059669;
 }
 
-.modal-field {
-  display: flex;
-  flex-direction: column;
+.sheet-title--danger {
+  color: #dc2626;
 }
 
-.modal-field-row {
+.sheet-close {
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 52rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 36rpx;
+}
+
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8rpx 28rpx 24rpx;
+}
+
+.sheet-actions {
   display: flex;
   gap: 14rpx;
+  padding: 16rpx 28rpx 24rpx;
+  border-top: 1rpx solid #f1f5f9;
 }
 
-.modal-field-row > .modal-field {
+/* ===== Field ===== */
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16rpx;
+}
+
+.field-row {
+  display: flex;
+  gap: 14rpx;
+  margin-bottom: 16rpx;
+}
+
+.field-row > .field {
   flex: 1;
+  margin-bottom: 0;
 }
 
-.modal-label {
+.field__label {
   display: block;
-  margin-bottom: 6rpx;
+  margin-bottom: 8rpx;
   color: #475569;
   font-size: 22rpx;
 }
 
-.modal-input,
-.modal-picker {
+.field__input,
+.field__picker {
   width: 100%;
-  min-height: 64rpx;
-  padding: 12rpx 16rpx;
+  min-height: 80rpx;
+  padding: 16rpx 20rpx;
   box-sizing: border-box;
-  border: 1rpx solid #dbe3ef;
-  border-radius: 12rpx;
-  background: #ffffff;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #f8fafc;
   color: #0f172a;
-  font-size: 24rpx;
+  font-size: 26rpx;
 }
 
-.modal-textarea {
-  width: 100%;
-  min-height: 120rpx;
-  padding: 12rpx 16rpx;
-  box-sizing: border-box;
-  border: 1rpx solid #dbe3ef;
-  border-radius: 12rpx;
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 24rpx;
-}
-
-.modal-actions {
+.field__picker {
   display: flex;
-  justify-content: flex-end;
-  gap: 12rpx;
-  padding: 16rpx 24rpx 24rpx;
-  border-top: 1rpx solid #f1f5f9;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field__picker-arrow {
+  color: #94a3b8;
+  font-size: 22rpx;
+}
+
+.field__textarea {
+  width: 100%;
+  min-height: 140rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 26rpx;
 }
 </style>
