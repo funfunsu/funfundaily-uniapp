@@ -1,4 +1,4 @@
-<template> {{localSchedule}}
+<template> 
   <view class="schedule-edit-container">
     <view class="edit-content">
       <!-- 基本信息 -->

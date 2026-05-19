@@ -1,5 +1,5 @@
 <template>
-	<view class="discovery-container"> 
+	<view class="discovery-container">
 		<view class="grid">
 			<view
 				v-for="(item, index) in discoverList" 

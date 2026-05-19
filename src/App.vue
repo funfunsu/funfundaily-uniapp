@@ -1,8 +1,10 @@
 <script>
 import { autoLogin } from './utils/auth'
+import { setupFinancialPlanRouteGuard } from './utils/financialPlanRouteGuard'
 export default {
   onLaunch: function () {
     console.log('App Launch')
+    setupFinancialPlanRouteGuard()
     // this.initializeApp()
   },
   onShow: function () {
