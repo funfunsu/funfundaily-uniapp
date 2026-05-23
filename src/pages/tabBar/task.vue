@@ -54,6 +54,7 @@
           @delay-click="onTaskDelay"
           @toggle-select="toggleSelect"
           @goal-title-click="switchToCalendarClick"
+          @create-task="onAddTaskClick"
       />
     </view>
 
@@ -226,8 +227,9 @@ const onTaskCheck = ({task, completed}) => {
 
 // ✅✅✅ 核心优化：删除异步请求标题，直接从goalMap取值，组装分组数据，性能最优
 async function fetchCheckinRecordList() {
-  const itemKeyList = taskList.value.map(task => task.showExtra.itemKey);
-  if (!itemKeyList.length) return
+  const itemKeyList = taskList.value.map(task => task.showExtra?.itemKey).filter(Boolean);
+  // 无任务时也要清空分组数据，否则切换成员后会残留上一个成员的任务
+  if (!itemKeyList.length) { goalTaskList.value = []; return }
   const req = { targetUserId: currentMember.value.userId, groupId: currentGroup.value.id, taskKeys: itemKeyList }
   const records = await apiTs.checkin.listV2(req)
   const recordMap = new Map()
@@ -239,7 +241,7 @@ async function fetchCheckinRecordList() {
     } else recordMap.set(taskKey, r)
   })
   taskList.value.forEach(task => {
-    const record = recordMap.get(task.showExtra.itemKey)
+    const record = recordMap.get(task.showExtra?.itemKey)
     task.isCompleted = record ? record.extra.count >= task.extra.totalCount :false;
     task.completedTime = record ? record.completeTime : null
     task.recordExtra = record ? record.extra : {}

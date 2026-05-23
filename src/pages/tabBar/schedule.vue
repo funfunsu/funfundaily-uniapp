@@ -96,6 +96,13 @@ const handleGridClick = (date,hour)=>{
   });
 }
 function handleEventClick(event) {
+  // 「收到的邀请」(invRecv) 只读：打开邀请函详情查看，不进入日程编辑
+  if (event.itemType === 'invRecv') {
+    uni.navigateTo({
+      url: `/subPackages/invitation/pages/preview?id=${event.id}`
+    });
+    return;
+  }
   uni.navigateTo({
     url: `/pages/schedule/edit?id=${event.id}`
   });

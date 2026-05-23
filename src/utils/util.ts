@@ -22,7 +22,7 @@ export default class DateUtils {
 		return new Date(d.setDate(diff));
 	}
 	static isTheSameDay( d1:Date, d2:Date){
-		return d1.getFullYear() == d2.getFullYear() || d1.getMonth() == d2.getMonth() || d1.getDate()  == d2.getDate()
+		return d1.getFullYear() == d2.getFullYear() && d1.getMonth() == d2.getMonth() && d1.getDate()  == d2.getDate()
 	}
 
 	static getNextMonday(date: Date = new Date()): Date {

@@ -1,15 +1,24 @@
 <template>
   <view class="exchange-page">
-    <!-- 顶部积分卡 -->
+    <!-- 顶部积分卡：积分余额 + 赚积分引导整合为单张 Hero 卡 -->
     <view class="balance-card">
-      <view class="balance-card__left">
-        <text class="balance-card__label">我的积分</text>
-        <text class="balance-card__value">{{ myScore !== null ? myScore : '--' }}</text>
-        <text class="balance-card__hint" v-if="currentGroup.groupName">{{ currentGroup.groupName }}</text>
+      <view class="balance-card__main">
+        <view class="balance-card__left">
+          <text class="balance-card__label">我的积分</text>
+          <text class="balance-card__value">{{ myScore !== null ? myScore : '--' }}</text>
+          <text class="balance-card__hint" v-if="currentGroup.groupName">{{ currentGroup.groupName }}</text>
+        </view>
+        <view class="balance-card__right" @click="goRecords">
+          <text class="balance-card__action-text">兑换记录</text>
+          <text class="balance-card__action-arrow">›</text>
+        </view>
       </view>
-      <view class="balance-card__right" @click="goRecords">
-        <text class="balance-card__action-text">兑换记录</text>
-        <text class="balance-card__action-arrow">›</text>
+      <view class="balance-card__earn" @click="goCheckin">
+        <text class="balance-card__earn-text">完成任务打卡，就能攒积分换奖励</text>
+        <view class="balance-card__earn-link">
+          <text class="balance-card__earn-link-text">去打卡</text>
+          <text class="balance-card__earn-arrow">›</text>
+        </view>
       </view>
     </view>
 
@@ -40,7 +49,14 @@
 
     <view class="empty" v-else-if="!isLoading">
       <text class="empty__icon">🎁</text>
-      <text class="empty__text">{{ currentGroup.id ? '暂无可兑换商品' : '请先选择群组' }}</text>
+      <template v-if="currentGroup.id">
+        <text class="empty__text">还没有可兑换的奖励</text>
+        <text class="empty__desc">让爸爸妈妈先配置好你们的约定，完成打卡攒积分，就能在这里兑换啦～</text>
+        <button class="empty__action" @click="goManage">去配置奖励</button>
+      </template>
+      <template v-else>
+        <text class="empty__text">请先在底部选择群组</text>
+      </template>
     </view>
   </view>
 
@@ -152,6 +168,16 @@ const doExchange = async (item) => {
   }
 };
 
+// 跳到「打卡」tab，引导孩子通过完成任务赚取积分
+const goCheckin = () => {
+  uni.switchTab({ url: '/pages/tabBar/task' });
+};
+
+// 空态时引导家长去配置可兑换的奖励
+const goManage = () => {
+  uni.navigateTo({ url: '/subPackages/points/pages/points-product-manage' });
+};
+
 const goRecords = () => {
   if (!currentGroup.value.id) {
     uni.showToast({title: '请先选择群组', icon: 'none'});
@@ -178,12 +204,17 @@ const goRecords = () => {
 /* 顶部积分卡 */
 .balance-card {
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   background: var(--gradient-primary);
   border-radius: var(--radius-block);
   padding: 32rpx;
   box-shadow: var(--shadow-primary-elevated);
   margin-bottom: 24rpx;
+}
+
+.balance-card__main {
+  display: flex;
+  align-items: stretch;
 }
 
 .balance-card__left {
@@ -230,6 +261,47 @@ const goRecords = () => {
   font-size: 28rpx;
   color: var(--color-text-on-primary);
   margin-left: 6rpx;
+  line-height: 1;
+}
+
+/* 积分卡内的「赚积分」引导条：以半透明分割线与余额区分，融入同一张卡 */
+.balance-card__earn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  padding-top: 22rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.25);
+}
+
+.balance-card__earn-text {
+  flex: 1;
+  font-size: 23rpx;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.balance-card__earn-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  padding: 10rpx 22rpx;
+}
+
+.balance-card__earn-link-text {
+  font-size: 23rpx;
+  font-weight: 500;
+  color: var(--color-text-on-primary);
+  white-space: nowrap;
+}
+
+.balance-card__earn-arrow {
+  font-size: 26rpx;
+  color: var(--color-text-on-primary);
+  margin-left: 4rpx;
   line-height: 1;
 }
 
@@ -350,7 +422,25 @@ const goRecords = () => {
 }
 
 .empty__text {
-  font-size: 26rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.empty__desc {
+  font-size: 24rpx;
+  line-height: 1.7;
   color: var(--color-text-secondary);
+  max-width: 480rpx;
+}
+
+.empty__action {
+  margin-top: 8rpx;
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 26rpx;
+  padding: 14rpx 48rpx;
 }
 </style>

@@ -157,9 +157,10 @@ const props = defineProps({
   },
   yearRange: {
     type: Array,
+    // 往前放宽到 100 年，覆盖生日/纪念日等久远日期；往后保留 10 年
     default: () => {
       const now = new Date()
-      return [now.getFullYear() - 10, now.getFullYear() + 10]
+      return [now.getFullYear() - 100, now.getFullYear() + 10]
     }
   },
   indicatorHeight: {

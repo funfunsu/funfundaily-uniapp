@@ -69,4 +69,47 @@ page {
   --radius-block: 20rpx;
   --radius-pill: 999rpx;
 }
+
+/* =========================================================================
+ * 全局表单字段样式（.field / .field__label / .field__input / .field__textarea）
+ *
+ * 小程序原生 <input>/<textarea> 默认没有边框和背景，必须显式设置。
+ * 以前各页面在自己的 scoped 样式里各写一份，漏写就出现「输入框没边框」。
+ * 这里统一成全局非 scoped 样式（app.wxss 全局生效），任何页面只要用
+ * .field__input / .field__textarea 类名即可获得一致外观；页面如需个性化
+ * 仍可用自己的 scoped 样式覆盖（scoped 选择器特异性更高）。
+ * ========================================================================= */
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16rpx;
+}
+.field__label {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #475569;
+  font-size: 22rpx;
+}
+.field__input {
+  width: 100%;
+  min-height: 80rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 26rpx;
+}
+.field__textarea {
+  width: 100%;
+  min-height: 140rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 26rpx;
+}
 </style>
