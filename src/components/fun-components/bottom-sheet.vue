@@ -235,6 +235,8 @@ void slots
 /* ===== Field primitives (apply to slot content via :deep) =====
  * 任何放在 sheet body 内的 .field / .field-row / .field__* 都自动套用统一样式，
  * 这样多个页面调用 BottomSheet 时不必各自再声明一遍。
+ * 注意：这些规则在 H5 通过 :deep 生效，但 mp-weixin 各组件 wxss 隔离、slot 内容归属
+ * 父组件作用域，:deep 不会穿透。故下面用第二个非 scoped <style> 块再声明一份全局规则。
  */
 .bs-body :deep(.field) {
   display: flex;
@@ -266,11 +268,17 @@ void slots
   min-height: 80rpx;
   padding: 16rpx 20rpx;
   box-sizing: border-box;
-  border: 1rpx solid #e2e8f0;
+  /* 用 1px（物理像素）+ 略深的边框色，避免 1rpx 在高 DPR 下被取整成 0、且浅灰描边在浅底上看不见 */
+  border: 1px solid #cbd5e1;
   border-radius: 14rpx;
-  background: #f8fafc;
+  background: #ffffff;
   color: #0f172a;
   font-size: 26rpx;
+}
+
+.bs-body :deep(.field__input:focus),
+.bs-body :deep(.field__textarea:focus) {
+  border-color: #6366f1;
 }
 
 .bs-body :deep(.field__picker) {
@@ -289,9 +297,79 @@ void slots
   min-height: 140rpx;
   padding: 16rpx 20rpx;
   box-sizing: border-box;
-  border: 1rpx solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   border-radius: 14rpx;
-  background: #f8fafc;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 26rpx;
+}
+</style>
+
+<!-- 非 scoped 全局规则：保证 mp-weixin 下 slot 内的 .field__input / .field__textarea
+     等也能拿到样式（scoped + :deep 不会穿透到父组件作用域的 slot 节点）。 -->
+<style>
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16rpx;
+}
+
+.field-row {
+  display: flex;
+  gap: 14rpx;
+  margin-bottom: 16rpx;
+}
+
+.field-row > .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #475569;
+  font-size: 22rpx;
+}
+
+.field__input,
+.field__picker {
+  width: 100%;
+  min-height: 80rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+  /* 用 1px（物理像素）+ 略深的边框色，避免 1rpx 在高 DPR 下被取整成 0、且浅灰描边在浅底上看不见 */
+  border: 1px solid #cbd5e1;
+  border-radius: 14rpx;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 26rpx;
+}
+
+.field__input:focus,
+.field__textarea:focus {
+  border-color: #6366f1;
+}
+
+.field__picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field__picker-arrow {
+  color: #94a3b8;
+  font-size: 22rpx;
+}
+
+.field__textarea {
+  width: 100%;
+  min-height: 140rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 14rpx;
+  background: #ffffff;
   color: #0f172a;
   font-size: 26rpx;
 }

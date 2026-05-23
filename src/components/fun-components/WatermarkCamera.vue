@@ -28,7 +28,7 @@
           />
           <view v-else class="wm-empty">
             <text class="wm-empty__icon">📷</text>
-            <text class="wm-empty__text">等待拍照</text>
+            <text class="wm-empty__text">拍照或从相册选择</text>
           </view>
           <view v-if="isRendering" class="wm-progress">
             <view class="wm-progress__card">
@@ -78,8 +78,12 @@
       <!-- ===== 操作按钮 ===== -->
       <view class="wm-actions">
         <button class="wm-btn wm-btn--ghost" @click="handleTakePhoto">
-          <text class="wm-btn__icon">↻</text>
-          <text class="wm-btn__text">重拍</text>
+          <text class="wm-btn__icon">📷</text>
+          <text class="wm-btn__text">拍照</text>
+        </button>
+        <button class="wm-btn wm-btn--ghost" @click="handleChooseAlbum">
+          <text class="wm-btn__icon">🖼️</text>
+          <text class="wm-btn__text">相册</text>
         </button>
         <button class="wm-btn wm-btn--ghost" :disabled="!resultImg || isRendering" @click="handleSave">
           <text class="wm-btn__icon">⤓</text>
@@ -243,14 +247,15 @@ const isH5 = computed(() => {
 })
 
 onMounted(() => {
-  // 组件弹出时立即触发拍照
-  handleTakePhoto()
+  // 组件弹出时立即让用户选择来源：拍照 或 从相册选择
+  pickInitialPhoto()
 })
 
-function handleTakePhoto() {
+// 统一的取图逻辑：sourceType 决定是相机、相册，还是二者都可选（弹系统菜单）
+function chooseImage(sourceType) {
   uni.chooseImage({
     count: 1,
-    sourceType: ['camera'],
+    sourceType,
     success: (res) => {
       if (res.tempFilePaths && res.tempFilePaths.length > 0) {
         originalImg.value = res.tempFilePaths[0]
@@ -262,10 +267,26 @@ function handleTakePhoto() {
       }
     },
     fail: () => {
-      // 用户取消拍照时直接关闭
-      handleClose()
+      // 还没有任何照片时取消（即首次进入直接退出）才关闭整个面板；
+      // 已选过照片时重新取图被取消，则保留当前照片，不关闭。
+      if (!originalImg.value) handleClose()
     }
   })
+}
+
+// 首次进入：相机 + 相册都可选，不强制必须当下拍摄
+function pickInitialPhoto() {
+  chooseImage(['camera', 'album'])
+}
+
+// 拍照（实时拍摄）
+function handleTakePhoto() {
+  chooseImage(['camera'])
+}
+
+// 从相册上传已有照片
+function handleChooseAlbum() {
+  chooseImage(['album'])
 }
 
 function startRenderProgress() {

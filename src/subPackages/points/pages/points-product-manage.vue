@@ -1,9 +1,33 @@
 <template>
   <view class="manage-page">
-    <!-- 头部 -->
-    <view class="page-header">
-      <text class="page-header__title">管理可兑换商品</text>
-      <text class="page-header__subtitle">{{ currentGroup.groupName || '让积分更有意义' }}</text>
+    <!-- Hero：标题 + 价值引导 + 一键添加常见奖励，整合为单张卡片，减少顶部割裂 -->
+    <view class="hero">
+      <view class="hero__top">
+        <view class="hero__heading">
+          <text class="hero__desc">和孩子约定好的奖励，完成任务攒下积分就能兑现——零花钱、一次出游、一本绘本都可以。</text>
+          <text class="hero__presets-label">快速添加 · 点一下即可加入，之后可改</text>
+        </view>
+        <view class="hero__link" @click="goExchange">
+          <text class="hero__link-text">看兑换页</text>
+          <text class="hero__link-arrow">›</text>
+        </view>
+      </view>
+
+      <view class="hero__presets" v-if="!isLoading && currentGroup.id && availablePresets.length > 0">
+        <view class="hero__chips">
+          <view
+            class="preset-chip"
+            v-for="preset in availablePresets"
+            :key="preset.name"
+            @click="addFromPreset(preset)"
+          >
+            <text class="preset-chip__emoji">{{ preset.emoji }}</text>
+            <text class="preset-chip__name">{{ preset.name }}</text>
+            <text class="preset-chip__points">{{ preset.points }}分</text>
+            <text class="preset-chip__plus">＋</text>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view class="section-title" v-if="!isLoading && products.length > 0">
@@ -27,11 +51,17 @@
       </view>
     </view>
 
-    <!-- 空态 -->
+    <!-- 空态：把「没有商品」变成一次价值引导 -->
     <view class="empty" v-else>
       <text class="empty__icon">🎁</text>
-      <text class="empty__text">{{ currentGroup.id ? '暂无可兑换商品' : '请先选择群组' }}</text>
-      <button v-if="currentGroup.id" class="empty__action" @click="addProduct">添加第一个</button>
+      <template v-if="currentGroup.id">
+        <text class="empty__text">还没有约定的奖励</text>
+        <text class="empty__desc">添加孩子心心念念的奖励——一次出游、一本绘本、30 分钟动画片，让 TA 的每一份努力都有盼头。</text>
+        <button class="empty__action" @click="addProduct">添加第一个奖励</button>
+      </template>
+      <template v-else>
+        <text class="empty__text">请先在底部选择群组</text>
+      </template>
     </view>
   </view>
   <schedule-bottom-bar :buttons="buttons"
@@ -42,7 +72,7 @@
 </template>
 
 <script setup>
-import {onMounted, ref} from 'vue';
+import {computed, onMounted, ref} from 'vue';
 import {getStoredData, removeStoredData, setStoredData, STORAGE_KEYS} from "../../../utils/storageManager";
 import apiTs from '../../../utils/apiTs';
 import ScheduleBottomBar from "../../../components/schedule-bottom-bar.vue";
@@ -84,6 +114,51 @@ const addProduct = () => {
   uni.navigateTo({
     url: `/subPackages/points/pages/points-product-edit`
   });
+}
+
+// 跳到孩子的积分兑换页，让家长直观看到配置后的效果
+const goExchange = () => {
+  uni.navigateTo({
+    url: `/subPackages/points/pages/points-exchange`
+  });
+}
+
+// 常见奖励模板：让家长第一次配置时不必从零想，点一下即可加入
+const PRESET_REWARDS = [
+  { emoji: '📺', name: '看 30 分钟动画片', points: 30, description: '完成约定后，可以看 30 分钟喜欢的动画片' },
+  { emoji: '🎮', name: '多玩 20 分钟游戏', points: 30, description: '额外解锁 20 分钟游戏 / 玩耍时间' },
+  { emoji: '🍦', name: '一份喜欢的小零食', points: 20, description: '兑换一份自己喜欢的小零食' },
+  { emoji: '💰', name: '10 元零花钱', points: 50, description: '兑换 10 元零花钱，自己决定怎么花' },
+  { emoji: '🍜', name: '点一次今晚吃什么', points: 40, description: '这一顿全家吃什么，由你来决定' },
+  { emoji: '📚', name: '挑一本喜欢的书', points: 80, description: '去书店挑一本自己喜欢的绘本或图书' },
+  { emoji: '🌙', name: '周末晚睡 30 分钟', points: 30, description: '周末可以比平时晚睡 30 分钟' },
+  { emoji: '🎡', name: '一次周末出游', points: 200, description: '攒够积分，全家一起去公园 / 游乐场玩一天' },
+];
+
+// 过滤掉名称已存在的模板，避免重复添加
+const availablePresets = computed(() =>
+  PRESET_REWARDS.filter(preset => !products.value.some(item => item.name === preset.name))
+);
+
+// 一键从模板创建奖励，创建后刷新列表，家长可再点卡片微调
+const addFromPreset = async (preset) => {
+  if (!currentGroup.value.id) {
+    uni.showToast({ title: '请先选择群组', icon: 'none' });
+    return;
+  }
+  try {
+    await apiTs.pointExchange.createProduct({
+      groupId: currentGroup.value.id,
+      name: preset.name,
+      description: preset.description,
+      requiredScore: preset.points
+    });
+    uni.showToast({ title: '已添加', icon: 'success' });
+    await fetchProducts();
+  } catch (error) {
+    console.error('快速添加奖励失败:', error);
+    uni.showToast({ title: '添加失败，请重试', icon: 'none' });
+  }
 }
 
 // 假设这里有一个API用于获取商品数据
@@ -158,27 +233,122 @@ onShow(() => {
   min-height: 100vh;
 }
 
-/* 头部条：浅蓝 strip */
-.page-header {
-  background: var(--gradient-soft-strip);
-  border: 1rpx solid var(--color-border-soft);
+/* Hero：单张卡片承载标题 / 引导 / 快速添加，避免顶部多卡片堆叠 */
+.hero {
+  background-color: var(--color-bg-card);
   border-radius: var(--radius-block);
-  padding: 28rpx 32rpx;
+  box-shadow: var(--shadow-card);
+  padding: 28rpx 28rpx 24rpx;
   margin-bottom: 24rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
 }
 
-.page-header__title {
+.hero__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.hero__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  min-width: 0;
+}
+
+.hero__title {
   font-size: 34rpx;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-.page-header__subtitle {
+.hero__group {
   font-size: 22rpx;
   color: var(--color-text-secondary);
+}
+
+.hero__link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 0 6rpx 16rpx;
+}
+
+.hero__link-text {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.hero__link-arrow {
+  font-size: 28rpx;
+  color: var(--color-primary);
+  margin-left: 4rpx;
+  line-height: 1;
+}
+
+.hero__desc {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+/* 快速添加区：以分割线与上方引导区分，仍属同一张卡片 */
+.hero__presets {
+  margin-top: 22rpx;
+  padding-top: 22rpx;
+  border-top: 1rpx solid var(--color-border-divider);
+}
+
+.hero__presets-label {
+  display: block;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  margin-bottom: 16rpx;
+}
+
+.hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  background: var(--gradient-soft-strip);
+  border: 1rpx solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  padding: 14rpx 20rpx;
+}
+
+.preset-chip:active {
+  opacity: 0.7;
+}
+
+.preset-chip__emoji {
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.preset-chip__name {
+  font-size: 24rpx;
+  color: var(--color-text-primary);
+}
+
+.preset-chip__points {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.preset-chip__plus {
+  font-size: 26rpx;
+  color: var(--color-primary);
+  line-height: 1;
+  margin-left: 2rpx;
 }
 
 /* 分区标题 */
@@ -292,8 +462,16 @@ onShow(() => {
 }
 
 .empty__text {
-  font-size: 26rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.empty__desc {
+  font-size: 24rpx;
+  line-height: 1.7;
   color: var(--color-text-secondary);
+  max-width: 480rpx;
 }
 
 .empty__action {

@@ -47,7 +47,11 @@ const apiTs = {
         // 添加日程
         save: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/save', data),
         copy: (data: ScheduleCopyRequest): Promise<boolean> => api.post<boolean>('/api/schedule/copy', data),
-        delete: (id): Promise<boolean> => api.delete<boolean>(`/api/schedule/${id}`, {})
+        delete: (id): Promise<boolean> => api.delete<boolean>(`/api/schedule/${id}`, {}),
+        // 停止关注 / 恢复关注：closeStatus = 'CLOSE' | 'OPEN'
+        close: (data: any): Promise<boolean> => api.post<boolean>('/api/schedule/close', data),
+        // 已停止关注列表（用于恢复入口）
+        closedList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/closed/list', data)
     },
     // 积分相关接口
     point: {
@@ -191,8 +195,12 @@ const apiTs = {
     },
     invitation: {
         list: (groupId: number | string): Promise<any[]> => api.get<any[]>('/api/invitation/list', { groupId }),
+        get: (id: number | string): Promise<any> => api.get<any>(`/api/invitation/${id}`),
         save: (data: any): Promise<any> => api.post<any>('/api/invitation/save', data),
         delete: (id: number | string): Promise<any> => api.delete<any>(`/api/invitation/${id}`),
+        // 受邀人「收下邀请」：依据原邀请 id 生成一条收到记录
+        accept: (data: { invitationId: number | string; recipientName?: string }): Promise<any> =>
+            api.post<any>('/api/invitation/accept', data),
     },
     universal_records:{
         // 添加打卡

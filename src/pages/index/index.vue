@@ -39,6 +39,7 @@ import { autoLogin } from '../../utils/auth';
 import apiTs from '../../utils/apiTs';
 import {STORAGE_KEYS, setStoredData, getStoredData} from '../../utils/storageManager';
 import {getShareToken} from "../../utils/token";
+import { performRedirect } from '../../utils/router';
 
 // --- 响应式状态 ---
 const showProfileUpdate = ref(false);
@@ -73,7 +74,7 @@ onMounted(async () => {
         showProfileUpdate.value = true;
       } else {
         setStoredData(STORAGE_KEYS.USER_INFO, fetchedUserInfo);
-        performRedirect();
+        performRedirect(redirectPath.value);
       }
     }
   } catch (err: any) {
@@ -83,18 +84,6 @@ onMounted(async () => {
 });
 
 // --- 方法 ---
-const performRedirect = () => {
-  let targetUrl = '/pages/tabBar/task';
-  if (redirectPath.value) {
-    targetUrl = redirectPath.value.split('?')[0];
-  }
-  if (targetUrl.includes('tabBar')) {
-    uni.switchTab({ url: targetUrl });
-  } else {
-    uni.redirectTo({ url: targetUrl });
-  }
-};
-
 const updateNickname = async () => {
   if (!userInfo.value.nickname?.trim()) {
     uni.showToast({ title: '请输入昵称', icon: 'none' });
@@ -107,7 +96,7 @@ const updateNickname = async () => {
     };
     const updatedUser = await apiTs.user.update(data);
     setStoredData(STORAGE_KEYS.USER_INFO, updatedUser);
-    performRedirect();
+    performRedirect(redirectPath.value);
   } catch (err: any) {
     console.error('Index page - Update nickname failed:', err);
     uni.showToast({ title: '更新昵称失败，请重试', icon: 'none' });
@@ -118,7 +107,7 @@ const skipNicknameSetup = () => {
   // 不保存昵称，直接跳转
   // 可选：记录用户已跳过（用于后续提醒）
   uni.setStorageSync('hasSkippedNickname', true);
-  performRedirect();
+  performRedirect(redirectPath.value);
 };
 
 const setCustomNickname = (e: any) => {

@@ -1,28 +1,36 @@
 <template>
   <view class="event-page">
     <!-- 页面标题 -->
-    <view class="page-header" v-if="currentView === 'top'">
+    <view class="page-header">
       <text class="page-subtitle">记录生活中的重要时刻</text>
     </view>
-    <view class="page-header nav-header" v-else>
-      <view class="back-btn" @click="currentView = 'top'">
-        <text class="back-icon">←</text> 返回
-      </view>
-      <text class="page-title nav-title">{{ activeGoalObj?.itemTitle }}</text>
-    </view>
 
-    <!-- 顶层视图: 有关联事件的目标分类 -->
-    <view class="goal-list-container" v-if="currentView === 'top' && activeGoals.length > 0">
-      <view class="goal-grid">
-        <view class="goal-card" v-for="goal in activeGoals" :key="goal.id" @click="enterGoal(goal)">
-          <view class="goal-card-content">
-            <view class="goal-text">
-              <text class="goal-name">{{ goal.itemTitle }}</text>
-              <text class="goal-count">{{ getGoalEventCount(goal.id) }}</text>
-            </view>
-          </view>
+    <!-- 目标筛选栏：默认「全部」，可按目标筛选事项 -->
+    <scroll-view
+      v-if="goalFilters.length > 1"
+      class="filter-bar"
+      scroll-x
+      enable-flex
+      :show-scrollbar="false"
+    >
+      <view class="filter-row">
+        <view
+          v-for="f in goalFilters"
+          :key="f.id"
+          class="filter-chip"
+          :class="{ 'filter-chip--active': activeFilter === f.id }"
+          @click="activeFilter = f.id"
+        >
+          <text class="filter-chip__label">{{ f.label }}</text>
+          <text class="filter-chip__count">{{ f.count }}</text>
         </view>
       </view>
+    </scroll-view>
+
+    <!-- 已停止关注入口：有已关闭事件时展示，点击可恢复 -->
+    <view v-if="closedEvents.length > 0" class="closed-entry" @click="showClosedPopup = true">
+      <text class="closed-entry__text">🔕 已停止关注 {{ closedEvents.length }}</text>
+      <text class="closed-entry__arrow">›</text>
     </view>
 
     <!-- 事件列表 - 炫酷卡片式布局 -->
@@ -55,31 +63,44 @@
         
         <!-- 分享按钮 -->
         <view class="event-share" @click.stop="openWatermarkCamera(item)">
-          <text class="share-text">拍照分享</text>
-        </view>
-      </view>
-    </view>
-
-    <!-- 顶层视图: 无关联事件的目标分类 -->
-    <view class="goal-list-container" style="margin-top: 10rpx;" v-if="currentView === 'top' && emptyGoals.length > 0">
-      <view class="goal-grid">
-        <view class="goal-card empty-goal-card" v-for="goal in emptyGoals" :key="goal.id" @click="enterGoal(goal)">
-          <view class="goal-card-content">
-            <view class="goal-text">
-              <text class="goal-name">{{ goal.itemTitle }}</text>
-              <text class="goal-count">0</text>
-            </view>
-          </view>
-          <text class="goal-arrow">></text>
+          <text class="share-text">照片分享</text>
         </view>
       </view>
     </view>
 
     <!-- 空状态 -->
-    <view class="empty-state" v-if="(currentView === 'top' && goalList.length === 0 && displayEvents.length === 0) || (currentView === 'detail' && displayEvents.length === 0)">
-      <text class="empty-icon">📅</text>
-      <text class="empty-text">{{ currentView === 'detail' ? '该分类下还没有事件' : '还没有记录事件' }}</text>
-      <text class="empty-subtext">点击下方按钮添加</text>
+    <view class="empty-state" v-if="displayEvents.length === 0">
+      <!-- 新用户引导 + 快捷创建 -->
+      <template v-if="eventList.length === 0">
+        <text class="empty-icon">🎉</text>
+        <text class="empty-text">记录人生的重要时刻</text>
+        <text class="empty-subtext">生日、纪念日、宝宝出生……把每个值得记住的日子存下来，自动帮你数「已经第几天」。</text>
+
+        <view class="quick-create">
+          <text class="quick-create__hint">选个常见的，一键开始 👇</text>
+          <view class="quick-grid">
+            <view
+              class="quick-chip"
+              v-for="p in quickPresets"
+              :key="p.name"
+              @click="quickCreate(p)"
+            >
+              <text class="quick-chip__emoji">{{ p.emoji }}</text>
+              <text class="quick-chip__name">{{ p.name }}</text>
+            </view>
+          </view>
+        </view>
+
+        <button class="empty-cta" @click="onAddEventClick">＋ 自定义创建</button>
+      </template>
+
+      <!-- 某目标筛选下为空 -->
+      <template v-else>
+        <text class="empty-icon">📅</text>
+        <text class="empty-text">该目标下还没有事件</text>
+        <text class="empty-subtext">点击下方按钮，给它添加第一个事件</text>
+        <button class="empty-cta" @click="onAddEventClick">＋ 添加事件</button>
+      </template>
     </view>
 
     <!-- 底部栏 -->
@@ -135,8 +156,30 @@
           ✏️ 编辑事件
         </button>
         <button class="detail-action-btn detail-action-btn--primary" @click="onShareFromDetail(selectedEvent)">
-          📷 拍照分享
+          📷 照片分享
         </button>
+      </view>
+      <view class="detail-stop" @click="stopFollow(selectedEvent)">
+        <text class="detail-stop__text">🔕 停止关注</text>
+      </view>
+    </BottomSheet>
+
+    <!-- 已停止关注列表弹窗 -->
+    <BottomSheet
+      :visible="showClosedPopup"
+      title="已停止关注的事件"
+      :show-footer="false"
+      @close="showClosedPopup = false"
+    >
+      <view class="closed-list">
+        <view v-if="closedEvents.length === 0" class="closed-empty">暂无已停止关注的事件</view>
+        <view v-for="item in closedEvents" :key="item.id" class="closed-item">
+          <view class="closed-item__info">
+            <text class="closed-item__title">{{ item.itemTitle || '未命名事件' }}</text>
+            <text class="closed-item__time">{{ formatEventTime(item.startTime || item.repeatStartDay) }} · {{ item.daysDesc }}</text>
+          </view>
+          <button class="closed-item__btn" @click="restoreFollow(item)">恢复关注</button>
+        </view>
       </view>
     </BottomSheet>
 
@@ -227,44 +270,51 @@ import { performRedirect } from "../../../../utils/router";
 const currentMember = ref(null);
 const currentDate = ref(new Date())
 const eventList = ref([])
+const closedEvents = ref([])
 const goalList = ref([])
 const goalMap = ref({})
 const buttons = ref([  {code: 'addEvent', text: '添加事件'}
 ]);
 
-// 视图状态层级
-const currentView = ref('top');
-const activeGoalObj = ref(null);
+// 当前选中的目标筛选：'all' = 全部；0 = 未分类；其它为目标 id
+const activeFilter = ref('all');
 
-const activeGoals = computed(() => {
-  return goalList.value.filter(g => getGoalEventCount(g.id) > 0);
+// id 兼容字符串/数字比较
+const sameId = (a, b) => String(a) === String(b);
+
+const getGoalEventCount = (goalId) => {
+  return eventList.value.filter(e => sameId(e.parentId, goalId)).length;
+};
+
+// 未关联任何目标的事件数量
+const ungroupedCount = computed(() => {
+  return eventList.value.filter(e => !e.parentId || Number(e.parentId) === 0).length;
 });
 
-const emptyGoals = computed(() => {
-  return goalList.value.filter(g => getGoalEventCount(g.id) === 0);
+// 目标筛选项：全部 + 各目标（含 0 事件，便于聚焦后添加）+ 未分类
+const goalFilters = computed(() => {
+  const filters = [{ id: 'all', label: '全部', count: eventList.value.length }];
+  goalList.value.forEach(g => {
+    filters.push({ id: g.id, label: g.itemTitle || '未命名目标', count: getGoalEventCount(g.id) });
+  });
+  if (ungroupedCount.value > 0 && goalList.value.length > 0) {
+    filters.push({ id: 0, label: '未分类', count: ungroupedCount.value });
+  }
+  return filters;
 });
 
 const displayEvents = computed(() => {
-  if (currentView.value === 'top') {
-    return eventList.value.filter(e => !e.parentId || Number(e.parentId) === 0);
-  } else {
-    return eventList.value.filter(e => e.parentId === activeGoalObj.value?.id);
-  }
+  const f = activeFilter.value;
+  if (f === 'all') return eventList.value;
+  if (f === 0) return eventList.value.filter(e => !e.parentId || Number(e.parentId) === 0);
+  return eventList.value.filter(e => sameId(e.parentId, f));
 });
-
-const getGoalEventCount = (goalId) => {
-  return eventList.value.filter(e => e.parentId === goalId).length;
-};
-
-function enterGoal(goal) {
-  activeGoalObj.value = goal;
-  currentView.value = 'detail';
-}
 
 // 弹窗相关
 const isShowAddEventPopup = ref(false);
 const showDetailPopup = ref(false);
 const showSharePopup = ref(false);
+const showClosedPopup = ref(false);
 const selectedEvent = ref(null);
 const sharingEvent = ref(null);
 const editingEvent = ref(null);
@@ -295,15 +345,44 @@ onMounted(() => {
 });
 
 // 打开添加事件弹窗
+// 当前正按某个目标筛选时，新事件默认归到该目标下
+function resolvePresetParent() {
+  const f = activeFilter.value;
+  return f !== 'all' && f !== 0 ? f : 0;
+}
+
+// 常见大事件，供新用户一键预填快捷创建
+const quickPresets = [
+  { emoji: '🎂', name: '生日' },
+  { emoji: '💑', name: '恋爱纪念日' },
+  { emoji: '💍', name: '结婚纪念日' },
+  { emoji: '👶', name: '宝宝出生' },
+  { emoji: '💼', name: '入职' },
+  { emoji: '🏡', name: '搬新家' },
+];
+
 function onAddEventClick() {
   editingEvent.value = null;
   eventForm.value = {
     name: '',
-    datetime: '',
-    parentId: currentView.value === 'detail' && activeGoalObj.value ? activeGoalObj.value.id : 0
+    // 默认今天，避免新用户被空时间卡住（弹窗里可改）
+    datetime: DateUtils.getDateStr(new Date()),
+    parentId: resolvePresetParent()
   };
   isShowAddEventPopup.value = true;
 }
+
+// 快捷创建：预填事件名 + 今天，直接进弹窗微调即可保存
+function quickCreate(preset) {
+  editingEvent.value = null;
+  eventForm.value = {
+    name: preset.name,
+    datetime: DateUtils.getDateStr(new Date()),
+    parentId: resolvePresetParent()
+  };
+  isShowAddEventPopup.value = true;
+}
+
 
 // 打开编辑事件弹窗
 function editEvent(event) {
@@ -348,6 +427,52 @@ function onShareFromDetail(event) {
   if (!event) return
   closeDetailPopup()
   openWatermarkCamera(event)
+}
+
+// 停止关注：关闭事件，关闭后所有页面都不再显示（可在「已停止关注」中恢复）
+async function stopFollow(event) {
+  if (!event || !currentMember.value) return;
+  const confirmed = await new Promise(resolve => uni.showModal({
+    title: '停止关注',
+    content: `停止关注「${event.itemTitle || '该事件'}」后将不再显示，可在「已停止关注」中恢复。`,
+    confirmText: '停止关注',
+    success: (r) => resolve(r.confirm),
+    fail: () => resolve(false)
+  }));
+  if (!confirmed) return;
+  try {
+    await apiTs.schedule.close({
+      id: event.id,
+      closeStatus: 'CLOSE',
+      groupId: currentMember.value.groupId,
+      targetUserId: currentMember.value.userId
+    });
+    uni.showToast({ title: '已停止关注', icon: 'success' });
+    closeDetailPopup();
+    await fetchAllData();
+  } catch (e) {
+    console.error('停止关注失败', e);
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+  }
+}
+
+// 恢复关注：重新展示该事件
+async function restoreFollow(event) {
+  if (!event || !currentMember.value) return;
+  try {
+    await apiTs.schedule.close({
+      id: event.id,
+      closeStatus: 'OPEN',
+      groupId: currentMember.value.groupId,
+      targetUserId: currentMember.value.userId
+    });
+    uni.showToast({ title: '已恢复关注', icon: 'success' });
+    await fetchAllData();
+    if (closedEvents.value.length === 0) showClosedPopup.value = false;
+  } catch (e) {
+    console.error('恢复关注失败', e);
+    uni.showToast({ title: '操作失败，请重试', icon: 'none' });
+  }
 }
 
 // 关闭分享弹窗
@@ -528,13 +653,24 @@ async function fetchAllData() {
       groupId: currentMember.value.groupId,
     };
     
-    const [goalRes, eventRes] = await Promise.all([
+    const [goalRes, eventRes, closedRes] = await Promise.all([
       apiTs.checkin.task.list({ ...reqBase, scheduleItemType: 'goal' }),
-      apiTs.checkin.task.list({ ...reqBase, scheduleItemType: 'event' })
+      apiTs.checkin.task.list({ ...reqBase, scheduleItemType: 'event' }),
+      apiTs.schedule.closedList({ groupId: currentMember.value.groupId, targetUserId: currentMember.value.userId, scheduleItemType: 'event' })
     ]);
 
     const rawGoals = goalRes.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
     const rawEvents = eventRes.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
+
+    // 已停止关注的事件（扁平列表），按开始时间倒序，供恢复入口使用
+    closedEvents.value = (closedRes || []).map(item => ({
+      ...item,
+      daysDesc: calcDaysDesc(item.startTime || item.repeatStartDay)
+    })).sort((a, b) => {
+      const timeA = new Date(a.startTime || a.repeatStartDay).getTime();
+      const timeB = new Date(b.startTime || b.repeatStartDay).getTime();
+      return timeB - timeA;
+    });
     
     // 处理目标数据
     goalList.value = rawGoals;
@@ -636,145 +772,69 @@ const onDatetimeConfirm = (value) => {
   margin-bottom: 28rpx;
 }
 
-.nav-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-}
-
-.back-btn {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  font-size: 28rpx;
-  color: #4b5563;
-  padding: 10rpx;
-}
-
-.back-icon {
-  font-size: 32rpx;
-  margin-right: 4rpx;
-}
-
-.nav-title {
-  font-size: 36rpx !important;
-  margin-top: 10rpx;
-}
-
-.section-heading {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #1d2129;
-  margin: 20rpx 0 16rpx 10rpx;
-  display: block;
-}
-
-.goal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20rpx;
-  margin-bottom: 24rpx;
-}
-
-.goal-card {
-  position: relative;
-  background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
-  border-radius: 16rpx;
-  padding: 32rpx 28rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.05);
-  border: 1rpx solid rgba(0, 122, 255, 0.1);
-  transition: all 0.2s;
-  overflow: hidden;
-}
-
-.goal-card::after {
-  content: '';
-  position: absolute;
-  right: -30rpx;
-  bottom: -30rpx;
-  width: 120rpx;
-  height: 120rpx;
-  background: radial-gradient(circle, rgba(0, 122, 255, 0.08) 0%, rgba(0, 122, 255, 0) 70%);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.empty-goal-card {
-  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
-  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.03);
-  border: 1rpx solid #e5e7eb;
-}
-
-.empty-goal-card::after {
-  background: radial-gradient(circle, rgba(156, 163, 175, 0.08) 0%, rgba(156, 163, 175, 0) 70%);
-}
-
-.goal-card:active {
-  transform: scale(0.98);
-}
-
-.goal-card-content {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  min-width: 0;
-}
-
-.goal-text {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
+/* 目标筛选栏 */
+.filter-bar {
   width: 100%;
-}
-
-.goal-name {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #111827;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 0 1 auto;
+  margin-bottom: 20rpx;
 }
 
-.goal-count {
+.filter-row {
+  display: inline-flex;
+  gap: 16rpx;
+  padding: 4rpx 4rpx 8rpx;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
   flex-shrink: 0;
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #fff;
+  padding: 14rpx 24rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.filter-chip:active {
+  transform: scale(0.96);
+}
+
+.filter-chip--active {
   background: #007AFF;
-  min-width: 36rpx;
-  height: 36rpx;
-  line-height: 36rpx;
+  border-color: #007AFF;
+  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.28);
+}
+
+.filter-chip__label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.filter-chip--active .filter-chip__label {
+  color: #ffffff;
+}
+
+.filter-chip__count {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f1f5f9;
+  min-width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
   text-align: center;
-  padding: 0 10rpx;
-  border-radius: 18rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 122, 255, 0.3);
+  padding: 0 8rpx;
+  border-radius: 16rpx;
   box-sizing: border-box;
 }
 
-.empty-goal-card .goal-count {
-  color: #fff;
-  background: #d1d5db;
-  box-shadow: none;
-}
-
-.goal-arrow {
-  color: #cbd5e1;
-  font-size: 28rpx;
-  font-weight: bold;
-  position: relative;
-  z-index: 1;
+.filter-chip--active .filter-chip__count {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .page-title {
@@ -1035,7 +1095,7 @@ const onDatetimeConfirm = (value) => {
 /* 空状态 */
 .empty-state {
   text-align: center;
-  padding: 100rpx 0;
+  padding: 72rpx 40rpx;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 20rpx;
   margin-top: 50rpx;
@@ -1043,7 +1103,7 @@ const onDatetimeConfirm = (value) => {
 }
 
 .empty-icon {
-  font-size: 100rpx;
+  font-size: 96rpx;
   margin-bottom: 20rpx;
   display: block;
 }
@@ -1052,7 +1112,7 @@ const onDatetimeConfirm = (value) => {
   font-size: 32rpx;
   font-weight: 600;
   color: #1d2129;
-  margin-bottom: 10rpx;
+  margin-bottom: 12rpx;
   display: block;
 }
 
@@ -1060,6 +1120,76 @@ const onDatetimeConfirm = (value) => {
   font-size: 24rpx;
   color: #86909c;
   display: block;
+  line-height: 1.6;
+  max-width: 520rpx;
+  margin: 0 auto;
+}
+
+/* 新用户快捷创建 */
+.quick-create {
+  margin-top: 40rpx;
+}
+
+.quick-create__hint {
+  display: block;
+  font-size: 24rpx;
+  color: #6b7280;
+  margin-bottom: 20rpx;
+}
+
+.quick-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16rpx;
+}
+
+.quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 16rpx 26rpx;
+  background: #f0f7ff;
+  border: 1px solid rgba(0, 122, 255, 0.15);
+  border-radius: 999rpx;
+  transition: all 0.2s ease;
+}
+
+.quick-chip:active {
+  transform: scale(0.96);
+  background: #e0eeff;
+}
+
+.quick-chip__emoji {
+  font-size: 30rpx;
+}
+
+.quick-chip__name {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #1d4ed8;
+}
+
+/* 空状态主行动按钮 */
+.empty-cta {
+  margin: 40rpx auto 0;
+  height: 88rpx;
+  padding: 0 56rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #007AFF 0%, #0056b3 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  border: none;
+  border-radius: 999rpx;
+  box-shadow: 0 10rpx 24rpx rgba(0, 122, 255, 0.3);
+  line-height: 1;
+}
+
+.empty-cta::after {
+  border: none;
 }
 
 /* 底部添加按钮 */
@@ -1185,6 +1315,103 @@ const onDatetimeConfirm = (value) => {
 .detail-action-btn--primary {
   background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
   color: #fff;
+}
+
+/* 详情弹窗内「停止关注」 */
+.detail-stop {
+  margin-top: 18rpx;
+  text-align: center;
+  padding: 16rpx 0 4rpx;
+}
+.detail-stop__text {
+  font-size: 26rpx;
+  color: #94a3b8;
+}
+.detail-stop:active .detail-stop__text {
+  color: #64748b;
+}
+
+/* 已停止关注入口 */
+.closed-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 24rpx;
+  margin-bottom: 16rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+  border: 1px solid #eef0f4;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
+}
+.closed-entry:active {
+  transform: scale(0.99);
+}
+.closed-entry__text {
+  font-size: 26rpx;
+  color: #64748b;
+  font-weight: 500;
+}
+.closed-entry__arrow {
+  font-size: 36rpx;
+  color: #c0c4cc;
+  line-height: 1;
+}
+
+/* 已停止关注列表 */
+.closed-list {
+  padding: 4rpx 0 8rpx;
+}
+.closed-empty {
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
+  padding: 48rpx 0;
+}
+.closed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+.closed-item:last-child {
+  border-bottom: none;
+}
+.closed-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.closed-item__title {
+  font-size: 28rpx;
+  color: #0f172a;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.closed-item__time {
+  font-size: 22rpx;
+  color: #94a3b8;
+  margin-top: 6rpx;
+}
+.closed-item__btn {
+  flex-shrink: 0;
+  height: 60rpx;
+  line-height: 60rpx;
+  padding: 0 28rpx;
+  margin: 0;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #007AFF;
+  background: #eef5ff;
+  border: none;
+  border-radius: 999rpx;
+}
+.closed-item__btn::after {
+  border: none;
 }
 
 /* 分享弹窗 */
