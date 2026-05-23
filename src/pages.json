@@ -155,6 +155,18 @@
       ]
     },
     {
+      "root": "subPackages/monthly-plan",
+      "pages": [
+        {
+          "path": "pages/list/index",
+          "style": {
+            "navigationBarTitleText": "月度计划",
+            "enablePullDownRefresh": false
+          }
+        }
+      ]
+    },
+    {
       "root": "subPackages/invitation",
       "pages": [
         {
