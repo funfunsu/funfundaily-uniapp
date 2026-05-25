@@ -305,7 +305,8 @@ function renderPoster() {
       if (!node) { renderStage.value = '生成失败(canvas)'; return }
       const canvas = node
       const ctx = canvas.getContext('2d')
-      const dpr = (wx.getSystemInfoSync && wx.getSystemInfoSync().pixelRatio) || 2
+      // pixelRatio 改用 getWindowInfo（getSystemInfoSync 已废弃），旧基础库回退
+      const dpr = ((wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : {})).pixelRatio) || 2
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
       ctx.scale(dpr, dpr)
