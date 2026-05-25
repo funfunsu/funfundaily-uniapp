@@ -194,6 +194,9 @@ const apiTs = {
         create: (data: any): Promise<Share> => api.post<Share>('/api/share/create', data),
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
         accept: (token: string): Promise<any> => api.post(`/api/share/accept/${token}`),
+        // 生成分享二维码（微信小程序码），返回 { qrBase64, contentType }
+        qrcode: (data: { token: string; page?: string }): Promise<{ qrBase64: string; contentType: string }> =>
+            api.post<{ qrBase64: string; contentType: string }>('/api/share/qrcode', data),
     },
     invitation: {
         list: (groupId: number | string): Promise<any[]> => api.get<any[]>('/api/invitation/list', { groupId }),

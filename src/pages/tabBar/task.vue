@@ -67,6 +67,16 @@
       @close="handleWatermarkClose"
     />
 
+    <!-- 任务分享海报 -->
+    <TaskSharePoster
+      :visible="posterVisible"
+      :tasks="posterTasks"
+      :qr-source="posterQr"
+      :creator-name="posterCreator"
+      @close="handlePosterClose"
+      @shared="handlePosterClose"
+    />
+
     <!-- 底部栏 -->
     <schedule-bottom-bar
         :buttons="buttons"
@@ -90,6 +100,8 @@ import DrawerBtnItem from "../../components/fun-components/drawer-btn/drawer-btn
 import TaskGoalGroupList from "../../components/task/task-goal-group-list.vue";
 import TaskUtil from "../../utils/taskUtil";
 import WatermarkCamera from "../../components/fun-components/WatermarkCamera.vue";
+import TaskSharePoster from "../../components/task/task-share-poster.vue";
+import { base64ToImageSource } from "../../utils/imageHelper";
 
 const drawerRef = ref(null);
 
@@ -120,6 +132,12 @@ const showWatermarkCamera = ref(false);
 const lastWatermarkPhoto = ref('');
 const watermarkShareImageUrl = ref('');
 const watermarkShareTitle = ref('水印照片');
+
+// 任务分享海报状态
+const posterVisible = ref(false);
+const posterTasks = ref([]);
+const posterQr = ref('');
+const posterCreator = ref('我');
 
 // =============== 计算属性 ===============
 const totalCount = computed(() => taskList.value.length)
@@ -189,7 +207,10 @@ function handleButtonClick(buttonCode) {
       break;
     case 'toShare':
       mode.value = 'share';
-      buttons.value = [{code: 'cancelShare', text: '取消'},{code: 'selectAll', text: '全选'},{code: 'toggleSelectAll', text: '反选'},{code: 'doShare', type: 'share', text: '去分享'}];
+      buttons.value = [{code: 'cancelShare', text: '取消'},{code: 'selectAll', text: '全选'},{code: 'toggleSelectAll', text: '反选'},{code: 'doShare', text: '去分享'}];
+      break;
+    case 'doShare':
+      doShare();
       break;
     case 'selectAll':
       selectedTaskIds.value.clear();
@@ -299,7 +320,8 @@ onShow(() => {
   if (refreshUri === currentTab) { fetchAllData(); removeStoredData(STORAGE_KEYS.REFRESH_TAB) }
 });
 
-onShareAppMessage((res) => {
+// 微信原生转发：仅用于水印照片场景；任务分享已改为「生成长图 + 二维码」（见 doShare）。
+onShareAppMessage(() => {
   if (watermarkShareImageUrl.value) {
     const data = {
       title: watermarkShareTitle.value,
@@ -312,24 +334,46 @@ onShareAppMessage((res) => {
     }, 0)
     return data
   }
-  const selectedTasks = taskList.value.filter(task => selectedTaskIds.value.has(task.id));
-  if (selectedTasks.length === 0) {
-    uni.showToast({ title: '请先选择要分享的任务', icon: 'none' });
-    return;
-  }
-  const uniqueSelectedJsonString = JSON.stringify(selectedTasks);
-  const shareTitle = `分享 ${selectedTasks.length} 个任务`;
-  return new Promise(async (resolve) => {
-    const resData = await apiTs.share.create({ content: uniqueSelectedJsonString, sceneCode: 'task_share' });
-    if (resData?.token) {
-      resolve({ title: shareTitle, path: `/pages/task/share?token=${resData.token}`, imageUrl: '' });
-    } else { await uni.showToast({title: '生成分享链接失败', icon: 'none'}); }
-  });
+  return { title: 'fun成长 · 一起打卡', path: '/pages/tabBar/task' }
 });
 
 function handleShareRequested(payload) {
   watermarkShareImageUrl.value = payload?.imageUrl || ''
   watermarkShareTitle.value = payload?.title || '水印照片'
+}
+
+// 「去分享」：拿 token → 取二维码 → 弹出海报组件画长图分享
+async function doShare() {
+  const selectedTasks = taskList.value.filter(task => selectedTaskIds.value.has(task.id));
+  if (selectedTasks.length === 0) {
+    uni.showToast({ title: '请先选择要分享的任务', icon: 'none' });
+    return;
+  }
+  uni.showLoading({ title: '生成分享图...', mask: true });
+  try {
+    const resData = await apiTs.share.create({
+      content: JSON.stringify(selectedTasks),
+      sceneCode: 'task_share'
+    });
+    if (!resData?.token) throw new Error('生成分享链接失败');
+
+    const qr = await apiTs.share.qrcode({ token: resData.token, page: 'pages/task/share' });
+    const qrSrc = await base64ToImageSource(qr.qrBase64, qr.contentType);
+
+    posterTasks.value = selectedTasks;
+    posterQr.value = qrSrc;
+    posterCreator.value = currentMember.value?.userInfo?.nickname || '我';
+    posterVisible.value = true;
+  } catch (e) {
+    console.error('生成分享图失败:', e);
+    uni.showToast({ title: e?.message || '生成失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
+}
+
+function handlePosterClose() {
+  posterVisible.value = false;
 }
 </script>
 
