@@ -51,7 +51,9 @@ const apiTs = {
         // 停止关注 / 恢复关注：closeStatus = 'CLOSE' | 'OPEN'
         close: (data: any): Promise<boolean> => api.post<boolean>('/api/schedule/close', data),
         // 已停止关注列表（用于恢复入口）
-        closedList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/closed/list', data)
+        closedList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/closed/list', data),
+        // 月度计划：群组维度的原始列表（不按天展开），前端按月份归属
+        planList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/plan/list', data)
     },
     // 积分相关接口
     point: {
