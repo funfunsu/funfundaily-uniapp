@@ -1,5 +1,5 @@
 <template>
-  <view class="schedule-edit-container">
+  <view class="schedule-edit-container" :class="{ 'is-embedded': embedded }">
     <view class="edit-content">
       <!-- 基本信息 -->
       <view class="form-section">
@@ -11,7 +11,7 @@
         <view class="form-item">
           <text class="label">描述</text>
           <view class="expand-container">
-            <textarea class="textarea" v-model="localSchedule.itemDesc" placeholder="请输入日程描述"/>
+            <textarea class="textarea" v-model="localSchedule.itemDesc" placeholder="请输入日程描述" :maxlength="500"/>
           </view>
         </view>
       </view>
@@ -184,6 +184,11 @@ const props = defineProps({
   goalList: {
     type: Array,
     default: () => []
+  },
+  // 嵌入底部弹层时为 true：去掉整页高度/自身滚动/卡片阴影，交给弹层 body 滚动
+  embedded: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -489,6 +494,26 @@ defineExpose({
   overflow-y: auto;
   padding: 30rpx;
   box-sizing: border-box;
+}
+
+/* 嵌入底部弹层：高度自适应、不自带滚动、去背景；卡片改浅灰托底避免白上白 */
+.is-embedded {
+  height: auto;
+  background-color: transparent;
+}
+.is-embedded .edit-content {
+  flex: none;
+  overflow: visible;
+  padding: 0;
+}
+.is-embedded .form-section {
+  background-color: #f7f8fa;
+  box-shadow: none;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+.is-embedded .form-section:last-child {
+  margin-bottom: 0;
 }
 
 .form-section {

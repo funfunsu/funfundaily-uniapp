@@ -55,6 +55,8 @@
           @toggle-select="toggleSelect"
           @goal-title-click="switchToCalendarClick"
           @create-task="onAddTaskClick"
+          @add-task="onAddTaskClick"
+          @edit-task="openEditSheet"
       />
     </view>
 
@@ -75,6 +77,19 @@
       :creator-name="posterCreator"
       @close="handlePosterClose"
       @shared="handlePosterClose"
+    />
+
+    <!-- 任务编辑底部弹层 -->
+    <TaskEditSheet
+      :visible="editSheetVisible"
+      :edit-id="editSheetId"
+      :goal-list="editGoalList"
+      :cur-date="currentDate"
+      :group-id="currentGroup?.id"
+      :target-user-id="currentMember?.userId"
+      @close="handleEditSheetClose"
+      @saved="handleEditSheetDone"
+      @deleted="handleEditSheetDone"
     />
 
     <!-- 底部栏 -->
@@ -102,6 +117,7 @@ import TaskUtil from "../../utils/taskUtil";
 import WatermarkCamera from "../../components/fun-components/WatermarkCamera.vue";
 import TaskSharePoster from "../../components/task/task-share-poster.vue";
 import { base64ToImageSource } from "../../utils/imageHelper";
+import TaskEditSheet from "../../components/task/task-edit-sheet.vue";
 
 const drawerRef = ref(null);
 
@@ -139,6 +155,11 @@ const posterTasks = ref([]);
 const posterQr = ref('');
 const posterCreator = ref('我');
 
+// 任务编辑底部弹层状态
+const editSheetVisible = ref(false);
+const editSheetId = ref(null);
+const editGoalList = ref([]);
+
 // =============== 计算属性 ===============
 const totalCount = computed(() => taskList.value.length)
 const completedCount = computed(() => taskList.value.filter(t => t.isCompleted).length)
@@ -151,8 +172,35 @@ const todayPoints = computed(() =>
 // =============== 生命周期 ===============
 onLoad(async (query) => {});
 
+// 读取当前成员的目标列表（task-goal-group-list 已写入该缓存）
+function loadEditGoalList() {
+  if (!currentMember.value?.userId) { editGoalList.value = []; return; }
+  const key = getStoredKey(STORAGE_KEYS.USER_ALL_GOAL, currentMember.value.userId);
+  editGoalList.value = getStoredData(key) || [];
+}
+
+// 新增任务：打开底部弹层
 function onAddTaskClick() {
-  uni.navigateTo({ url: '/pages/task/edit' });
+  loadEditGoalList();
+  editSheetId.value = null;
+  editSheetVisible.value = true;
+}
+
+// 编辑任务：打开底部弹层
+function openEditSheet(task) {
+  if (!task?.id) return;
+  loadEditGoalList();
+  editSheetId.value = task.id;
+  editSheetVisible.value = true;
+}
+
+function handleEditSheetClose() {
+  editSheetVisible.value = false;
+}
+
+async function handleEditSheetDone() {
+  editSheetVisible.value = false;
+  await fetchAllData();
 }
 function switchToCalendarClick(goalId) {
   if (goalId){
