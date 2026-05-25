@@ -214,6 +214,7 @@ function handleButtonClick(buttonCode) {
       break;
     case 'selectAll':
       selectedTaskIds.value.clear();
+      // 不论是否完成，全部可选中分享
       taskList.value.forEach(task => selectedTaskIds.value.add(task.id));
       break;
     case 'toggleSelectAll':
@@ -227,7 +228,10 @@ function handleButtonClick(buttonCode) {
 
 const toggleSelect = (task) => {
   if (mode.value !== 'share') return;
-  selectedTaskIds.value.has(task.id) ? selectedTaskIds.value.delete(task.id) : !task.isCompleted && selectedTaskIds.value.add(task.id);
+  // 不论任务今日是否完成，都允许选中/取消选中分享
+  selectedTaskIds.value.has(task.id)
+    ? selectedTaskIds.value.delete(task.id)
+    : selectedTaskIds.value.add(task.id);
 };
 
 async function handleMemberChange(e) {
