@@ -409,6 +409,7 @@ function handleClose() {
 .poster-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 28rpx 32rpx 12rpx;
+  box-sizing: border-box; width: 100%;
 }
 .poster-title { font-size: 32rpx; font-weight: 700; color: #1f2937; }
 .poster-close {
@@ -418,6 +419,7 @@ function handleClose() {
 .poster-close__icon { font-size: 40rpx; color: #64748b; line-height: 1; }
 .poster-stage {
   flex: 1; min-height: 0; padding: 12rpx 32rpx;
+  box-sizing: border-box; width: 100%;
 }
 .poster-frame {
   width: 100%; border-radius: 20rpx; overflow: hidden;
@@ -433,8 +435,8 @@ function handleClose() {
 }
 @keyframes posterSpin { to { transform: rotate(360deg); } }
 .poster-loading__text { font-size: 26rpx; color: #94a3b8; }
-.poster-hint { display: block; text-align: center; font-size: 24rpx; color: #94a3b8; padding: 8rpx 32rpx 0; }
-.poster-actions { display: flex; gap: 20rpx; padding: 24rpx 32rpx 28rpx; }
+.poster-hint { display: block; text-align: center; font-size: 24rpx; color: #94a3b8; padding: 8rpx 32rpx 0; box-sizing: border-box; width: 100%; }
+.poster-actions { display: flex; gap: 20rpx; padding: 24rpx 32rpx 28rpx; box-sizing: border-box; width: 100%; }
 .poster-btn {
   flex: 1; height: 88rpx; border-radius: 44rpx; border: none; margin: 0;
   display: flex; align-items: center; justify-content: center;
