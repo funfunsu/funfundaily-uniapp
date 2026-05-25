@@ -211,10 +211,30 @@ const fetchSharedContent = async (token) => {
   }
 }
 
+// 解析分享 token，覆盖三种进入方式：
+// 1) 旧链接转发：query.token
+// 2) 扫小程序码：query.scene（getUnlimitedQRCode 的 scene，URL 编码）
+// 3) 冷启动扫码：scene 只在小程序启动参数里（页面 onLoad query 为空时兜底）
+function resolveShareToken(query) {
+  let raw = (query && (query.token || query.scene)) || ''
+  // #ifdef MP-WEIXIN
+  if (!raw && typeof wx !== 'undefined') {
+    try {
+      const enter = (wx.getEnterOptionsSync && wx.getEnterOptionsSync())
+          || (wx.getLaunchOptionsSync && wx.getLaunchOptionsSync()) || {}
+      const q = enter.query || {}
+      raw = q.token || q.scene || ''
+      console.log('[share] enterOptions:', JSON.stringify(enter))
+    } catch (e) { console.warn('[share] getEnterOptionsSync 失败:', e) }
+  }
+  // #endif
+  if (raw) { try { raw = decodeURIComponent(raw) } catch (e) { /* token 为纯 hex，理论不会抛 */ } }
+  return raw
+}
+
 onLoad(async (query) => {
-  // 二维码识别进入时 token 在 query.scene；旧链接转发在 query.token
-  const token = (query && query.token)
-      || (query && query.scene ? decodeURIComponent(query.scene) : '')
+  console.log('[share] onLoad query:', JSON.stringify(query))
+  const token = resolveShareToken(query)
   if (!token) {
     loadError.value = true
     uni.showToast({ title: "缺少分享令牌", icon: "none" })
