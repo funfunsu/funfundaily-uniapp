@@ -34,21 +34,31 @@
         </view>
         <text class="t-seg-hint">{{ typeHint }}</text>
 
-      <!-- 习惯：重复 + 范围 + 次数 + 截止 -->
+      <!-- 习惯：重复+次数一行 / 重复范围一行 / 日期细节 / 截止 -->
       <view v-if="scheduleExtra.taskType === 'Habit'" class="t-section">
-        <picker mode="selector" :range="repeatTypeOptions"
-                :value="getRepeatTypeIndex(localSchedule?.repeatType)"
-                @change="handleRepeatTypeChange">
-          <view class="t-row">
-            <text class="t-row__label">重复</text>
-            <view class="t-row__value"><text>{{ getRepeatTypeText(localSchedule?.repeatType) }}</text><text class="t-row__chev">›</text></view>
+        <!-- 重复(日月年) 与 次数 同一行 -->
+        <view class="t-row t-row--split">
+          <picker class="t-split__l" mode="selector" :range="repeatTypeOptions"
+                  :value="getRepeatTypeIndex(localSchedule?.repeatType)" @change="handleRepeatTypeChange">
+            <view class="t-kv">
+              <text class="t-row__label">重复</text>
+              <view class="t-row__value"><text>{{ getRepeatTypeText(localSchedule?.repeatType) }}</text><text class="t-row__chev">›</text></view>
+            </view>
+          </picker>
+          <view class="t-split__r">
+            <text class="t-row__label">次数</text>
+            <view class="t-stepper">
+              <view class="t-stepper__btn" @click="stepCount(-1)">−</view>
+              <text class="t-stepper__val">{{ scheduleExtra.totalCount }}</text>
+              <view class="t-stepper__btn" @click="stepCount(1)">＋</view>
+            </view>
           </view>
-        </picker>
+        </view>
 
-        <!-- 重复范围（非每天才需要）-->
-        <view v-if="localSchedule?.repeatType !== 'daily'" class="t-row t-row--col">
+        <!-- 重复范围（非每天）：标签 + 定宽分段，一行展示 -->
+        <view v-if="localSchedule?.repeatType !== 'daily'" class="t-row">
           <text class="t-row__label">重复范围</text>
-          <view class="t-seg t-seg--sm">
+          <view class="t-seg t-seg--inline">
             <view class="t-seg__item" :class="{ 't-seg__item--active': localRepeatDuration === 'whole' }" @click="onRepeatDurationChanged('whole')">不指定</view>
             <view class="t-seg__item" :class="{ 't-seg__item--active': localRepeatDuration === 'select' }" @click="onRepeatDurationChanged('select')">指定日期</view>
           </view>
@@ -71,15 +81,6 @@
           <picker v-else-if="localSchedule?.repeatType === 'yearly'" mode="date" :value="localSchedule?.repeatKeys?.[0]" fields="month-day" @change="handleYearDateChange">
             <view class="t-row"><text class="t-row__label">每年日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}</text><text class="t-row__chev">›</text></view></view>
           </picker>
-        </view>
-
-        <view class="t-row">
-          <text class="t-row__label">每周期次数</text>
-          <view class="t-stepper">
-            <view class="t-stepper__btn" @click="stepCount(-1)">−</view>
-            <text class="t-stepper__val">{{ scheduleExtra.totalCount }}</text>
-            <view class="t-stepper__btn" @click="stepCount(1)">＋</view>
-          </view>
         </view>
 
         <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
@@ -505,13 +506,16 @@ defineExpose({
   box-sizing: border-box;
 }
 
-/* 标题：主输入 */
+/* 标题：主输入，定高+行高居中，避免大字号被裁切 */
 .t-title {
   width: 100%;
-  font-size: 38rpx;
+  font-size: 34rpx;
   font-weight: 700;
   color: #1f2937;
-  padding: 28rpx 0 20rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  padding: 0;
+  margin-top: 8rpx;
   border-bottom: 2rpx solid #f1f5f9;
   box-sizing: border-box;
 }
@@ -556,7 +560,8 @@ defineExpose({
   padding: 6rpx;
   gap: 6rpx;
 }
-.t-seg--sm { max-width: 380rpx; align-self: flex-start; }
+/* 行内定宽分段（重复范围用）：固定宽度，避免在弹性行里被收缩挤压变形 */
+.t-seg--inline { width: 300rpx; flex: none; padding: 4rpx; }
 .t-seg__item {
   flex: 1;
   text-align: center;
@@ -597,6 +602,11 @@ defineExpose({
   align-items: stretch;
   gap: 16rpx;
 }
+/* 一行两栏：左选择器（可点）+ 右步进器 */
+.t-row--split { gap: 24rpx; }
+.t-split__l { flex: 1; min-width: 0; }
+.t-split__r { display: flex; align-items: center; gap: 16rpx; flex-shrink: 0; }
+.t-kv { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
 .t-row__label { font-size: 28rpx; color: #334155; }
 .t-row__value {
   display: flex;
