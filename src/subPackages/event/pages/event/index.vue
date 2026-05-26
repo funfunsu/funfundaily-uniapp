@@ -1556,8 +1556,8 @@ const onDatetimeConfirm = (value) => {
   margin-top: auto;
 }
 
-/* 响应式设计 */
-@media (max-width: 750rpx) {
+/* 响应式设计（rpx 在 @media 条件中无效，按 750rpx 基准换算为 375px） */
+@media (max-width: 375px) {
   .event-card {
     padding: 20rpx;
   }
