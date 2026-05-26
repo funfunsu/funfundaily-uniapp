@@ -89,20 +89,12 @@
         </picker>
       </view>
 
-      <!-- 待办：截止 + 完成次数 -->
+      <!-- 待办：仅截止日期（待办默认 1 次，不显示次数）-->
       <view v-else-if="scheduleExtra.taskType === 'Todo'" class="t-section">
         <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
                 @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
+          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
         </picker>
-        <view class="t-row t-row--last">
-          <text class="t-row__label">完成次数</text>
-          <view class="t-stepper">
-            <view class="t-stepper__btn" @click="stepCount(-1)">−</view>
-            <text class="t-stepper__val">{{ scheduleExtra.totalCount }}</text>
-            <view class="t-stepper__btn" @click="stepCount(1)">＋</view>
-          </view>
-        </view>
       </view>
 
       <!-- 目标：截止 -->
@@ -125,7 +117,7 @@
 
         <!-- 积分奖励（仅任务类型）-->
         <view v-if="localSchedule?.itemType === 'task'" class="t-row t-row--solo">
-          <text class="t-row__label">积分奖励</text>
+          <text class="t-row__label">完成可得积分</text>
           <view class="t-stepper">
             <view class="t-stepper__btn" @click="stepScore(-1)">−</view>
             <text class="t-stepper__val">{{ scheduleExtra.score }}</text>
@@ -240,6 +232,7 @@ const onTaskTypeChanged = (e) => {
     localSchedule.value.repeatType = 'none';
     localSchedule.value.repeatKeys = [];
     localSchedule.value.itemType = 'task'
+    scheduleExtra.totalCount = 1; // 待办固定 1 次
   } else if(e === 'Habit'){
     localSchedule.value.repeatType = 'daily'; // 或其他默认类型
     localSchedule.value.repeatKeys = ['whole'];
@@ -460,6 +453,7 @@ watch(
 // ✅ 暴露给父组件的核心方法 - 合并所有最新值并返回，父组件直接调用即可拿到全部最新数据
 defineExpose({
   getFinalSchedule: () => {
+    if (scheduleExtra.taskType === 'Todo') scheduleExtra.totalCount = 1; // 待办固定 1 次
     localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
     return localSchedule.value;
   }
