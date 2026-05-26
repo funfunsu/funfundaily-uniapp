@@ -37,13 +37,15 @@
           class="month-row"
           :class="{
             'month-row--empty': cellPlans(y, m).length === 0,
-            'month-row--current': y === thisYear && m === thisMonth
+            'month-row--past': isPastMonth(y, m),
+            'month-row--current': isCurrentMonth(y, m)
           }"
         >
           <!-- 左侧月份轨道 -->
           <view class="month-row__rail">
             <text class="month-row__num">{{ m }}</text>
             <text class="month-row__unit">月</text>
+            <text v-if="isCurrentMonth(y, m)" class="month-row__now">本月</text>
           </view>
 
           <!-- 右侧内容 -->
@@ -270,6 +272,14 @@ function yearCount(y) {
   let c = 0
   for (let m = 1; m <= 12; m++) c += cellPlans(y, m).length
   return c
+}
+
+// 当前月 / 已过去的月（年视图里用于高亮当月、置灰过往）
+function isCurrentMonth(y, m) {
+  return y === thisYear && m === thisMonth
+}
+function isPastMonth(y, m) {
+  return y < thisYear || (y === thisYear && m < thisMonth)
 }
 
 // ---------- 滚动：双向加载年份 ----------
@@ -588,11 +598,36 @@ onShow(() => {
   color: #94a3b8;
   margin-top: 2rpx;
 }
-.month-row--current .month-row__num {
-  color: #007AFF;
+.month-row__now {
+  margin-top: 6rpx;
+  font-size: 18rpx;
+  color: #ffffff;
+  background: #007AFF;
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+  line-height: 1.5;
 }
+
+/* 空月份置灰（放在 --current 之前，确保当月规则覆盖它） */
 .month-row--empty .month-row__num {
   color: #c4cbd6;
+}
+
+/* 已过去的月份整体置灰、弱化 */
+.month-row--past {
+  opacity: 0.5;
+}
+
+/* 当前月份：浅蓝高亮卡 + 蓝色月份数字 */
+.month-row--current {
+  background: #eaf3ff;
+  border-radius: 16rpx;
+  padding: 12rpx 14rpx;
+  margin: 4rpx 0;
+  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.12);
+}
+.month-row--current .month-row__num {
+  color: #007AFF;
 }
 .month-row__content {
   flex: 1;
