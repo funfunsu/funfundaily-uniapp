@@ -1,8 +1,22 @@
 <template>
   <view class="plan-page">
-    <!-- 顶部栏：标题 + 回到今年 -->
+    <!-- 顶部栏：群组选择 + 回到今年 -->
     <view class="top-bar">
-      <text class="top-bar__title">月度计划</text>
+      <picker
+        v-if="groupList.length"
+        class="top-bar__group-picker"
+        mode="selector"
+        :range="groupList"
+        range-key="groupName"
+        :value="currentGroupIndex"
+        @change="onGroupChange"
+      >
+        <view class="top-bar__group">
+          <text class="top-bar__group-name">{{ currentGroup?.groupName || '选择群组' }}</text>
+          <text class="top-bar__group-arrow">▾</text>
+        </view>
+      </picker>
+      <text v-else class="top-bar__title">月度计划</text>
       <text class="top-bar__today" @click="backToThisYear">回到今年</text>
     </view>
 
@@ -178,7 +192,7 @@ import { onShow } from '@dcloudio/uni-app'
 import apiTs from '../../../../utils/apiTs'
 import DateUtils from '../../../../utils/util'
 import { ensureCurrentGroup, ensureCurrentMember } from '../../../../utils/currentGroupResolver'
-import { STORAGE_KEYS, getStoredData } from '../../../../utils/storageManager'
+import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../../../utils/storageManager'
 import BottomSheet from '../../../../components/fun-components/bottom-sheet.vue'
 
 const PLAN_TYPE = 'monthlyPlan'
@@ -200,6 +214,13 @@ const allPlans = ref([]) // 群组下全部 monthlyPlan 原始项
 
 const currentGroup = ref(null)
 const currentMember = ref(null)
+const groupList = ref([]) // 当前用户的群组列表，供顶部切换
+
+const currentGroupIndex = computed(() => {
+  const id = currentGroup.value?.id
+  const idx = groupList.value.findIndex((g) => String(g.id) === String(id))
+  return idx >= 0 ? idx : 0
+})
 
 const monthOptions = Array.from({ length: 12 }, (_, i) => `${i + 1}月`)
 // 一次性计划允许选择的年月范围（往前 5 年 ~ 往后 30 年）
@@ -378,6 +399,35 @@ async function ensureContext() {
   return true
 }
 
+// ---------- 群组切换 ----------
+// 复用全 App 共享的「当前群组」缓存：读 GROUP_LIST（ensureCurrentGroup 已写入），空则拉一次。
+async function loadGroupList() {
+  let list = getStoredData(STORAGE_KEYS.GROUP_LIST)
+  if (!Array.isArray(list) || list.length === 0) {
+    try {
+      list = await apiTs.group.list({})
+    } catch (e) {
+      list = []
+    }
+    if (Array.isArray(list)) setStoredData(STORAGE_KEYS.GROUP_LIST, list)
+  }
+  groupList.value = Array.isArray(list) ? list : []
+}
+
+async function onGroupChange(e) {
+  const idx = Number(e.detail.value)
+  const g = groupList.value[idx]
+  if (!g || String(g.id) === String(currentGroup.value?.id)) return
+  // 写回共享缓存，让其它页面也跟随切换；成员上下文按新群重解析
+  currentGroup.value = g
+  setStoredData(STORAGE_KEYS.CURRENT_GROUP, g)
+  removeStoredData(STORAGE_KEYS.CURRENT_MEMBER)
+  currentMember.value = await ensureCurrentMember(g.id)
+  allPlans.value = []
+  await fetchPlans()
+  scrollToYear(thisYear)
+}
+
 function resolveOwnerUserId() {
   const loginUser = getStoredData(STORAGE_KEYS.USER_INFO)
   if (loginUser?.id !== undefined && loginUser?.id !== null) return loginUser.id
@@ -389,6 +439,7 @@ function resolveOwnerUserId() {
 async function fetchPlans() {
   const ok = await ensureContext()
   if (!ok) return
+  if (groupList.value.length === 0) loadGroupList()
   try {
     const list = await apiTs.schedule.planList({
       groupId: String(currentGroup.value.id),
@@ -520,6 +571,32 @@ onShow(() => {
   font-size: 34rpx;
   font-weight: 700;
   color: #0f172a;
+}
+.top-bar__group-picker {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.top-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  max-width: 440rpx;
+}
+.top-bar__group-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.top-bar__group-arrow {
+  font-size: 24rpx;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+.top-bar__group:active {
+  opacity: 0.6;
 }
 .top-bar__today {
   font-size: 24rpx;
