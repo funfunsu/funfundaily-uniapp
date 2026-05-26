@@ -11,7 +11,8 @@
       </view>
       <view v-if="hasFooter" class="bs-actions">
         <slot name="footer">
-          <button class="bs-btn bs-btn--ghost" @click="handleClose">{{ cancelText }}</button>
+          <button v-if="showDelete" class="bs-btn bs-btn--danger-ghost" @click="handleDelete">{{ deleteText }}</button>
+          <button v-else class="bs-btn bs-btn--ghost" @click="handleClose">{{ cancelText }}</button>
           <button class="bs-btn" :class="confirmClass" :disabled="confirmDisabled" @click="handleConfirm">{{ confirmText }}</button>
         </slot>
       </view>
@@ -39,6 +40,10 @@ interface Props {
   maskClosable?: boolean
   /** body 高度上限（用于内部滚动），默认 60vh */
   bodyMaxHeight?: string
+  /** 是否在 footer 左侧显示删除按钮（替代取消），用于编辑场景 */
+  showDelete?: boolean
+  /** 删除按钮文案 */
+  deleteText?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -50,11 +55,14 @@ const props = withDefaults(defineProps<Props>(), {
   confirmDisabled: false,
   maskClosable: true,
   bodyMaxHeight: '60vh',
+  showDelete: false,
+  deleteText: '删除',
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'confirm'): void
+  (e: 'delete'): void
   (e: 'update:visible', value: boolean): void
 }>()
 
@@ -92,6 +100,10 @@ function handleClose(): void {
 
 function handleConfirm(): void {
   emit('confirm')
+}
+
+function handleDelete(): void {
+  emit('delete')
 }
 
 // 静默使用 slots，避免编译期 unused-warning。
@@ -230,6 +242,11 @@ void slots
 .bs-btn--danger {
   background: linear-gradient(135deg, #dc2626, #ef4444);
   color: #ffffff;
+}
+
+.bs-btn--danger-ghost {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 /* ===== Field primitives (apply to slot content via :deep) =====

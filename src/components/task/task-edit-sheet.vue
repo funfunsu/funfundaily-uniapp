@@ -4,7 +4,12 @@
     :title="isEdit ? '编辑任务' : '新增任务'"
     accent="primary"
     body-max-height="64vh"
+    :show-delete="isEdit"
+    :confirm-text="saving ? '保存中…' : (isEdit ? '保存修改' : '保存')"
+    :confirm-disabled="saving || loading || !innerSchedule"
     @close="onClose"
+    @confirm="onConfirm"
+    @delete="onDelete"
   >
     <view v-if="loading" class="tes-loading"><text>加载中...</text></view>
     <task-edit
@@ -15,16 +20,6 @@
       :cur-date="curDate"
       embedded
     />
-
-    <template #footer>
-      <button v-if="isEdit" class="tes-btn tes-btn--ghost" @click="onDelete">删除</button>
-      <button v-else class="tes-btn tes-btn--ghost" @click="onClose">取消</button>
-      <button
-        class="tes-btn tes-btn--primary"
-        :disabled="saving || loading || !innerSchedule"
-        @click="onConfirm"
-      >{{ saving ? '保存中…' : (isEdit ? '保存修改' : '保存') }}</button>
-    </template>
   </BottomSheet>
 </template>
 
@@ -163,24 +158,4 @@ function onClose() {
   font-size: 26rpx;
   padding: 60rpx 0;
 }
-/* 自带 footer 按钮样式（slot 内容在本组件作用域，拿不到 BottomSheet 的 bs-btn 样式） */
-.tes-btn {
-  flex: 1;
-  height: 80rpx;
-  line-height: 1;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 999rpx;
-  font-size: 28rpx;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.tes-btn::after { border: none; }
-.tes-btn:active { opacity: 0.88; }
-.tes-btn[disabled] { opacity: 0.5; }
-.tes-btn--ghost { background: #f1f5f9; color: #475569; }
-.tes-btn--primary { background: linear-gradient(135deg, #2196f3, #4f8cff); color: #ffffff; }
 </style>

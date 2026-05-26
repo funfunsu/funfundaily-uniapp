@@ -1,161 +1,134 @@
 <template>
   <view class="schedule-edit-container" :class="{ 'is-embedded': embedded }">
     <view class="edit-content">
-      <!-- 基本信息 -->
-      <view class="form-section">
-        <text class="section-title">基本信息</text>
-        <view class="form-item">
-          <text class="label">标题 *</text>
-          <input class="input" v-model="localSchedule.itemTitle" placeholder="请输入日程标题"/>
+      <view class="form">
+        <!-- 标题：主输入，置顶突出 -->
+        <input
+            class="t-title"
+            v-model="localSchedule.itemTitle"
+            placeholder="想做点什么？"
+            placeholder-class="t-title-ph"
+        />
+
+        <!-- 描述：默认折叠，点击后展开（已有内容则直接展开） -->
+        <view v-if="!showDesc" class="t-desc-add" @click="expandDesc">
+          <text class="t-desc-add__icon">＋</text>
+          <text>添加描述</text>
         </view>
-        <view class="form-item">
-          <text class="label">描述</text>
-          <view class="expand-container">
-            <textarea class="textarea" v-model="localSchedule.itemDesc" placeholder="请输入日程描述" :maxlength="500"/>
+        <textarea
+            v-else
+            class="t-desc-textarea"
+            v-model="localSchedule.itemDesc"
+            :maxlength="500"
+            placeholder="补充说明（可选）"
+            placeholder-class="t-desc-ph"
+            auto-height
+        />
+
+        <!-- 类型：分段控件 -->
+        <text class="t-group-label">类型</text>
+        <view class="t-seg">
+          <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Habit' }" @click="onTaskTypeChanged('Habit')">习惯</view>
+          <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Todo' }" @click="onTaskTypeChanged('Todo')">待办</view>
+          <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Goal' }" @click="onTaskTypeChanged('Goal')">目标</view>
+        </view>
+        <text class="t-seg-hint">{{ typeHint }}</text>
+
+      <!-- 习惯：重复 + 范围 + 次数 + 截止 -->
+      <view v-if="scheduleExtra.taskType === 'Habit'" class="t-section">
+        <picker mode="selector" :range="repeatTypeOptions"
+                :value="getRepeatTypeIndex(localSchedule?.repeatType)"
+                @change="handleRepeatTypeChange">
+          <view class="t-row">
+            <text class="t-row__label">重复</text>
+            <view class="t-row__value"><text>{{ getRepeatTypeText(localSchedule?.repeatType) }}</text><text class="t-row__chev">›</text></view>
+          </view>
+        </picker>
+
+        <!-- 重复范围（非每天才需要）-->
+        <view v-if="localSchedule?.repeatType !== 'daily'" class="t-row t-row--col">
+          <text class="t-row__label">重复范围</text>
+          <view class="t-seg t-seg--sm">
+            <view class="t-seg__item" :class="{ 't-seg__item--active': localRepeatDuration === 'whole' }" @click="onRepeatDurationChanged('whole')">不指定</view>
+            <view class="t-seg__item" :class="{ 't-seg__item--active': localRepeatDuration === 'select' }" @click="onRepeatDurationChanged('select')">指定日期</view>
           </view>
         </view>
-      </view>
 
-      <!-- 设置模式选择 -->
-      <view class="form-section">
-        <text class="section-title">模式</text>
-        <fun-radio-group
-            :options="radioOptions"
-            @update:modelValue="onTaskTypeChanged"
-            :modelValue="scheduleExtra.taskType"
-        ></fun-radio-group>
-      </view>
-
-      <!-- 习惯养成模式 -->
-      <view class="form-section" v-if="scheduleExtra?.taskType === 'Habit'">
-        <view class="form-row">
-          <view class="form-item form-item-inline">
-            <picker class="picker" mode="selector" :range="repeatTypeOptions"
-                    :value="getRepeatTypeIndex(localSchedule?.repeatType)"
-                    @change="handleRepeatTypeChange">
-              <view class="picker-display">{{ getRepeatTypeText(localSchedule?.repeatType) }}</view>
-            </picker>
-          </view>
-          <view class="form-item form-item-inline" v-if="localSchedule?.repeatType !== 'daily'">
-            <fun-radio-group
-                :options="repeatDurationOptions"
-                @update:model-value="onRepeatDurationChanged"
-                :model-value="localRepeatDuration"
-            ></fun-radio-group>
-          </view>
-        </view>
-
-        <view v-if="localRepeatDuration !== 'whole'" class="form-row">
-          <view style="width: 100%" v-if="isWeekRepeat(localSchedule?.repeatType)">
-            <text class="label">重复星期</text>
+        <!-- 指定日期细节 -->
+        <view v-if="localRepeatDuration !== 'whole'">
+          <view v-if="isWeekRepeat(localSchedule?.repeatType)" class="t-row t-row--col">
+            <text class="t-row__label">重复星期</text>
             <view class="week-days-container">
               <view v-for="(day, index) in weekDays" :key="index" class="week-day-item"
                     :class="{ selected: localSchedule?.repeatKeys?.includes(weekDayIndex[index]) }"
-                    @click="toggleWeekDay(weekDayIndex[index])">
-                {{ day }}
-              </view>
+                    @click="toggleWeekDay(weekDayIndex[index])">{{ day }}</view>
             </view>
           </view>
-          <view   style="width: 100%" v-else-if="localSchedule?.repeatType === 'monthly'">
-            <text class="label">日期 *</text>
-            <picker class="picker" mode="selector" :range="monthDays"
-                    :value="getMonthDayIndex(localSchedule?.repeatKeys?.[0])"
-                    @change="handleMonthDayChange">
-              <view class="picker-display">{{ localSchedule?.repeatKeys?.[0] }}日</view>
-            </picker>
-          </view>
-          <view  style="width: 100%" v-else-if="localSchedule?.repeatType === 'yearly'">
-            <text class="label">日期 *</text>
-            <picker class="picker" mode="date" :value="localSchedule?.repeatKeys?.[0]" fields="month-day"
-                    @change="handleYearDateChange">
-              <view class="picker-display">{{ localSchedule?.repeatKeys?.[0] }}</view>
-            </picker>
+          <picker v-else-if="localSchedule?.repeatType === 'monthly'" mode="selector" :range="monthDays"
+                  :value="getMonthDayIndex(localSchedule?.repeatKeys?.[0])" @change="handleMonthDayChange">
+            <view class="t-row"><text class="t-row__label">每月日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}日</text><text class="t-row__chev">›</text></view></view>
+          </picker>
+          <picker v-else-if="localSchedule?.repeatType === 'yearly'" mode="date" :value="localSchedule?.repeatKeys?.[0]" fields="month-day" @change="handleYearDateChange">
+            <view class="t-row"><text class="t-row__label">每年日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}</text><text class="t-row__chev">›</text></view></view>
+          </picker>
+        </view>
+
+        <view class="t-row">
+          <text class="t-row__label">每周期次数</text>
+          <view class="t-stepper">
+            <view class="t-stepper__btn" @click="stepCount(-1)">−</view>
+            <text class="t-stepper__val">{{ scheduleExtra.totalCount }}</text>
+            <view class="t-stepper__btn" @click="stepCount(1)">＋</view>
           </view>
         </view>
 
-        <view class="form-row">
-          <view class="form-item form-item-inline">
-            <text class="label">打卡次数</text>
-            <input class="input" type="number" v-model.number="scheduleExtra.totalCount" placeholder="请输入总执行次数"/>
-          </view>
-          <view class="form-item form-item-inline">
-            <text class="label">截止日期</text>
-            <picker class="picker" mode="date" :value="formatDate(localSchedule?.repeatEndDay)"
-                    start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-              <view class="picker-display">{{ formatDate(localSchedule?.repeatEndDay) }}</view>
-            </picker>
+        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
+                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
+          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
+        </picker>
+      </view>
+
+      <!-- 待办：截止 + 完成次数 -->
+      <view v-else-if="scheduleExtra.taskType === 'Todo'" class="t-section">
+        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
+                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
+          <view class="t-row"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
+        </picker>
+        <view class="t-row t-row--last">
+          <text class="t-row__label">完成次数</text>
+          <view class="t-stepper">
+            <view class="t-stepper__btn" @click="stepCount(-1)">−</view>
+            <text class="t-stepper__val">{{ scheduleExtra.totalCount }}</text>
+            <view class="t-stepper__btn" @click="stepCount(1)">＋</view>
           </view>
         </view>
       </view>
 
-      <view class="form-section" v-else-if="scheduleExtra?.taskType === 'Todo'">
-        <view class="form-row">
-          <view class="form-item form-item-inline">
-            <text class="label">截止日期</text>
-            <picker class="picker" mode="date" :value="formatDate(localSchedule?.repeatEndDay)"
-                    start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-              <view class="picker-display">{{ formatDate(localSchedule?.repeatEndDay) }}</view>
-            </picker>
-          </view>
-          <view class="form-item form-item-inline">
-            <text class="label">完成次数</text>
-            <input class="input" type="number" v-model.number="scheduleExtra.totalCount" placeholder="请输入总执行次数"/>
-          </view>
-        </view>
+      <!-- 目标：截止 -->
+      <view v-else-if="scheduleExtra.taskType === 'Goal'" class="t-section">
+        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
+                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
+          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
+        </picker>
       </view>
 
-      <view class="form-section" v-else-if="scheduleExtra?.taskType === 'Goal'">
-        <view class="form-row">
-          <view class="form-item form-item-inline">
-            <text class="label">截止日期</text>
-            <picker class="picker" mode="date" :value="formatDate(localSchedule?.repeatEndDay)"
-                    start="2023-01-01" end="2030-12-31"
-                    @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-              <view class="picker-display">{{ formatDate(localSchedule?.repeatEndDay) }}</view>
-            </picker>
+        <!-- 关联目标（仅任务类型）-->
+        <view v-if="localSchedule?.itemType === 'task'">
+          <text class="t-group-label">关联目标</text>
+          <view class="t-chips">
+            <view class="t-chip" :class="{ 't-chip--active': !localSchedule.parentId }" @click="handleSelectGoal({ id: 0, title: '无目标' })">无目标</view>
+            <view class="t-chip" v-for="(goal, idx) in goalList" :key="idx"
+                  :class="{ 't-chip--active': localSchedule.parentId === goal.id }" @click="handleSelectGoal(goal)">{{ goal.itemTitle || '未命名目标' }}</view>
           </view>
         </view>
-      </view>
 
-      <!-- 类型设置 -->
-      <view class="form-section" v-if="localSchedule?.itemType === 'task'">
-        <text class="section-title">目标</text>
-        <view class="form-item">
-          <text class="label">关联目标</text>
-          <!-- ✅ 关联目标 单选列表 -->
-          <view class="goal-select-wrap">
-            <view
-                class="goal-select-item"
-                v-for="(goal, idx) in goalList"
-                :key="idx"
-                :class="{active: localSchedule.parentId === goal.id}"
-                @click="handleSelectGoal(goal)"
-            >
-              <text class="goal-name">{{goal.itemTitle || '未命名目标'}}</text>
-              <text class="icon-selected" v-show="localSchedule.parentId === goal.id">✓</text>
-            </view>
-            <!-- ✅ 无目标选项 - 选中后parentId置空 -->
-            <view
-                class="goal-select-item"
-                :class="{active: !localSchedule.parentId}"
-                @click="handleSelectGoal({id: 0, title: '无目标'})"
-            >
-              <text class="goal-name">无目标</text>
-              <text class="icon-selected" v-show="!localSchedule.parentId">✓</text>
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <!-- 积分设置 -->
-      <view class="form-section" v-if="localSchedule?.itemType === 'task'">
-        <text class="section-title">积分设置</text>
-        <view class="form-row">
-          <view class="form-item form-item-inline">
-            <text class="label">积分数量</text>
-            <input class="input" type="number" v-model.number="scheduleExtra.score" placeholder="积分"/>
+        <!-- 积分奖励（仅任务类型）-->
+        <view v-if="localSchedule?.itemType === 'task'" class="t-row t-row--solo">
+          <text class="t-row__label">积分奖励</text>
+          <view class="t-stepper">
+            <view class="t-stepper__btn" @click="stepScore(-1)">−</view>
+            <text class="t-stepper__val">{{ scheduleExtra.score }}</text>
+            <view class="t-stepper__btn" @click="stepScore(1)">＋</view>
           </view>
         </view>
       </view>
@@ -168,7 +141,6 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import DateUtils from "../../utils/util";
 import { getStoredData, setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
-import FunRadioGroup from "../fun-components/fun-radio-group.vue";
 import {HOBIT_TASK_REPEAT_TYPE_LABELS, HOBIT_TASK_REPEAT_TYPE_VALUES} from "../../utils/constants";
 
 // --- Props 定义 ---
@@ -226,15 +198,28 @@ const localSchedule = ref({
 // ✅ 核心：独立响应式extra对象，解决v-model绑定嵌套属性undefined报错
 const scheduleExtra = reactive({ score: 0, taskType: 'Habit', totalCount: 1 });
 
-const radioOptions = reactive([
-  { label: '习惯养成', value: 'Habit' },
-  { label: 'ToDo', value: 'Todo' },
-  { label: '目标', value: 'Goal' }
-])
-const repeatDurationOptions = reactive([
-  { label: '不指定', value: 'whole' },
-  { label: '指定日期', value: 'select' }
-])
+// 描述：默认折叠，已有内容或点击「添加描述」后展开
+const descExpanded = ref(false)
+const showDesc = computed(() => descExpanded.value || !!localSchedule.value.itemDesc)
+function expandDesc() { descExpanded.value = true }
+
+// 类型说明文案
+const typeHint = computed(() => {
+  switch (scheduleExtra.taskType) {
+    case 'Habit': return '每天 / 每周重复打卡，养成习惯'
+    case 'Todo': return '一次性待办，完成即可'
+    case 'Goal': return '长期目标，可关联子任务'
+    default: return ''
+  }
+})
+
+// 步进器：次数 ≥ 1，积分 ≥ 0
+function stepCount(d) {
+  scheduleExtra.totalCount = Math.max(1, Number(scheduleExtra.totalCount || 1) + d)
+}
+function stepScore(d) {
+  scheduleExtra.score = Math.max(0, Number(scheduleExtra.score || 0) + d)
+}
 
 // ✅ 重复时长切换事件 - 修改为操作 localRepeatDuration ref
 const onRepeatDurationChanged = (e) => {
@@ -496,7 +481,7 @@ defineExpose({
   box-sizing: border-box;
 }
 
-/* 嵌入底部弹层：高度自适应、不自带滚动、去背景；卡片改浅灰托底避免白上白 */
+/* 嵌入底部弹层：高度自适应、不自带滚动、去背景 */
 .is-embedded {
   height: auto;
   background-color: transparent;
@@ -506,15 +491,155 @@ defineExpose({
   overflow: visible;
   padding: 0;
 }
-.is-embedded .form-section {
-  background-color: #f7f8fa;
-  box-shadow: none;
-  padding: 24rpx;
-  margin-bottom: 20rpx;
+.is-embedded .form {
+  padding-left: 0;
+  padding-right: 0;
+  border-radius: 0;
 }
-.is-embedded .form-section:last-child {
-  margin-bottom: 0;
+
+/* ===== 极简渐进式表单 ===== */
+.form {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 4rpx 28rpx 16rpx;
+  box-sizing: border-box;
 }
+
+/* 标题：主输入 */
+.t-title {
+  width: 100%;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #1f2937;
+  padding: 28rpx 0 20rpx;
+  border-bottom: 2rpx solid #f1f5f9;
+  box-sizing: border-box;
+}
+.t-title-ph { color: #cbd5e1; font-weight: 600; }
+
+/* 描述折叠/展开 */
+.t-desc-add {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 24rpx 0;
+  color: #94a3b8;
+  font-size: 27rpx;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+.t-desc-add__icon { font-size: 30rpx; }
+.t-desc-textarea {
+  width: 100%;
+  min-height: 120rpx;
+  padding: 20rpx 0;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: #334155;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+.t-desc-ph { color: #cbd5e1; }
+
+/* 分组小标题 */
+.t-group-label {
+  display: block;
+  font-size: 24rpx;
+  color: #94a3b8;
+  margin: 30rpx 0 14rpx;
+  font-weight: 500;
+}
+
+/* 分段控件 */
+.t-seg {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 999rpx;
+  padding: 6rpx;
+  gap: 6rpx;
+}
+.t-seg--sm { max-width: 380rpx; align-self: flex-start; }
+.t-seg__item {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: 27rpx;
+  color: #64748b;
+  border-radius: 999rpx;
+  transition: all 0.2s;
+}
+.t-seg__item--active {
+  background: #ffffff;
+  color: #2196f3;
+  font-weight: 600;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+}
+.t-seg-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #b8c2cf;
+  margin-top: 12rpx;
+}
+
+.t-section { margin-top: 18rpx; }
+
+/* 可点行 */
+.t-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 92rpx;
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+.t-row--last { border-bottom: none; }
+.t-row--solo { border-bottom: none; margin-top: 8rpx; }
+.t-row--col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16rpx;
+}
+.t-row__label { font-size: 28rpx; color: #334155; }
+.t-row__value {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 28rpx;
+  color: #1f2937;
+}
+.t-row__chev { color: #cbd5e1; font-size: 32rpx; }
+
+/* 步进器 */
+.t-stepper { display: flex; align-items: center; gap: 6rpx; }
+.t-stepper__btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34rpx;
+  line-height: 1;
+}
+.t-stepper__btn:active { background: #e2e8f0; }
+.t-stepper__val {
+  min-width: 72rpx;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* 目标 chips */
+.t-chips { display: flex; flex-wrap: wrap; gap: 14rpx; }
+.t-chip {
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 26rpx;
+}
+.t-chip--active { background: #e6f0ff; color: #2196f3; font-weight: 600; }
 
 .form-section {
   background-color: white;
