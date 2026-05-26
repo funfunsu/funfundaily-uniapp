@@ -49,28 +49,25 @@
           <!-- 右侧内容 -->
           <view class="month-row__content">
             <template v-if="cellPlans(y, m).length">
-              <view
-                v-for="item in cellPlans(y, m)"
-                :key="item.id"
-                class="plan-card"
-                :class="{ 'plan-card--repeat': item.repeatType === 'yearly' }"
-                @click="openEdit(item)"
-              >
-                <view class="plan-card__icon">{{ item.repeatType === 'yearly' ? '🔁' : '📌' }}</view>
-                <view class="plan-card__body">
-                  <view class="plan-card__title-row">
+              <!-- 计划卡片：一行多个（网格），紧凑展示，节省空间 -->
+              <view class="month-plans">
+                <view
+                  v-for="item in cellPlans(y, m)"
+                  :key="item.id"
+                  class="plan-card"
+                  :class="{ 'plan-card--repeat': item.repeatType === 'yearly' }"
+                  @click="openEdit(item)"
+                >
+                  <text class="plan-card__icon">{{ item.repeatType === 'yearly' ? '🔁' : '📌' }}</text>
+                  <view class="plan-card__main">
                     <text class="plan-card__title">{{ item.itemTitle || '未命名计划' }}</text>
-                    <text
-                      class="plan-card__badge"
-                      :class="item.repeatType === 'yearly' ? 'badge--repeat' : 'badge--once'"
-                    >{{ item.repeatType === 'yearly' ? '每年' : '一次性' }}</text>
+                    <text v-if="item.itemDesc" class="plan-card__desc">{{ item.itemDesc }}</text>
                   </view>
-                  <text v-if="item.itemDesc" class="plan-card__desc">{{ item.itemDesc }}</text>
                 </view>
-              </view>
-              <!-- 在该月补充计划 -->
-              <view class="month-add" @click="openAddFor(y, m)">
-                <text class="month-add__text">＋ 在 {{ m }} 月添加</text>
+                <!-- 在该月补充计划：作为网格里的一个虚线占位卡 -->
+                <view class="plan-add-cell" @click="openAddFor(y, m)">
+                  <text class="plan-add-cell__plus">＋</text>
+                </view>
               </view>
             </template>
 
@@ -600,92 +597,84 @@ onShow(() => {
 .month-row__content {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
+}
+
+/* 计划网格：一行多个，节省纵向空间 */
+.month-plans {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 12rpx;
 }
 
-/* 计划卡片 */
+/* 计划卡片（紧凑版，🔁/📌 图标已表达类型，无需文字徽标） */
 .plan-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 18rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 22rpx 22rpx;
-  box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.06);
-  border: 1rpx solid #eef0f4;
-}
-.plan-card:active {
-  transform: scale(0.99);
-}
-.plan-card--repeat {
-  border-color: rgba(0, 122, 255, 0.25);
-}
-.plan-card__icon {
-  font-size: 40rpx;
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #eef2ff;
-  border-radius: 16rpx;
-  flex-shrink: 0;
-}
-.plan-card__body {
-  flex: 1;
-  min-width: 0;
-}
-.plan-card__title-row {
   display: flex;
   align-items: center;
   gap: 12rpx;
+  min-width: 0;
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.05);
+  border: 1rpx solid #eef0f4;
+}
+.plan-card:active {
+  transform: scale(0.98);
+}
+.plan-card--repeat {
+  border-color: rgba(0, 122, 255, 0.28);
+  background: #f5f9ff;
+}
+.plan-card__icon {
+  font-size: 30rpx;
+  width: 52rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  text-align: center;
+  background: #eef2ff;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+}
+.plan-card__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .plan-card__title {
-  font-size: 30rpx;
+  font-size: 26rpx;
   font-weight: 600;
   color: #111827;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 0 1 auto;
-  max-width: 70%;
-}
-.plan-card__badge {
-  flex-shrink: 0;
-  font-size: 20rpx;
-  font-weight: 600;
-  padding: 4rpx 14rpx;
-  border-radius: 999rpx;
-}
-.badge--once {
-  color: #b45309;
-  background: #fef3c7;
-}
-.badge--repeat {
-  color: #007AFF;
-  background: #e6f1ff;
 }
 .plan-card__desc {
-  display: block;
-  font-size: 24rpx;
+  font-size: 20rpx;
   color: #94a3b8;
-  margin-top: 8rpx;
-  line-height: 1.4;
+  margin-top: 2rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 在某月补充计划 */
-.month-add {
-  align-self: flex-start;
-  padding: 6rpx 4rpx;
+/* 网格内「添加」占位卡 */
+.plan-add-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 84rpx;
+  border: 1rpx dashed #d6dbe4;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.4);
 }
-.month-add__text {
-  font-size: 22rpx;
-  color: #007AFF;
+.plan-add-cell__plus {
+  font-size: 34rpx;
+  color: #b6bdc9;
+  line-height: 1;
 }
-.month-add:active {
-  opacity: 0.6;
+.plan-add-cell:active {
+  background: #f1f5f9;
 }
 
 /* 空月份占位 */
