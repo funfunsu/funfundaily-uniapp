@@ -1,60 +1,92 @@
 <template>
-  <view
-    class="plan-page"
-    @touchstart="onTouchStart"
-    @touchend="onTouchEnd"
-  >
-    <!-- 月份导航：上一月 / 当前年月 / 下一月，支持上下滑动 -->
-    <view class="month-nav">
-      <view class="month-nav__btn" @click="goPrevMonth">
-        <text class="month-nav__chevron">︿</text>
-        <text class="month-nav__btn-label">上一月</text>
-      </view>
-
-      <view class="month-nav__center">
-        <text class="month-nav__year">{{ viewYear }}年</text>
-        <text class="month-nav__month">{{ viewMonth }}月</text>
-        <text v-if="!isCurrentMonth" class="month-nav__today" @click="goCurrentMonth">回到本月</text>
-      </view>
-
-      <view class="month-nav__btn" @click="goNextMonth">
-        <text class="month-nav__btn-label">下一月</text>
-        <text class="month-nav__chevron">﹀</text>
-      </view>
+  <view class="plan-page">
+    <!-- 顶部栏：标题 + 回到今年 -->
+    <view class="top-bar">
+      <text class="top-bar__title">月度计划</text>
+      <text class="top-bar__today" @click="backToThisYear">回到今年</text>
     </view>
 
-    <text class="swipe-hint">上下滑动切换月份</text>
-
-    <!-- 当月计划列表 -->
-    <view v-if="monthPlans.length > 0" class="plan-list">
+    <!-- 全年滚动视图：纵向铺开 1-12 月，滑到顶/底自动加载上/下一年 -->
+    <scroll-view
+      class="year-scroll"
+      scroll-y
+      :scroll-into-view="scrollIntoId"
+      :scroll-with-animation="false"
+      :upper-threshold="40"
+      :lower-threshold="120"
+      @scrolltoupper="onReachTop"
+      @scrolltolower="onReachBottom"
+    >
       <view
-        v-for="item in monthPlans"
-        :key="item.id"
-        class="plan-card"
-        :class="{ 'plan-card--repeat': item.repeatType === 'yearly' }"
-        @click="openEdit(item)"
+        v-for="y in years"
+        :key="y"
+        :id="'year-' + y"
+        class="year-block"
       >
-        <view class="plan-card__icon">{{ item.repeatType === 'yearly' ? '🔁' : '📌' }}</view>
-        <view class="plan-card__body">
-          <view class="plan-card__title-row">
-            <text class="plan-card__title">{{ item.itemTitle || '未命名计划' }}</text>
-            <text class="plan-card__badge" :class="item.repeatType === 'yearly' ? 'badge--repeat' : 'badge--once'">
-              {{ item.repeatType === 'yearly' ? '每年' : '一次性' }}
-            </text>
+        <!-- 年份分隔头 -->
+        <view class="year-head" :class="{ 'year-head--this': y === thisYear }">
+          <text class="year-head__label">{{ y }}年</text>
+          <text v-if="y === thisYear" class="year-head__tag">今年</text>
+          <text class="year-head__count">{{ yearCount(y) }} 项计划</text>
+        </view>
+
+        <!-- 12 个月 -->
+        <view
+          v-for="m in 12"
+          :key="m"
+          class="month-row"
+          :class="{
+            'month-row--empty': cellPlans(y, m).length === 0,
+            'month-row--current': y === thisYear && m === thisMonth
+          }"
+        >
+          <!-- 左侧月份轨道 -->
+          <view class="month-row__rail">
+            <text class="month-row__num">{{ m }}</text>
+            <text class="month-row__unit">月</text>
           </view>
-          <text class="plan-card__when">{{ formatWhen(item) }}</text>
-          <text v-if="item.itemDesc" class="plan-card__desc">{{ item.itemDesc }}</text>
+
+          <!-- 右侧内容 -->
+          <view class="month-row__content">
+            <template v-if="cellPlans(y, m).length">
+              <view
+                v-for="item in cellPlans(y, m)"
+                :key="item.id"
+                class="plan-card"
+                :class="{ 'plan-card--repeat': item.repeatType === 'yearly' }"
+                @click="openEdit(item)"
+              >
+                <view class="plan-card__icon">{{ item.repeatType === 'yearly' ? '🔁' : '📌' }}</view>
+                <view class="plan-card__body">
+                  <view class="plan-card__title-row">
+                    <text class="plan-card__title">{{ item.itemTitle || '未命名计划' }}</text>
+                    <text
+                      class="plan-card__badge"
+                      :class="item.repeatType === 'yearly' ? 'badge--repeat' : 'badge--once'"
+                    >{{ item.repeatType === 'yearly' ? '每年' : '一次性' }}</text>
+                  </view>
+                  <text v-if="item.itemDesc" class="plan-card__desc">{{ item.itemDesc }}</text>
+                </view>
+              </view>
+              <!-- 在该月补充计划 -->
+              <view class="month-add" @click="openAddFor(y, m)">
+                <text class="month-add__text">＋ 在 {{ m }} 月添加</text>
+              </view>
+            </template>
+
+            <!-- 空月份：轻量占位，点击即可在该月添加 -->
+            <view v-else class="month-empty" @click="openAddFor(y, m)">
+              <text class="month-empty__text">暂无计划</text>
+              <text class="month-empty__add">＋</text>
+            </view>
+          </view>
         </view>
       </view>
-    </view>
 
-    <!-- 空状态 -->
-    <view v-else class="empty-state">
-      <text class="empty-state__icon">🗓️</text>
-      <text class="empty-state__text">{{ viewYear }}年{{ viewMonth }}月还没有计划</text>
-      <text class="empty-state__sub">记录这个月要做的家庭大事，一次性的或每年都要做的都可以</text>
-      <button class="empty-state__cta" @click="openAdd">＋ 添加月度计划</button>
-    </view>
+      <view class="scroll-foot">
+        <text class="scroll-foot__text">继续上滑查看更早的年份 · 下滑查看更晚的年份</text>
+      </view>
+    </scroll-view>
 
     <!-- 悬浮添加按钮 -->
     <view class="fab" @click="openAdd">
@@ -142,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import apiTs from '../../../../utils/apiTs'
 import DateUtils from '../../../../utils/util'
@@ -155,8 +187,15 @@ const PLAN_TYPE = 'monthlyPlan'
 const RECUR_YEARS = 20
 
 const now = new Date()
-const viewYear = ref(now.getFullYear())
-const viewMonth = ref(now.getMonth() + 1) // 1-12
+const thisYear = now.getFullYear()
+const thisMonth = now.getMonth() + 1 // 1-12
+
+// 已加载到滚动视图里的年份窗口（默认含上一年/今年/下一年，便于双向滚动）
+const years = ref([thisYear - 1, thisYear, thisYear + 1])
+// 滚动定位锚点（scroll-into-view），初始落在今年
+const scrollIntoId = ref('year-' + thisYear)
+const loadingTop = ref(false)
+let positioned = false
 
 const allPlans = ref([]) // 群组下全部 monthlyPlan 原始项
 
@@ -165,12 +204,8 @@ const currentMember = ref(null)
 
 const monthOptions = Array.from({ length: 12 }, (_, i) => `${i + 1}月`)
 // 一次性计划允许选择的年月范围（往前 5 年 ~ 往后 30 年）
-const pickerStart = `${now.getFullYear() - 5}-01`
-const pickerEnd = `${now.getFullYear() + 30}-12`
-
-const isCurrentMonth = computed(
-  () => viewYear.value === now.getFullYear() && viewMonth.value === now.getMonth() + 1
-)
+const pickerStart = `${thisYear - 5}-01`
+const pickerEnd = `${thisYear + 30}-12`
 
 // ---------- 解析工具：从日期字符串里取年/月，避免各端 new Date 解析差异 ----------
 function parseYearMonth(str) {
@@ -184,12 +219,10 @@ function parseYear(str) {
   return ym ? ym.year : null
 }
 
-// 判定某计划是否落在「查看的年月」内
-function occursInViewMonth(item) {
+// 判定某计划是否落在指定的「年-月」内
+function occursInYearMonth(item, Y, M) {
   const anchor = parseYearMonth(item.startTime || item.repeatStartDay)
   if (!anchor) return false
-  const Y = viewYear.value
-  const M = viewMonth.value
   if (item.repeatType === 'yearly') {
     if (anchor.month !== M) return false
     const startY = parseYear(item.repeatStartDay) ?? anchor.year
@@ -209,52 +242,68 @@ function occursInViewMonth(item) {
   return anchor.year === Y && anchor.month === M
 }
 
-const monthPlans = computed(() =>
-  allPlans.value
-    .filter(occursInViewMonth)
-    .sort((a, b) => {
-      // 周期性排在一次性之前，其余按标题稳定排序
-      const ra = a.repeatType === 'yearly' ? 0 : 1
-      const rb = b.repeatType === 'yearly' ? 0 : 1
-      if (ra !== rb) return ra - rb
-      return String(a.itemTitle || '').localeCompare(String(b.itemTitle || ''))
+function sortPlans(a, b) {
+  // 周期性排在一次性之前，其余按标题稳定排序
+  const ra = a.repeatType === 'yearly' ? 0 : 1
+  const rb = b.repeatType === 'yearly' ? 0 : 1
+  if (ra !== rb) return ra - rb
+  return String(a.itemTitle || '').localeCompare(String(b.itemTitle || ''))
+}
+
+// 一次性构建「年-月 -> 计划列表」映射，避免模板里重复过滤
+const plansByCell = computed(() => {
+  const map = {}
+  for (const y of years.value) {
+    for (let m = 1; m <= 12; m++) map[`${y}-${m}`] = []
+  }
+  for (const item of allPlans.value) {
+    for (const y of years.value) {
+      for (let m = 1; m <= 12; m++) {
+        if (occursInYearMonth(item, y, m)) map[`${y}-${m}`].push(item)
+      }
+    }
+  }
+  for (const k in map) map[k].sort(sortPlans)
+  return map
+})
+function cellPlans(y, m) {
+  return plansByCell.value[`${y}-${m}`] || []
+}
+function yearCount(y) {
+  let c = 0
+  for (let m = 1; m <= 12; m++) c += cellPlans(y, m).length
+  return c
+}
+
+// ---------- 滚动：双向加载年份 ----------
+function onReachBottom() {
+  const last = years.value[years.value.length - 1]
+  years.value = [...years.value, last + 1]
+}
+function onReachTop() {
+  if (loadingTop.value) return
+  loadingTop.value = true
+  const oldFirst = years.value[0]
+  years.value = [oldFirst - 1, ...years.value]
+  // 顶部插入新年份会把已有内容顶下去，需把视图滚回原来的首年块以维持视觉位置
+  nextTick(() => {
+    scrollIntoId.value = ''
+    nextTick(() => {
+      scrollIntoId.value = 'year-' + oldFirst
+      setTimeout(() => { loadingTop.value = false }, 300)
     })
-)
-
-// ---------- 月份导航 ----------
-function shiftMonth(delta) {
-  let y = viewYear.value
-  let m = viewMonth.value + delta
-  while (m > 12) { m -= 12; y += 1 }
-  while (m < 1) { m += 12; y -= 1 }
-  viewYear.value = y
-  viewMonth.value = m
-}
-function goPrevMonth() { shiftMonth(-1) }
-function goNextMonth() { shiftMonth(1) }
-function goCurrentMonth() {
-  viewYear.value = now.getFullYear()
-  viewMonth.value = now.getMonth() + 1
+  })
 }
 
-// 上下滑动切换月份：上滑→下一月，下滑→上一月
-const touchStartY = ref(0)
-const touchStartX = ref(0)
-function onTouchStart(e) {
-  const t = e.touches?.[0] || e.changedTouches?.[0]
-  if (!t) return
-  touchStartY.value = t.clientY
-  touchStartX.value = t.clientX
+function scrollToYear(y) {
+  if (!years.value.includes(y)) {
+    years.value = [y - 1, y, y + 1]
+  }
+  scrollIntoId.value = ''
+  nextTick(() => { scrollIntoId.value = 'year-' + y })
 }
-function onTouchEnd(e) {
-  const t = e.changedTouches?.[0]
-  if (!t) return
-  const dy = t.clientY - touchStartY.value
-  const dx = t.clientX - touchStartX.value
-  // 仅认定明显的纵向滑动，避免与横向/点击冲突
-  if (Math.abs(dy) < 60 || Math.abs(dy) < Math.abs(dx)) return
-  if (dy < 0) goNextMonth()
-  else goPrevMonth()
+function backToThisYear() {
+  scrollToYear(thisYear)
 }
 
 // ---------- 表单 ----------
@@ -264,17 +313,20 @@ const form = ref({
   title: '',
   repeatType: 'none',
   yearMonth: '', // 'YYYY-MM'，一次性用
-  month: viewMonth.value, // 1-12，每年用
+  month: thisMonth, // 1-12，每年用
   desc: ''
 })
 
 function openAdd() {
+  openAddFor(thisYear, thisMonth)
+}
+function openAddFor(y, m) {
   editingId.value = null
   form.value = {
     title: '',
     repeatType: 'none',
-    yearMonth: `${viewYear.value}-${pad2(viewMonth.value)}`,
-    month: viewMonth.value,
+    yearMonth: `${y}-${pad2(m)}`,
+    month: m,
     desc: ''
   }
   showForm.value = true
@@ -282,7 +334,7 @@ function openAdd() {
 
 function openEdit(item) {
   editingId.value = item.id
-  const anchor = parseYearMonth(item.startTime || item.repeatStartDay) || { year: viewYear.value, month: viewMonth.value }
+  const anchor = parseYearMonth(item.startTime || item.repeatStartDay) || { year: thisYear, month: thisMonth }
   form.value = {
     title: item.itemTitle || '',
     repeatType: item.repeatType === 'yearly' ? 'yearly' : 'none',
@@ -336,6 +388,11 @@ async function fetchPlans() {
       scheduleItemType: PLAN_TYPE
     })
     allPlans.value = Array.isArray(list) ? list : []
+    // 数据加载后高度变化，首次回到今年以保证起始位置正确
+    if (!positioned) {
+      positioned = true
+      nextTick(() => scrollToYear(thisYear))
+    }
   } catch (err) {
     console.error('加载月度计划失败', err)
     uni.showToast({ title: '加载失败，请重试', icon: 'none' })
@@ -354,12 +411,11 @@ async function submitForm() {
   let anchorDate
   let repeatEndDate
   if (form.value.repeatType === 'yearly') {
-    // 每年：以「当前查看年」为基准锚月，向后 RECUR_YEARS 年收尾
-    const baseYear = now.getFullYear()
-    anchorDate = new Date(baseYear, form.value.month - 1, 1)
-    repeatEndDate = new Date(baseYear + RECUR_YEARS, form.value.month - 1, 1)
+    // 每年：以「今年」为基准锚月，向后 RECUR_YEARS 年收尾
+    anchorDate = new Date(thisYear, form.value.month - 1, 1)
+    repeatEndDate = new Date(thisYear + RECUR_YEARS, form.value.month - 1, 1)
   } else {
-    const ym = parseYearMonth(form.value.yearMonth) || { year: viewYear.value, month: viewMonth.value }
+    const ym = parseYearMonth(form.value.yearMonth) || { year: thisYear, month: thisMonth }
     anchorDate = new Date(ym.year, ym.month - 1, 1)
     // 一次性：收尾设为当月最后一天
     repeatEndDate = DateUtils.getLastDayOfMonth(anchorDate)
@@ -427,12 +483,6 @@ function formatYearMonth(ym) {
   if (!parsed) return '请选择月份'
   return `${parsed.year}年${parsed.month}月`
 }
-function formatWhen(item) {
-  const anchor = parseYearMonth(item.startTime || item.repeatStartDay)
-  if (!anchor) return ''
-  if (item.repeatType === 'yearly') return `每年 ${anchor.month} 月`
-  return `${anchor.year}年${anchor.month}月`
-}
 
 onShow(() => {
   fetchPlans()
@@ -441,89 +491,129 @@ onShow(() => {
 
 <style scoped>
 .plan-page {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   box-sizing: border-box;
-  padding: 20rpx 20rpx 200rpx;
   background: #f6f7fb;
 }
 
-/* 月份导航 */
-.month-nav {
+/* 顶部栏 */
+.top-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 20rpx 28rpx;
   background: #ffffff;
-  border-radius: 24rpx;
-  padding: 24rpx 28rpx;
-  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.06);
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.05);
+  z-index: 5;
 }
-.month-nav__btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4rpx;
-  padding: 8rpx 12rpx;
-  min-width: 96rpx;
-}
-.month-nav__btn:active {
-  opacity: 0.6;
-}
-.month-nav__chevron {
-  font-size: 32rpx;
-  color: #007AFF;
-  line-height: 1;
-}
-.month-nav__btn-label {
-  font-size: 22rpx;
-  color: #94a3b8;
-}
-.month-nav__center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.month-nav__year {
-  font-size: 26rpx;
-  color: #64748b;
-}
-.month-nav__month {
-  font-size: 56rpx;
+.top-bar__title {
+  font-size: 34rpx;
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.1;
 }
-.month-nav__today {
-  margin-top: 6rpx;
-  font-size: 22rpx;
+.top-bar__today {
+  font-size: 24rpx;
   color: #007AFF;
   background: #eaf3ff;
-  padding: 4rpx 18rpx;
+  padding: 8rpx 22rpx;
   border-radius: 999rpx;
 }
 
-.swipe-hint {
-  display: block;
-  text-align: center;
-  font-size: 22rpx;
-  color: #b6bdc9;
-  margin: 16rpx 0 4rpx;
+/* 全年滚动视图 */
+.year-scroll {
+  flex: 1;
+  height: 0; /* 配合 flex:1 让 scroll-y 拿到确定高度 */
+  padding: 0 20rpx;
+  box-sizing: border-box;
 }
 
-/* 列表 */
-.plan-list {
+/* 年份分隔头 */
+.year-block {
+  padding-top: 8rpx;
+}
+.year-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+  padding: 20rpx 8rpx 12rpx;
+  background: #f6f7fb;
+}
+.year-head__label {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+.year-head--this .year-head__label {
+  color: #007AFF;
+}
+.year-head__tag {
+  font-size: 20rpx;
+  color: #007AFF;
+  background: #e6f1ff;
+  padding: 3rpx 14rpx;
+  border-radius: 999rpx;
+}
+.year-head__count {
+  margin-left: auto;
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+/* 月份行 */
+.month-row {
+  display: flex;
+  gap: 16rpx;
+  padding: 10rpx 0;
+}
+.month-row__rail {
+  flex-shrink: 0;
+  width: 84rpx;
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
-  margin-top: 8rpx;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 6rpx;
 }
+.month-row__num {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #334155;
+  line-height: 1;
+}
+.month-row__unit {
+  font-size: 20rpx;
+  color: #94a3b8;
+  margin-top: 2rpx;
+}
+.month-row--current .month-row__num {
+  color: #007AFF;
+}
+.month-row--empty .month-row__num {
+  color: #c4cbd6;
+}
+.month-row__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+/* 计划卡片 */
 .plan-card {
   display: flex;
   align-items: flex-start;
   gap: 18rpx;
   background: #ffffff;
   border-radius: 20rpx;
-  padding: 26rpx 24rpx;
-  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.06);
+  padding: 22rpx 22rpx;
+  box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.06);
   border: 1rpx solid #eef0f4;
 }
 .plan-card:active {
@@ -533,14 +623,14 @@ onShow(() => {
   border-color: rgba(0, 122, 255, 0.25);
 }
 .plan-card__icon {
-  font-size: 44rpx;
-  width: 72rpx;
-  height: 72rpx;
+  font-size: 40rpx;
+  width: 64rpx;
+  height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #eef2ff;
-  border-radius: 18rpx;
+  border-radius: 16rpx;
   flex-shrink: 0;
 }
 .plan-card__body {
@@ -577,12 +667,6 @@ onShow(() => {
   color: #007AFF;
   background: #e6f1ff;
 }
-.plan-card__when {
-  display: block;
-  font-size: 24rpx;
-  color: #6b7280;
-  margin-top: 8rpx;
-}
 .plan-card__desc {
   display: block;
   font-size: 24rpx;
@@ -591,50 +675,50 @@ onShow(() => {
   line-height: 1.4;
 }
 
-/* 空状态 */
-.empty-state {
-  text-align: center;
-  padding: 96rpx 48rpx;
-  background: #ffffff;
-  border-radius: 24rpx;
-  margin-top: 24rpx;
-  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.04);
+/* 在某月补充计划 */
+.month-add {
+  align-self: flex-start;
+  padding: 6rpx 4rpx;
 }
-.empty-state__icon {
-  font-size: 96rpx;
-  display: block;
-  margin-bottom: 20rpx;
+.month-add__text {
+  font-size: 22rpx;
+  color: #007AFF;
 }
-.empty-state__text {
-  display: block;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1d2129;
-  margin-bottom: 12rpx;
+.month-add:active {
+  opacity: 0.6;
 }
-.empty-state__sub {
-  display: block;
-  font-size: 24rpx;
-  color: #94a3b8;
-  line-height: 1.6;
-  margin-bottom: 36rpx;
-}
-.empty-state__cta {
-  display: inline-flex;
+
+/* 空月份占位 */
+.month-empty {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  height: 84rpx;
-  padding: 0 48rpx;
-  background: linear-gradient(135deg, #007AFF 0%, #0056b3 100%);
-  color: #ffffff;
-  font-size: 28rpx;
-  font-weight: 600;
-  border: none;
-  border-radius: 999rpx;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1rpx dashed #dfe3ea;
+  border-radius: 16rpx;
+  padding: 18rpx 22rpx;
+}
+.month-empty__text {
+  font-size: 24rpx;
+  color: #b6bdc9;
+}
+.month-empty__add {
+  font-size: 32rpx;
+  color: #c4cbd6;
   line-height: 1;
 }
-.empty-state__cta::after {
-  border: none;
+.month-empty:active {
+  background: #f1f5f9;
+}
+
+/* 滚动底部提示 */
+.scroll-foot {
+  text-align: center;
+  padding: 36rpx 0 200rpx;
+}
+.scroll-foot__text {
+  font-size: 22rpx;
+  color: #c4cbd6;
 }
 
 /* 悬浮添加按钮 */
