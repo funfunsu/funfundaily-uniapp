@@ -9,26 +9,34 @@
       <text class="empty-hint">在底部群组选择器中切换，查看该群组的邀请函</text>
     </view>
 
-    <view
-      v-else-if="!loading && sentList.length === 0 && receivedList.length === 0"
-      class="empty"
-    >
-      <view class="empty-illustration">
-        <text class="empty-illustration__icon">📨</text>
-      </view>
-      <text class="empty-title">还没有邀请函</text>
-      <text class="empty-hint">点击底部「新建」，几分钟做一张精致的邀请函</text>
-    </view>
-
     <view v-else>
-      <!-- 我创建的（发出的邀请） -->
-      <view class="section">
-        <view class="section__head">
-          <text class="section__title">我创建的</text>
-          <text class="section__count">{{ sentList.length }}</text>
+      <!-- Tab 切换：默认看「我创建的」，收到的需二次点击 -->
+      <view class="seg">
+        <view
+          class="seg__item"
+          :class="{ 'seg__item--active': activeTab === 'sent' }"
+          @click="activeTab = 'sent'"
+        >
+          <text class="seg__label">我创建的</text>
+          <text v-if="sentList.length" class="seg__count">{{ sentList.length }}</text>
         </view>
-        <view v-if="sentList.length === 0" class="section__empty">
-          还没有创建邀请函，点击底部「新建」开始制作
+        <view
+          class="seg__item"
+          :class="{ 'seg__item--active': activeTab === 'received' }"
+          @click="activeTab = 'received'"
+        >
+          <text class="seg__label">我收到的</text>
+          <text v-if="receivedList.length" class="seg__count">{{ receivedList.length }}</text>
+          <view v-if="hasReceivedUpdates" class="seg__dot" />
+        </view>
+      </view>
+
+      <!-- 我创建的（发出的邀请） -->
+      <view v-show="activeTab === 'sent'">
+        <view v-if="sentList.length === 0" class="tab-empty">
+          <text class="tab-empty__icon">📨</text>
+          <text class="tab-empty__title">还没有创建邀请函</text>
+          <text class="tab-empty__hint">点击底部「新建」，几分钟做一张精致的邀请函</text>
         </view>
         <view v-else class="card-list">
           <view
@@ -113,12 +121,13 @@
       </view>
 
       <!-- 我收到的（收下的邀请） -->
-      <view v-if="receivedList.length > 0" class="section">
-        <view class="section__head">
-          <text class="section__title">我收到的</text>
-          <text class="section__count">{{ receivedList.length }}</text>
+      <view v-show="activeTab === 'received'">
+        <view v-if="receivedList.length === 0" class="tab-empty">
+          <text class="tab-empty__icon">📭</text>
+          <text class="tab-empty__title">还没有收到邀请函</text>
+          <text class="tab-empty__hint">收到好友分享并「收下」邀请函后，会出现在这里</text>
         </view>
-        <view class="card-list">
+        <view v-else class="card-list">
           <view
             v-for="item in receivedList"
             :key="'r-' + item.id"
@@ -421,6 +430,13 @@ const currentUserNickname =
 // 我发出的 / 我收到的
 const sentList = computed(() => list.value.filter((i) => i.direction !== 'received'))
 const receivedList = computed(() => list.value.filter((i) => i.direction === 'received'))
+
+// 默认停在「我创建的」，收到的需二次点击切换
+const activeTab = ref<'sent' | 'received'>('sent')
+// 收到的邀请有变更时，在「我收到的」tab 上点一个红点提示
+const hasReceivedUpdates = computed(() =>
+  receivedList.value.some((i) => (i.changes?.length ?? 0) > 0)
+)
 
 const showForm = ref(false)
 const saving = ref(false)
@@ -935,35 +951,88 @@ onShareAppMessage(() => {
   line-height: 1.6;
 }
 
-.section {
-  margin-bottom: 12rpx;
+.seg {
+  display: flex;
+  background: #eef2ff;
+  border-radius: 999rpx;
+  padding: 6rpx;
+  margin-bottom: 28rpx;
 }
 
-.section__head {
+.seg__item {
+  position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  padding: 24rpx 8rpx 16rpx;
+  justify-content: center;
+  gap: 8rpx;
+  height: 64rpx;
+  border-radius: 999rpx;
 }
 
-.section__title {
+.seg__item--active {
+  background: #ffffff;
+  box-shadow: 0 4rpx 12rpx rgba(79, 70, 229, 0.12);
+}
+
+.seg__label {
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.seg__item--active .seg__label {
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.seg__count {
+  font-size: 20rpx;
+  line-height: 1.6;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-radius: 999rpx;
+  padding: 0 10rpx;
+}
+
+.seg__item--active .seg__count {
+  color: #4338ca;
+  background: #eef2ff;
+}
+
+.seg__dot {
+  position: absolute;
+  top: 8rpx;
+  right: 28rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.tab-empty {
+  text-align: center;
+  padding: 120rpx 40rpx;
+}
+
+.tab-empty__icon {
+  display: block;
+  font-size: 72rpx;
+  margin-bottom: 20rpx;
+}
+
+.tab-empty__title {
+  display: block;
   font-size: 28rpx;
   font-weight: 600;
   color: #1d2129;
+  margin-bottom: 10rpx;
 }
 
-.section__count {
-  font-size: 22rpx;
-  color: #64748b;
-  background: #eef2ff;
-  border-radius: 999rpx;
-  padding: 2rpx 14rpx;
-}
-
-.section__empty {
+.tab-empty__hint {
+  display: block;
   font-size: 24rpx;
   color: #94a3b8;
-  padding: 16rpx 8rpx 8rpx;
+  line-height: 1.6;
 }
 
 .card-list {

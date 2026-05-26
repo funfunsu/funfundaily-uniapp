@@ -25,6 +25,8 @@
             @check-task="emit('check-task', $event)"
             @delay-click="emit('delay-click', $event)"
             @toggle-select="emit('toggle-select', $event)"
+            @add-task="emit('add-task')"
+            @edit-task="emit('edit-task', $event)"
         />
       </view>
     </view>
@@ -116,7 +118,9 @@ const emit = defineEmits([
   'delay-click',
   'toggle-select',
   'goal-title-click', // 目标标题点击事件
-  'create-task' // 新手引导卡片：创建第一个任务
+  'create-task', // 新手引导卡片：创建第一个任务
+  'add-task', // 透传：列表内新增任务
+  'edit-task' // 透传：列表内编辑任务
 ])
 
 // ✅ 3. 组件内部独立方法 - 分组折叠/展开 (原页面逻辑不变)

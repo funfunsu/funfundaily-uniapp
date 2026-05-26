@@ -55,6 +55,8 @@
           @toggle-select="toggleSelect"
           @goal-title-click="switchToCalendarClick"
           @create-task="onAddTaskClick"
+          @add-task="onAddTaskClick"
+          @edit-task="openEditSheet"
       />
     </view>
 
@@ -65,6 +67,29 @@
       @shareRequested="handleShareRequested"
       @photoTaken="handlePhotoTaken"
       @close="handleWatermarkClose"
+    />
+
+    <!-- 任务分享海报 -->
+    <TaskSharePoster
+      :visible="posterVisible"
+      :tasks="posterTasks"
+      :qr-source="posterQr"
+      :creator-name="posterCreator"
+      @close="handlePosterClose"
+      @shared="handlePosterClose"
+    />
+
+    <!-- 任务编辑底部弹层 -->
+    <TaskEditSheet
+      :visible="editSheetVisible"
+      :edit-id="editSheetId"
+      :goal-list="editGoalList"
+      :cur-date="currentDate"
+      :group-id="currentGroup?.id"
+      :target-user-id="currentMember?.userId"
+      @close="handleEditSheetClose"
+      @saved="handleEditSheetDone"
+      @deleted="handleEditSheetDone"
     />
 
     <!-- 底部栏 -->
@@ -90,6 +115,9 @@ import DrawerBtnItem from "../../components/fun-components/drawer-btn/drawer-btn
 import TaskGoalGroupList from "../../components/task/task-goal-group-list.vue";
 import TaskUtil from "../../utils/taskUtil";
 import WatermarkCamera from "../../components/fun-components/WatermarkCamera.vue";
+import TaskSharePoster from "../../components/task/task-share-poster.vue";
+import { base64ToImageSource } from "../../utils/imageHelper";
+import TaskEditSheet from "../../components/task/task-edit-sheet.vue";
 
 const drawerRef = ref(null);
 
@@ -121,6 +149,17 @@ const lastWatermarkPhoto = ref('');
 const watermarkShareImageUrl = ref('');
 const watermarkShareTitle = ref('水印照片');
 
+// 任务分享海报状态
+const posterVisible = ref(false);
+const posterTasks = ref([]);
+const posterQr = ref('');
+const posterCreator = ref('我');
+
+// 任务编辑底部弹层状态
+const editSheetVisible = ref(false);
+const editSheetId = ref(null);
+const editGoalList = ref([]);
+
 // =============== 计算属性 ===============
 const totalCount = computed(() => taskList.value.length)
 const completedCount = computed(() => taskList.value.filter(t => t.isCompleted).length)
@@ -133,8 +172,35 @@ const todayPoints = computed(() =>
 // =============== 生命周期 ===============
 onLoad(async (query) => {});
 
+// 读取当前成员的目标列表（task-goal-group-list 已写入该缓存）
+function loadEditGoalList() {
+  if (!currentMember.value?.userId) { editGoalList.value = []; return; }
+  const key = getStoredKey(STORAGE_KEYS.USER_ALL_GOAL, currentMember.value.userId);
+  editGoalList.value = getStoredData(key) || [];
+}
+
+// 新增任务：打开底部弹层
 function onAddTaskClick() {
-  uni.navigateTo({ url: '/pages/task/edit' });
+  loadEditGoalList();
+  editSheetId.value = null;
+  editSheetVisible.value = true;
+}
+
+// 编辑任务：打开底部弹层
+function openEditSheet(task) {
+  if (!task?.id) return;
+  loadEditGoalList();
+  editSheetId.value = task.id;
+  editSheetVisible.value = true;
+}
+
+function handleEditSheetClose() {
+  editSheetVisible.value = false;
+}
+
+async function handleEditSheetDone() {
+  editSheetVisible.value = false;
+  await fetchAllData();
 }
 function switchToCalendarClick(goalId) {
   if (goalId){
@@ -189,10 +255,14 @@ function handleButtonClick(buttonCode) {
       break;
     case 'toShare':
       mode.value = 'share';
-      buttons.value = [{code: 'cancelShare', text: '取消'},{code: 'selectAll', text: '全选'},{code: 'toggleSelectAll', text: '反选'},{code: 'doShare', type: 'share', text: '去分享'}];
+      buttons.value = [{code: 'cancelShare', text: '取消'},{code: 'selectAll', text: '全选'},{code: 'toggleSelectAll', text: '反选'},{code: 'doShare', text: '去分享'}];
+      break;
+    case 'doShare':
+      doShare();
       break;
     case 'selectAll':
       selectedTaskIds.value.clear();
+      // 不论是否完成，全部可选中分享
       taskList.value.forEach(task => selectedTaskIds.value.add(task.id));
       break;
     case 'toggleSelectAll':
@@ -206,7 +276,10 @@ function handleButtonClick(buttonCode) {
 
 const toggleSelect = (task) => {
   if (mode.value !== 'share') return;
-  selectedTaskIds.value.has(task.id) ? selectedTaskIds.value.delete(task.id) : !task.isCompleted && selectedTaskIds.value.add(task.id);
+  // 不论任务今日是否完成，都允许选中/取消选中分享
+  selectedTaskIds.value.has(task.id)
+    ? selectedTaskIds.value.delete(task.id)
+    : selectedTaskIds.value.add(task.id);
 };
 
 async function handleMemberChange(e) {
@@ -299,7 +372,8 @@ onShow(() => {
   if (refreshUri === currentTab) { fetchAllData(); removeStoredData(STORAGE_KEYS.REFRESH_TAB) }
 });
 
-onShareAppMessage((res) => {
+// 微信原生转发：仅用于水印照片场景；任务分享已改为「生成长图 + 二维码」（见 doShare）。
+onShareAppMessage(() => {
   if (watermarkShareImageUrl.value) {
     const data = {
       title: watermarkShareTitle.value,
@@ -312,24 +386,46 @@ onShareAppMessage((res) => {
     }, 0)
     return data
   }
-  const selectedTasks = taskList.value.filter(task => selectedTaskIds.value.has(task.id));
-  if (selectedTasks.length === 0) {
-    uni.showToast({ title: '请先选择要分享的任务', icon: 'none' });
-    return;
-  }
-  const uniqueSelectedJsonString = JSON.stringify(selectedTasks);
-  const shareTitle = `分享 ${selectedTasks.length} 个任务`;
-  return new Promise(async (resolve) => {
-    const resData = await apiTs.share.create({ content: uniqueSelectedJsonString, sceneCode: 'task_share' });
-    if (resData?.token) {
-      resolve({ title: shareTitle, path: `/pages/task/share?token=${resData.token}`, imageUrl: '' });
-    } else { await uni.showToast({title: '生成分享链接失败', icon: 'none'}); }
-  });
+  return { title: 'fun成长 · 一起打卡', path: '/pages/tabBar/task' }
 });
 
 function handleShareRequested(payload) {
   watermarkShareImageUrl.value = payload?.imageUrl || ''
   watermarkShareTitle.value = payload?.title || '水印照片'
+}
+
+// 「去分享」：拿 token → 取二维码 → 弹出海报组件画长图分享
+async function doShare() {
+  const selectedTasks = taskList.value.filter(task => selectedTaskIds.value.has(task.id));
+  if (selectedTasks.length === 0) {
+    uni.showToast({ title: '请先选择要分享的任务', icon: 'none' });
+    return;
+  }
+  uni.showLoading({ title: '生成分享图...', mask: true });
+  try {
+    const resData = await apiTs.share.create({
+      content: JSON.stringify(selectedTasks),
+      sceneCode: 'task_share'
+    });
+    if (!resData?.token) throw new Error('生成分享链接失败');
+
+    const qr = await apiTs.share.qrcode({ token: resData.token, page: 'pages/task/share' });
+    const qrSrc = await base64ToImageSource(qr.qrBase64, qr.contentType);
+
+    posterTasks.value = selectedTasks;
+    posterQr.value = qrSrc;
+    posterCreator.value = currentMember.value?.userInfo?.nickname || '我';
+    posterVisible.value = true;
+  } catch (e) {
+    console.error('生成分享图失败:', e);
+    uni.showToast({ title: e?.message || '生成失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
+}
+
+function handlePosterClose() {
+  posterVisible.value = false;
 }
 </script>
 

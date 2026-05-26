@@ -911,7 +911,9 @@ function drawWatermarkWeixin2d(maxSide, done) {
         queryWeixinCanvas2d(
           ({ node: canvas }) => {
             const ctx = canvas.getContext('2d')
-            const dpr = (typeof wx !== 'undefined' && wx.getSystemInfoSync ? wx.getSystemInfoSync().pixelRatio : 1) || 1
+            // pixelRatio 改用 getWindowInfo（getSystemInfoSync 已废弃），旧基础库回退
+            const dpr = (typeof wx !== 'undefined' && wx.getWindowInfo ? wx.getWindowInfo().pixelRatio
+              : (typeof wx !== 'undefined' && wx.getSystemInfoSync ? wx.getSystemInfoSync().pixelRatio : 1)) || 1
             canvas.width = Math.max(1, Math.floor(width * dpr))
             canvas.height = Math.max(1, Math.floor(height * dpr))
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0)

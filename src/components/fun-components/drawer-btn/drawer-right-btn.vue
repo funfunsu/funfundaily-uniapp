@@ -40,7 +40,8 @@ const POS_KEY = 'drawer_btn_pos' // 记住用户拖到的位置（跨页面共�
 const pos = ref(null) // { left, top } 单位 px；为 null 时退回默认 CSS 定位
 
 let sys = { windowWidth: 375, windowHeight: 667 }
-try { sys = uni.getSystemInfoSync() } catch (e) { /* ignore */ }
+// getSystemInfoSync 已废弃：窗口尺寸改用 getWindowInfo（旧版本回退）
+try { sys = (uni.getWindowInfo ? uni.getWindowInfo() : uni.getSystemInfoSync()) } catch (e) { /* ignore */ }
 
 // 主按钮在 px 下的尺寸（rpx → px）
 const sizePx = computed(() => props.circleSize * sys.windowWidth / 750)

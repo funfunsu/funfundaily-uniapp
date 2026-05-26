@@ -94,7 +94,8 @@ const pinyinResultRef = ref(''); // 存储转换后的拼音
 
 onMounted(() => {
   // 检测运行环境
-  const platform = uni.getSystemInfoSync().platform;
+  // getSystemInfoSync 已废弃：platform 改用 getDeviceInfo（旧版本回退）
+  const platform = (uni.getDeviceInfo ? uni.getDeviceInfo() : uni.getSystemInfoSync()).platform;
   const miniProgramEnv = uni.getAccountInfoSync()?.miniProgram?.envVersion;
   isWechatMiniProgram.value = platform === 'devtools' || !!miniProgramEnv;
 
