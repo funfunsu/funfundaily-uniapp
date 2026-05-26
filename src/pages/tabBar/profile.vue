@@ -63,7 +63,7 @@
     <view v-if="showQrcodeModal" class="qrcode-modal" @click="closeQrcodeModal">
       <view class="qrcode-container" @click.stop>
         <view class="qrcode-header">
-          <text class="qrcode-title">联系客服</text>
+          <text class="qrcode-title">联系开发者</text>
           <text class="close-icon" @click="closeQrcodeModal">×</text>
         </view>
         <view class="qrcode-body">
@@ -90,7 +90,7 @@
       <!-- 移除 open-type="contact"，新增点击事件 -->
       <button class="contact-service-btn" @click="showQrcodeModal = true">
         <text class="contact-icon">&#x1F4AC;</text>
-        <text>联系客服</text>
+        <text>联系开发者</text>
       </button>
     </view>
   </view>

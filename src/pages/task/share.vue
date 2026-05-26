@@ -7,20 +7,22 @@
           <text class="stat-label">分享任务</text>
         </view>
         <view class="stat-divider"></view>
-        <view class="stat-divider"></view>
+        <view class="stat-block">
+          <text class="stat-name">{{ creatorName || '好友' }}</text>
+          <text class="stat-label">来自</text>
+        </view>
       </view>
     </view>
+
     <!-- 内容区域 -->
     <view class="content-container">
-
-      <!-- 任务列表 -->
       <view v-show="listShow" class="task-list">
         <view v-if="taskList.length === 0" class="empty-state">
           <text class="empty-icon">📋</text>
-          <text class="empty-text">今天没有任务，来创建一个吧！</text>
+          <text class="empty-text">{{ loadError ? '加载失败或分享已过期' : '没有可收下的任务' }}</text>
         </view>
 
-        <view v-for="task in taskList" :key="task.id"> <!-- 添加 key 提高性能 -->
+        <view v-for="task in taskList" :key="task.id">
           <TaskCard
               @toggle-select="toggleSelect"
               :mode="mode"
@@ -31,269 +33,247 @@
       </view>
     </view>
 
-    <!-- 底部栏 -->
+    <!-- 底部栏：只保留群组选择 + 收下相关按钮 -->
     <schedule-bottom-bar
         :buttons="buttons"
+        :show-group-member="false"
         @member-change="handleMemberChange"
         @buttonClick="handleButtonClick"/>
+
+    <!-- 成员选择弹窗：选择/新建成员来收下 -->
+    <MemberSelectPopup
+        :visible="popupVisible"
+        :group-id="currentGroup?.id"
+        @close="popupVisible = false"
+        @select="onSelectMember"
+        @create="onCreateMember"/>
   </view>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import apiTs from '../../utils/apiTs'
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue'
 import TaskCard from '../../components/task/task-card.vue'
-import DateUtils from "../../utils/util";
-import { onLoad, onShow } from "@dcloudio/uni-app";
-import {getStoredData, removeStoredData, setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
-import {setShareToken} from "../../utils/token";
-import {autoLogin} from "../../utils/auth";
+import MemberSelectPopup from '../../components/member-select-popup.vue'
+import { onLoad } from "@dcloudio/uni-app";
+import { setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
+import { setShareToken } from "../../utils/token";
+import { autoLogin } from "../../utils/auth";
+import { ensureCurrentGroup } from "../../utils/currentGroupResolver";
 
 // =============== 响应式状态 ===============
-const pointBalance = ref(0)
-const taskList = ref([]) // Task[] 类型会自动推断
-const currentDate = ref(new Date())
+const taskList = ref([])
 const listShow = ref(true)
-const isLoginSuccessful = ref(false);
+const isLoginSuccessful = ref(false)
+const loadError = ref(false)
+const creatorName = ref('')
 
 const buttons = ref([
-  { code: 'copy', text: '收下' },
-  { code: 'copyToNewMember', text: '新成员收下' }
+  { code: 'selectAll', text: '全选' },
+  { code: 'toggleSelectAll', text: '反选' },
+  { code: 'receive', text: '收下' }
 ])
 
-const currentMember = ref(null) // object 类型
-const currentGroup = ref(null) // object 类型
-
-const mode = ref('share');
-// 新增：存储选中的任务 ID
-const selectedTaskIds = ref(new Set());
-
-const flowType = 'POINTS';
+const currentGroup = ref(null)
+const currentMember = ref(null)
+const mode = ref('share')
+const selectedTaskIds = ref(new Set())
+const popupVisible = ref(false)
 
 // =============== 计算属性 ===============
-
 const totalCount = computed(() => taskList.value.length)
 
+// =============== 选择逻辑 ===============
+const isTaskSelected = (task) => selectedTaskIds.value.has(task.id)
 
-// =============== 方法 ===============
-
-async function fetchAllData() {
-  await Promise.all([fetchPointBalance(), fetchTaskList()])
-  // 退出分享模式时，清空选中状态
-  if (mode.value !== 'share') {
-    selectedTaskIds.value.clear();
-  }
-}
-
-async function fetchPointBalance() {
-  if (!currentMember.value || !currentGroup.value) {
-    console.warn('Member or Group not selected, skipping balance fetch.');
-    return;
-  }
-  const req = {
-    flowType: flowType,
-    targetUserId: currentMember.value.userId,
-    groupId: currentGroup.value.id
-  }
-  try {
-    pointBalance.value = await apiTs.flow.balance(req)
-  } catch (error) {
-    console.error('获取余额失败:', error);
-    // 可以设置一个默认值或提示用户
-  }
-
-}
-
-async function handleButtonClick(buttonCode) {
-  switch (buttonCode) {
-    case 'selectAll':
-      // 全选
-      selectedTaskIds.value.clear();
-      taskList.value.forEach(task => {
-        selectedTaskIds.value.add(task.id);
-      });
-      break;
-    case 'toggleSelectAll':
-      // 反选
-      const newSelectedIds = new Set();
-      taskList.value.forEach(task => {
-        if (!selectedTaskIds.value.has(task.id)) {
-          // 未完成且未被选中 -> 选中它
-          newSelectedIds.add(task.id);
-        } else if (selectedTaskIds.value.has(task.id)) {
-          // 已被选中 -> 不包含在新集合中（即取消选中）
-        }
-      });
-      selectedTaskIds.value = newSelectedIds;
-      break;
-    case 'copyToNewMember' :
-      // 添加新成员并复制
-      uni.showModal({
-        title: '添加新成员',
-        placeholderText: '请输入昵称',
-        editable: true,
-        success: async (res1) => {
-          if (res1.confirm && res1.content && res1.content.trim()) {
-            const nickname = res1.content.trim();
-            const userResp = await apiTs.group.user.add({ groupId: currentGroup.value.id, nickname: nickname });
-            await receiveToUser(userResp.userId, currentGroup.value.id);
-          } else if(res1.cancel) {
-            // 用户取消输入
-          }
-        },
-        fail: (failRes) => {
-          console.error("Modal 失败:", failRes);
-          uni.showToast({ title: "操作中断", icon: "none" });
-        }
-      });
-      break;
-    case 'copy':
-      await receiveToUser(currentMember.value.userId,currentGroup.value.id)
-      break;
-    default:
-      // 可以选择在这里处理未知的 buttonCode，或者什么都不做
-      console.warn('Unknown button code:', buttonCode);
-      break;
-  }
-}
-
-
-
-const receiveToUser = async (targetUserId,groupId) => {
-
-  taskList.value.forEach(task => {
-    task.id = null;
-  })
-
-  const req = { // 移除了类型注解
-    targetUserId:targetUserId, // 访问 ref 的值
-    groupId: groupId,          // 访问 ref 的值
-    items: taskList.value          // 访问 ref 的值
-  };
-  await apiTs.schedule.save(req);
-  switchToTab()
-}
-
-
-const switchToTab = ()=>{
-  const uri = '/pages/tabBar/task'
-  setStoredData(STORAGE_KEYS.REFRESH_TAB,uri)
-  uni.switchTab({
-    url: uri // 确保路径正确
-  });
-}
-
-// 判断任务是否被选中
-const isTaskSelected = (task) => {
-  return selectedTaskIds.value.has(task.id);
-};
-
-// 切换单个任务的选中状态
 const toggleSelect = (task) => {
-  if (mode.value !== 'share') return; // 只在分享模式下有效
-
-  if (selectedTaskIds.value.has(task.id)) {
-    selectedTaskIds.value.delete(task.id);
-  } else {
-    if (!task.isCompleted) { // 可选：不允许选中已完成的任务
-      selectedTaskIds.value.add(task.id);
-    }
-  }
-  console.log('Selected IDs:', selectedTaskIds.value);
-};
-
-// 处理成员切换
-async function handleMemberChange(e) {
-  currentMember.value = e.currentMember;
-  currentGroup.value = e.currentGroup;
+  if (mode.value !== 'share') return
+  if (selectedTaskIds.value.has(task.id)) selectedTaskIds.value.delete(task.id)
+  else selectedTaskIds.value.add(task.id)
 }
-// =============== 生命周期 ===============
-onMounted(() => {
-})
 
-// 获取分享内容
-const fetchSharedContent = async (token) => {
-  await uni.showLoading({title: "加载中..."});
-  try {
-    // 1. 调用后端接口获取分享内容
-    const content = await apiTs.share.getContent(token)
-    taskList.value = JSON.parse(content)
+function selectAll() {
+  selectedTaskIds.value.clear()
+  taskList.value.forEach(t => selectedTaskIds.value.add(t.id))
+}
+function toggleSelectAll() {
+  const next = new Set()
+  taskList.value.forEach(t => { if (!selectedTaskIds.value.has(t.id)) next.add(t.id) })
+  selectedTaskIds.value = next
+}
 
-    await handleButtonClick('selectAll');
-
-    console.log(taskList.value)
-
-  } catch (err) {
-    console.error("❌ 获取分享内容失败:", err);
-    await uni.showToast({
-      title: err.message || "加载失败，请稍后重试",
-      icon: "none"
-    });
-  } finally {
-    uni.hideLoading();
+function handleButtonClick(buttonCode) {
+  switch (buttonCode) {
+    case 'selectAll': selectAll(); break
+    case 'toggleSelectAll': toggleSelectAll(); break
+    case 'receive': openReceive(); break
+    default: console.warn('Unknown button code:', buttonCode); break
   }
-};
+}
 
+// 打开成员选择弹窗（先确保有可用群组）
+async function openReceive() {
+  if (selectedTaskIds.value.size === 0) {
+    uni.showToast({ title: '请先选择要收下的任务', icon: 'none' })
+    return
+  }
+  if (!currentGroup.value) {
+    const group = await ensureCurrentGroup()
+    if (!group) {
+      uni.showToast({ title: '你还没有群组，请先在 App 创建群组', icon: 'none' })
+      return
+    }
+    currentGroup.value = group
+  }
+  popupVisible.value = true
+}
+
+// 选择已有成员收下
+async function onSelectMember(member) {
+  popupVisible.value = false
+  await receiveToUser(member.userId, currentGroup.value.id)
+}
+
+// 新建成员并收下（多用于给小朋友收）
+async function onCreateMember(nickname) {
+  try {
+    uni.showLoading({ title: '创建成员中...', mask: true })
+    const userResp = await apiTs.group.user.add({ groupId: currentGroup.value.id, nickname })
+    popupVisible.value = false
+    uni.hideLoading()
+    await receiveToUser(userResp.userId, currentGroup.value.id)
+  } catch (e) {
+    uni.hideLoading()
+    console.error('新建成员失败:', e)
+    uni.showToast({ title: e?.message || '新建成员失败', icon: 'none' })
+  }
+}
+
+// 把选中的任务保存给目标成员
+const receiveToUser = async (targetUserId, groupId) => {
+  const selected = taskList.value.filter(t => selectedTaskIds.value.has(t.id))
+  if (selected.length === 0) {
+    uni.showToast({ title: '请先选择要收下的任务', icon: 'none' })
+    return
+  }
+  // 收下=新建副本：清空 id；parentId 指向分享者的目标，在本群组不存在，归零避免悬挂
+  const items = selected.map(t => ({ ...t, id: null, parentId: 0 }))
+  try {
+    uni.showLoading({ title: '收下中...', mask: true })
+    await apiTs.schedule.save({ targetUserId, groupId, items })
+    uni.hideLoading()
+    uni.showToast({ title: `已收下 ${items.length} 个任务`, icon: 'success' })
+    setTimeout(() => switchToTab(), 800)
+  } catch (e) {
+    uni.hideLoading()
+    console.error('收下失败:', e)
+    uni.showToast({ title: e?.message || '收下失败，请重试', icon: 'none' })
+  }
+}
+
+const switchToTab = () => {
+  const uri = '/pages/tabBar/task'
+  setStoredData(STORAGE_KEYS.REFRESH_TAB, uri)
+  uni.switchTab({ url: uri })
+}
+
+// 底部栏群组切换
+function handleMemberChange(e) {
+  currentGroup.value = e.currentGroup
+  currentMember.value = e.currentMember
+}
+
+// =============== 加载分享内容 ===============
+const fetchSharedContent = async (token) => {
+  uni.showLoading({ title: '加载中...' })
+  try {
+    const res = await apiTs.share.getContent(token)
+    // 新结构：{ creatorNickname, data: [...] }；兼容旧的裸 JSON 字符串
+    let list = []
+    if (typeof res === 'string') {
+      list = JSON.parse(res)
+    } else if (res && Array.isArray(res.data)) {
+      list = res.data
+      creatorName.value = res.creatorNickname || ''
+    } else if (Array.isArray(res)) {
+      list = res
+    }
+    taskList.value = Array.isArray(list) ? list : []
+    selectAll()
+    loadError.value = taskList.value.length === 0
+  } catch (err) {
+    console.error("获取分享内容失败:", err)
+    loadError.value = true
+    uni.showToast({ title: err?.message || "加载失败，请稍后重试", icon: "none" })
+  } finally {
+    uni.hideLoading()
+  }
+}
+
+// 解析分享 token，覆盖三种进入方式：
+// 1) 旧链接转发：query.token
+// 2) 扫小程序码：query.scene（getUnlimitedQRCode 的 scene，URL 编码）
+// 3) 冷启动扫码：scene 只在小程序启动参数里（页面 onLoad query 为空时兜底）
+function resolveShareToken(query) {
+  let raw = (query && (query.token || query.scene)) || ''
+  // #ifdef MP-WEIXIN
+  if (!raw && typeof wx !== 'undefined') {
+    try {
+      const enter = (wx.getEnterOptionsSync && wx.getEnterOptionsSync())
+          || (wx.getLaunchOptionsSync && wx.getLaunchOptionsSync()) || {}
+      const q = enter.query || {}
+      raw = q.token || q.scene || ''
+      console.log('[share] enterOptions:', JSON.stringify(enter))
+    } catch (e) { console.warn('[share] getEnterOptionsSync 失败:', e) }
+  }
+  // #endif
+  if (raw) { try { raw = decodeURIComponent(raw) } catch (e) { /* token 为纯 hex，理论不会抛 */ } }
+  return raw
+}
 
 onLoad(async (query) => {
-  console.log("🚀 页面 onLoad 参数:", query);
-  const token = query && query.token;
-  if (token) {
-    setShareToken(token);
-    try {
-      // 等待 autoLogin 完成
-      const loginToken = await autoLogin(token);
-      console.log("✅ 自动登录成功, 获取到 token:", loginToken);
-      isLoginSuccessful.value = true;
-    } catch (loginError) {
-      // 处理自动登录失败
-      console.error("❌ 自动登录失败:", loginError);
-      await uni.showToast({
-        title: loginError.message || "自动登录失败，请尝试手动登录", // 更具体的提示
-        icon: "none",
-        duration: 3000 // 稍长一些的显示时间
-      });
-      // 即使登录失败，也可以考虑是否加载公开部分或给出提示
-    }
-
-    if (isLoginSuccessful.value) {
-      // 如果必须登录：
-      console.log("➡️ 准备获取分享内容...");
-      await fetchSharedContent(token);
-    } else {
-      console.log("🛑 由于未登录，暂不加载需要登录的分享内容。");
-      // 可能需要显示登录提示或其他UI状态
-    }
-  } else {
-    console.warn("⚠️ 缺少分享令牌");
-    await uni.showToast({title: "缺少分享令牌", icon: "none"});
+  console.log('[share] onLoad query:', JSON.stringify(query))
+  const token = resolveShareToken(query)
+  if (!token) {
+    loadError.value = true
+    uni.showToast({ title: "缺少分享令牌", icon: "none" })
+    return
   }
-});
+  setShareToken(token)
+  try {
+    await autoLogin(token)
+    isLoginSuccessful.value = true
+  } catch (loginError) {
+    console.error("自动登录失败:", loginError)
+    uni.showToast({ title: loginError?.message || "自动登录失败", icon: "none", duration: 3000 })
+  }
+  if (isLoginSuccessful.value) {
+    // 预解析当前群组，收下时弹窗直接可用
+    ensureCurrentGroup().then(g => { if (g && !currentGroup.value) currentGroup.value = g })
+    await fetchSharedContent(token)
+  }
+})
 </script>
+
 <style scoped>
-/* --- 全局容器 --- */
 .page-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: #f5f5f5;
 }
-
-/* --- 内容容器 --- */
 .content-container {
   display: flex;
   flex-direction: column;
-  flex-grow: 1; /* 或者保持 flex: 1; 但要确保父级 page-container 是 flex column */
-  overflow-y: auto; /* 启用滚动 */
-  -webkit-overflow-scrolling: touch; /* 平滑滚动 */
-  box-sizing: border-box; /* 确保 padding 不增加总高度 */
+  flex-grow: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
   margin-top: 84px;
   padding-top: 10px;
   padding-bottom: 84px;
 }
-
-/* --- 任务统计卡片 --- */
 .task-stats-card {
   background: white;
   border-radius: 16rpx;
@@ -304,71 +284,20 @@ onLoad(async (query) => {
   position: fixed;
   width: 100%;
   height: 60px;
-  z-index: 100
+  z-index: 100;
 }
-
-/* --- 任务统计卡片内部样式 --- */
-.stats-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.stat-block {
-  text-align: center;
-  flex: 1;
-}
-
-.stat-number {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #2196f3;
-  display: block;
-}
-
-.stat-label {
-  font-size: 24rpx;
-  color: #888;
-  margin-top: 8rpx;
-}
-
-.stat-divider {
-  width: 2rpx;
-  height: 40rpx;
-  background: #eee;
-}
-
-.task-list {
-  padding: 0 16rpx; /* 左右 padding 保留 */
-  flex-grow: 1;
-}
-
-
-/* --- 空状态 --- */
+.stats-row { display: flex; align-items: center; justify-content: space-between; }
+.stat-block { text-align: center; flex: 1; }
+.stat-number { font-size: 36rpx; font-weight: bold; color: #2196f3; display: block; }
+.stat-name { font-size: 30rpx; font-weight: bold; color: #1f2937; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-label { font-size: 24rpx; color: #888; margin-top: 8rpx; }
+.stat-divider { width: 2rpx; height: 40rpx; background: #eee; }
+.task-list { padding: 0 16rpx; flex-grow: 1; }
 .empty-state {
-  text-align: center;
-  padding: 40rpx;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  text-align: center; padding: 40rpx;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
 }
-
-.empty-icon {
-  font-size: 72rpx;
-  margin-bottom: 20rpx;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: #999;
-}
-
-
-/* --- 小屏适配 --- */
-@media (max-width: 375px) {
-  .stat-number {
-    font-size: 32rpx;
-  }
-}
+.empty-icon { font-size: 72rpx; margin-bottom: 20rpx; }
+.empty-text { font-size: 28rpx; color: #999; }
+@media (max-width: 375px) { .stat-number { font-size: 32rpx; } }
 </style>

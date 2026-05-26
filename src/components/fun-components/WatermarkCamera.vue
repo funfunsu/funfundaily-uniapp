@@ -1,64 +1,117 @@
 <template>
-  <!-- 全屏/半屏遮罩容器 -->
   <view class="wm-overlay" @tap.self="handleClose">
     <view
-      class="wm-container"
-      :class="fullscreen ? 'wm-container--full' : 'wm-container--half'"
+      class="wm-shell"
+      :class="fullscreen ? 'wm-shell--full' : 'wm-shell--half'"
       @tap.stop
     >
-      <view class="wm-header">
-        <text class="wm-title">水印拍照</text>
-        <text class="wm-close" @click="handleClose">×</text>
+      <!-- ===== 顶栏：标题 + 当前模板 + 关闭按钮 ===== -->
+      <view class="wm-topbar">
+        <view class="wm-topbar__meta">
+          <text class="wm-topbar__title">水印拍照</text>
+          <text class="wm-topbar__divider">·</text>
+          <text class="wm-topbar__subtitle">{{ currentTemplate.emoji }} {{ currentTemplate.name }}</text>
+        </view>
+        <view class="wm-topbar__close" @click="handleClose">
+          <text class="wm-topbar__close-icon">×</text>
+        </view>
       </view>
 
-      <view class="wm-body" @tap.stop>
-        <image
-          v-if="resultImg"
-          :src="resultImg"
-          class="wm-preview"
-          mode="aspectFit"
-        />
-        <view v-if="isRendering" class="wm-loading">
-          <view class="wm-loading-dot"></view>
-          <view class="wm-loading-main">
-            <text class="wm-loading-text">{{ renderStage }}</text>
-            <view class="wm-progress-track">
-              <view class="wm-progress-bar" :style="{ width: renderProgress + '%' }"></view>
+      <!-- ===== 照片预览舞台 ===== -->
+      <view class="wm-stage" @tap.stop>
+        <view class="wm-frame">
+          <image
+            v-if="resultImg"
+            :src="resultImg"
+            class="wm-preview"
+            mode="aspectFit"
+          />
+          <view v-else class="wm-empty">
+            <text class="wm-empty__icon">📷</text>
+            <text class="wm-empty__text">拍照或从相册选择</text>
+          </view>
+          <view v-if="isRendering" class="wm-progress">
+            <view class="wm-progress__card">
+              <view class="wm-progress__pulse"></view>
+              <view class="wm-progress__main">
+                <text class="wm-progress__stage">{{ renderStage }}</text>
+                <view class="wm-progress__track">
+                  <view class="wm-progress__bar" :style="{ width: renderProgress + '%' }"></view>
+                </view>
+              </view>
+              <text class="wm-progress__percent">{{ renderProgress }}%</text>
             </view>
           </view>
         </view>
-        <view class="wm-input-row" v-if="!props.initialWatermarkName" @tap.stop>
-          <input
-            v-model="customWatermark"
-            placeholder="自定义水印（如植物名称）"
-            @tap.stop
-          />
-        </view>
-
-        <view class="wm-actions">
-          <button class="wm-btn wm-btn--ghost" type="default" @click="handleTakePhoto">重拍</button>
-          <button class="wm-btn wm-btn--ghost" type="default" :disabled="!resultImg || isRendering" @click="handleSave">
-            保存到相册
-          </button>
-          <!-- #ifdef MP-WEIXIN -->
-          <button
-            class="wm-btn wm-btn--primary"
-            type="primary"
-            :disabled="!resultImg || isRendering"
-            @tap="handleShareImageMenu"
-          >
-            分享照片
-          </button>
-          <!-- #endif -->
-          <!-- #ifndef MP-WEIXIN -->
-          <button class="wm-btn wm-btn--primary" type="primary" :disabled="!resultImg || isRendering" @click="handleShareFallback">
-            分享照片
-          </button>
-          <!-- #endif -->
-        </view>
       </view>
 
-      <!-- 隐藏画布用于绘制水印 -->
+      <!-- ===== 自定义水印输入（仅在父组件没传 initialWatermarkName 时显示） ===== -->
+      <view class="wm-input" v-if="!props.initialWatermarkName" @tap.stop>
+        <input
+          v-model="customWatermark"
+          placeholder="自定义水印（如植物名称）"
+          class="wm-input__field"
+          placeholder-class="wm-input__placeholder"
+          @tap.stop
+        />
+      </view>
+
+      <!-- ===== 模板选择 ===== -->
+      <view class="wm-templates" @tap.stop>
+        <text class="wm-templates__label">水印样式</text>
+        <scroll-view scroll-x class="wm-templates__scroll" show-scrollbar="false">
+          <view class="wm-templates__row">
+            <view
+              v-for="t in WATERMARK_TEMPLATES"
+              :key="t.id"
+              class="wm-template-chip"
+              :class="{ 'wm-template-chip--active': currentTemplateId === t.id }"
+              @tap.stop="selectTemplate(t.id)"
+            >
+              <text class="wm-template-chip__emoji">{{ t.emoji }}</text>
+              <text class="wm-template-chip__name">{{ t.name }}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- ===== 操作按钮 ===== -->
+      <view class="wm-actions">
+        <button class="wm-btn wm-btn--ghost" @click="handleTakePhoto">
+          <text class="wm-btn__icon">📷</text>
+          <text class="wm-btn__text">拍照</text>
+        </button>
+        <button class="wm-btn wm-btn--ghost" @click="handleChooseAlbum">
+          <text class="wm-btn__icon">🖼️</text>
+          <text class="wm-btn__text">相册</text>
+        </button>
+        <button class="wm-btn wm-btn--ghost" :disabled="!resultImg || isRendering" @click="handleSave">
+          <text class="wm-btn__icon">⤓</text>
+          <text class="wm-btn__text">保存</text>
+        </button>
+        <!-- #ifdef MP-WEIXIN -->
+        <button
+          class="wm-btn wm-btn--primary"
+          :disabled="!resultImg || isRendering"
+          @tap="handleShareImageMenu"
+        >
+          <text class="wm-btn__icon">↗</text>
+          <text class="wm-btn__text">分享</text>
+        </button>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN -->
+        <button
+          class="wm-btn wm-btn--primary"
+          :disabled="!resultImg || isRendering"
+          @click="handleShareFallback"
+        >
+          <text class="wm-btn__icon">↗</text>
+          <text class="wm-btn__text">分享</text>
+        </button>
+        <!-- #endif -->
+      </view>
+
+      <!-- ===== 隐藏画布（绘制用，不展示） ===== -->
       <!-- #ifdef MP-WEIXIN -->
       <canvas
         v-if="!isH5"
@@ -94,7 +147,7 @@ const props = defineProps({
   // 兼容旧字段
   initialWatermark: { type: String, default: '' },
   // 小程序码图片地址（建议放在 static 下）
-  miniProgramCodeSrc: { type: String, default: '/static/images/miniprogram-code-event.png' }
+  miniProgramCodeSrc: { type: String, default: '/static/images/minipro_event_qr.png' }
 })
 
 const emit = defineEmits(['photoTaken', 'close', 'shareRequested'])
@@ -113,6 +166,78 @@ let renderTimer = null
 const PREVIEW_MAX_SIDE = 1200
 const HD_MAX_SIDE = 2800
 
+// ===== 水印模板系统 =====
+// 每套模板负责：
+//   1) computeLayout(sw, sh, maxSide) → 决定 canvas 整体尺寸 + 原图放置矩形
+//      —— 这步必须保证 photoRect 的宽高比 ≡ 原图宽高比，drawImage 才不会拉伸
+//   2) getBackground → canvas 底色（无返回则不填底，直接铺图）
+//   3) decorate → 在原图绘制完成后叠加文字 / 边框 / 小程序码
+// 新增模板时往 WATERMARK_TEMPLATES 里追加一项即可，UI 选择条会自动出现。
+function defaultComputeLayout(sw, sh, maxSide) {
+  const scale = Math.min(1, maxSide / Math.max(sw, sh))
+  const w = Math.max(1, Math.floor(sw * scale))
+  const h = Math.max(1, Math.floor(sh * scale))
+  return { canvasW: w, canvasH: h, photoRect: { x: 0, y: 0, w, h } }
+}
+
+function polaroidComputeLayout(sw, sh, maxSide) {
+  // 关键：先按 maxSide 把原图缩好，photoRect 用原图等比尺寸，
+  // 再在 canvas 四周补上拍立得的白边，从而避免对原图做非等比拉伸。
+  const scale = Math.min(1, maxSide / Math.max(sw, sh))
+  const pw = Math.max(1, Math.floor(sw * scale))
+  const ph = Math.max(1, Math.floor(sh * scale))
+  const side = Math.max(20, Math.floor(pw * 0.035))
+  const top = side
+  const bottom = Math.max(120, Math.floor(ph * 0.22))
+  return {
+    canvasW: pw + side * 2,
+    canvasH: top + ph + bottom,
+    photoRect: { x: side, y: top, w: pw, h: ph },
+  }
+}
+
+const WATERMARK_TEMPLATES = [
+  {
+    id: 'editorial',
+    name: '杂志',
+    emoji: '📰',
+    computeLayout: defaultComputeLayout,
+    getBackground: () => null,
+    decorate: drawEditorialTemplate,
+  },
+  {
+    id: 'minimal',
+    name: '极简',
+    emoji: '🌿',
+    computeLayout: defaultComputeLayout,
+    getBackground: () => null,
+    decorate: drawMinimalTemplate,
+  },
+  {
+    id: 'polaroid',
+    name: '拍立得',
+    emoji: '📷',
+    computeLayout: polaroidComputeLayout,
+    getBackground: () => '#fbf6ec',
+    decorate: drawPolaroidTemplate,
+  },
+]
+
+const currentTemplateId = ref('editorial')
+const currentTemplate = computed(() => {
+  return WATERMARK_TEMPLATES.find((t) => t.id === currentTemplateId.value) || WATERMARK_TEMPLATES[0]
+})
+
+function selectTemplate(id) {
+  if (currentTemplateId.value === id) return
+  currentTemplateId.value = id
+  if (originalImg.value) {
+    isRendering.value = true
+    startRenderProgress()
+    drawWatermark(PREVIEW_MAX_SIDE)
+  }
+}
+
 // 组件实例，用于 H5 等平台正确获取 canvas 上下文
 const instance = getCurrentInstance()
 
@@ -122,14 +247,15 @@ const isH5 = computed(() => {
 })
 
 onMounted(() => {
-  // 组件弹出时立即触发拍照
-  handleTakePhoto()
+  // 组件弹出时立即让用户选择来源：拍照 或 从相册选择
+  pickInitialPhoto()
 })
 
-function handleTakePhoto() {
+// 统一的取图逻辑：sourceType 决定是相机、相册，还是二者都可选（弹系统菜单）
+function chooseImage(sourceType) {
   uni.chooseImage({
     count: 1,
-    sourceType: ['camera'],
+    sourceType,
     success: (res) => {
       if (res.tempFilePaths && res.tempFilePaths.length > 0) {
         originalImg.value = res.tempFilePaths[0]
@@ -141,10 +267,26 @@ function handleTakePhoto() {
       }
     },
     fail: () => {
-      // 用户取消拍照时直接关闭
-      handleClose()
+      // 还没有任何照片时取消（即首次进入直接退出）才关闭整个面板；
+      // 已选过照片时重新取图被取消，则保留当前照片，不关闭。
+      if (!originalImg.value) handleClose()
     }
   })
+}
+
+// 首次进入：相机 + 相册都可选，不强制必须当下拍摄
+function pickInitialPhoto() {
+  chooseImage(['camera', 'album'])
+}
+
+// 拍照（实时拍摄）
+function handleTakePhoto() {
+  chooseImage(['camera'])
+}
+
+// 从相册上传已有照片
+function handleChooseAlbum() {
+  chooseImage(['album'])
 }
 
 function startRenderProgress() {
@@ -344,212 +486,412 @@ function getPosterHeadlineLines() {
   return { titleLine: legacy, dayLine: '' }
 }
 
-function drawVerticalBrandColumn(ctx, brandText, x, startY, endY, step) {
-  for (let y = startY; y <= endY; y += step) {
-    ctx.fillText(brandText, x, y)
+// ===== 模板绘制工具 =====
+
+/**
+ * 统一 canvas 样式 API：
+ * - 现代浏览器 / 微信 canvas-2d 直接走 ctx.fillStyle 等属性
+ * - 旧版 uni-app canvas 走 ctx.setFillStyle 等方法
+ * 模板里只要调 setFill / setStroke / setFont 等就能跨平台。
+ */
+function makeCanvasApi(ctx) {
+  const legacy = typeof ctx.setFillStyle === 'function' && typeof ctx.fillStyle === 'undefined'
+  return {
+    legacy,
+    setFill(v) { if (legacy) ctx.setFillStyle(v); else ctx.fillStyle = v },
+    setStroke(v) { if (legacy) ctx.setStrokeStyle(v); else ctx.strokeStyle = v },
+    setLineWidth(v) { if (legacy) ctx.setLineWidth(v); else ctx.lineWidth = v },
+    setTextAlign(v) {
+      if (legacy && ctx.setTextAlign) ctx.setTextAlign(v)
+      else if (!legacy) ctx.textAlign = v
+    },
+    setTextBaseline(v) {
+      if (legacy && ctx.setTextBaseline) ctx.setTextBaseline(v)
+      else if (!legacy) ctx.textBaseline = v
+    },
+    setFont(spec, size) {
+      if (legacy) ctx.setFontSize(size)
+      else ctx.font = spec
+    },
+    measureWidth(text) {
+      if (ctx.measureText) {
+        try { return ctx.measureText(text).width } catch (e) { /* ignore */ }
+      }
+      return String(text || '').length * 12
+    },
   }
 }
 
-function drawPosterFrameBrand(ctx, width, height, brandText) {
-  const frame = Math.max(18, Math.floor(Math.min(width, height) * 0.038))
-  const frameColor = 'rgba(198,234,62,0.88)'
-  const cornerColor = 'rgba(0, 122, 255, 0.88)'
-
-  ctx.fillStyle = frameColor
-  ctx.fillRect(0, 0, width, frame)
-  ctx.fillRect(0, height - frame, width, frame)
-  ctx.fillRect(0, 0, frame, height)
-  ctx.fillRect(width - frame, 0, frame, height)
-
-  const corner = Math.max(frame * 2.1, Math.floor(Math.min(width, height) * 0.12))
-  ctx.beginPath()
-  ctx.moveTo(width - corner, 0)
-  ctx.lineTo(width, 0)
-  ctx.lineTo(width, corner)
-  ctx.closePath()
-  ctx.fillStyle = cornerColor
-  ctx.fill()
-
-  const corner2 = Math.max(frame * 2.1, Math.floor(Math.min(width, height) * 0.12))*2
-  ctx.beginPath()
-  ctx.moveTo(0, height - corner2)
-  ctx.lineTo(0, height)
-  ctx.lineTo(corner2, height)
-  ctx.closePath()
-  ctx.fillStyle = cornerColor
-  ctx.fill()
-
-  const textColor = 'rgba(0,160,120,0.56)'
-  const fontSize = Math.max(12, Math.floor(frame * 0.52))
-  ctx.font = `500 ${fontSize}px sans-serif`
-  ctx.fillStyle = textColor
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-
-  const tile = Math.max(170, Math.floor(width / 3.2))
-  for (let x = frame * 1.05; x < width - frame; x += tile) {
-    ctx.fillText(brandText, x, frame / 2)
-    ctx.fillText(brandText, x, height - frame / 2)
+/**
+ * 在 rect 区域内画一个圆角小程序码（minimal / polaroid 模板共用）。
+ * 假设传进来的 image 已经过 buildTransparentQR 处理（白底变透明），
+ * 因此不再绘制白色底板，让 QR 直接叠在照片 / 模板背景上。
+ */
+function drawRoundMiniCode(ctx, image, rect) {
+  if (!image || !rect) return
+  const { x, y, size } = rect
+  const radius = Math.max(8, Math.floor(size * 0.18))
+  if (ctx.save && ctx.clip) {
+    ctx.save()
+    drawRoundRectPath(ctx, x, y, size, size, radius)
+    ctx.clip()
+    try { ctx.drawImage(image, x, y, size, size) } catch (e) { /* ignore */ }
+    ctx.restore()
+  } else {
+    try { ctx.drawImage(image, x, y, size, size) } catch (e) { /* ignore */ }
   }
-
-
-  // 右侧边框（竖排，从上到下）
-  ctx.save()
-  ctx.translate(width - frame / 2, frame * 1.8)
-  ctx.rotate(Math.PI / 2)
-  for (let y = frame; y < height - frame * 3.0; y += Math.max(200, Math.floor(height / 3.6))) {
-    ctx.fillText(brandText, y, 1.8  )
-  }
-  ctx.restore()
-
-
-  // 左侧边框（竖排，从上到下）
-  ctx.save()
-  ctx.translate(frame / 2, frame * 1.8)
-  ctx.rotate(-Math.PI / 2)
-  for (let y = frame; y < height - frame * 3.0; y += Math.max(200, Math.floor(height / 3.6))) {
-    ctx.fillText(brandText, y-height, 1.8)
-  }
-  ctx.restore()
-
-  return { frame, corner }
 }
 
-function drawPosterHeadline(ctx, rightX, topY, titleLine, dayLine, width) {
-  const titleSize = Math.max(34, Math.floor(width / 14))*0.8
-  const daySize = titleSize*0.8
-  const drawOutlined = (text, x, y, size, fill, maxWidth) => {
-    if (!text) return
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'top'
-    ctx.lineJoin = 'round'
-    ctx.miterLimit = 2
-    let finalSize = size
-    ctx.font = `900 ${finalSize}px sans-serif`
-    if (maxWidth) {
-      while (finalSize > 24 && ctx.measureText(text).width > maxWidth) {
-        finalSize -= 2
-        ctx.font = `900 ${finalSize}px sans-serif`
+/**
+ * 把白底小程序码处理成透明背景：
+ * - H5 / 微信 canvas 2d：用 offscreen canvas + getImageData，把接近白色的像素 alpha 设为 0
+ * - 其他平台（旧版 uni-app canvas）：直接返回原图，前端肉眼会看到白底，但不会崩
+ *
+ * 阈值 brightnessSum = R + G + B：JPEG 压缩噪点也通常 > 690，QR 数据点 < 200，
+ * 这里取 600，能过滤掉接近白色的所有亮像素，又不会误伤 QR 的黑色 / 边缘。
+ */
+function buildTransparentQR(image, size) {
+  if (!image || !size) return image
+  try {
+    // H5
+    if (typeof document !== 'undefined' && document.createElement) {
+      const temp = document.createElement('canvas')
+      temp.width = size
+      temp.height = size
+      const tctx = temp.getContext('2d')
+      if (!tctx) return image
+      tctx.clearRect(0, 0, size, size)
+      tctx.drawImage(image, 0, 0, size, size)
+      try {
+        const data = tctx.getImageData(0, 0, size, size)
+        const buf = data.data
+        for (let i = 0; i < buf.length; i += 4) {
+          if (buf[i] + buf[i + 1] + buf[i + 2] > 600) {
+            buf[i + 3] = 0
+          }
+        }
+        tctx.putImageData(data, 0, 0)
+        return temp
+      } catch (e) {
+        // 跨域图等导致 canvas 被污染，无法读像素，直接返回原图
+        return image
       }
     }
-    ctx.strokeStyle = 'rgba(8,14,24,0.95)'
-    ctx.lineWidth = Math.max(6, Math.floor(finalSize * 0.24))
-    ctx.strokeText(text, x, y)
-    ctx.strokeStyle = 'rgba(0,210,220,0.96)'
-    ctx.lineWidth = Math.max(3, Math.floor(finalSize * 0.1))
-    ctx.strokeText(text, x, y)
-    ctx.fillStyle = fill
-    ctx.fillText(text, x, y)
-    return finalSize
+    // 微信小程序 canvas 2d
+    if (typeof wx !== 'undefined' && wx.createOffscreenCanvas) {
+      const off = wx.createOffscreenCanvas({ type: '2d', width: size, height: size })
+      if (!off || !off.getContext) return image
+      const octx = off.getContext('2d')
+      if (!octx) return image
+      octx.clearRect(0, 0, size, size)
+      octx.drawImage(image, 0, 0, size, size)
+      try {
+        const data = octx.getImageData(0, 0, size, size)
+        const buf = data.data
+        for (let i = 0; i < buf.length; i += 4) {
+          if (buf[i] + buf[i + 1] + buf[i + 2] > 600) {
+            buf[i + 3] = 0
+          }
+        }
+        octx.putImageData(data, 0, 0)
+        return off
+      } catch (e) {
+        return image
+      }
+    }
+  } catch (e) {
+    // any failure: fall back to original
   }
+  return image
+}
 
-  const maxWidth = Math.max(140, Math.floor(width * 0.56))
-  const hasTitle = !!titleLine
-  const usedTitleSize = drawOutlined(titleLine, rightX, topY, titleSize, 'rgba(255,255,255,0.98)', maxWidth) || titleSize
+/**
+ * 杂志模板：照片满铺，顶部琥珀色短线 + 大标题 + 天数胶囊；底部薄玻璃栏放品牌、时间、QR。
+ * 视觉灵感来自 Apple Photos / NYT Cooking 这类编辑级图文排版：把照片当主角，文字保持克制。
+ */
+function drawEditorialTemplate(ctx, params) {
+  const { width, height, titleLine, dayLine, brand, timeStr, miniCodeImage } = params
+  const api = makeCanvasApi(ctx)
+
+  const padX = Math.max(40, Math.floor(width * 0.06))
+  const padTop = Math.max(40, Math.floor(height * 0.06))
+  const accentColor = '#fbbf24' // amber-400，暖色调与多数照片兼容
+
+  // ===== 顶部渐变托底 =====
+  // 让白字在浅色照片上也能稳定可读；只压到顶部 32%，不破坏构图。
+  const topShade = Math.max(200, Math.floor(height * 0.32))
+  if (ctx.createLinearGradient) {
+    const grad = ctx.createLinearGradient(0, 0, 0, topShade)
+    grad.addColorStop(0, 'rgba(8, 12, 24, 0.55)')
+    grad.addColorStop(0.55, 'rgba(8, 12, 24, 0.18)')
+    grad.addColorStop(1, 'rgba(8, 12, 24, 0)')
+    api.setFill(grad)
+  } else {
+    api.setFill('rgba(8, 12, 24, 0.4)')
+  }
+  ctx.fillRect(0, 0, width, topShade)
+
+  // ===== 标题（粗白，溢出会自动缩字号） =====
+  const titleText = String(titleLine || '记录此刻')
+  let titleSize = Math.max(46, Math.floor(width / 14))
+  const titleFontFamily = '"PingFang SC", "Hiragino Sans", sans-serif'
+  api.setFont(`800 ${titleSize}px ${titleFontFamily}`, titleSize)
+  const maxTitleW = width - padX * 2
+  while (titleSize > 28 && api.measureWidth(titleText) > maxTitleW) {
+    titleSize -= 2
+    api.setFont(`800 ${titleSize}px ${titleFontFamily}`, titleSize)
+  }
+  api.setFill('rgba(255, 255, 255, 0.98)')
+  api.setTextAlign('left')
+  api.setTextBaseline('top')
+  ctx.fillText(titleText, padX, padTop)
+
+  // ===== 琥珀短线 + 天数胶囊 =====
+  const accentY = padTop + titleSize + Math.max(16, Math.floor(titleSize * 0.22))
+  const accentH = Math.max(4, Math.floor(titleSize * 0.07))
+  const accentW = Math.max(60, Math.floor(titleSize * 1.1))
+  api.setFill(accentColor)
+  ctx.fillRect(padX, accentY, accentW, accentH)
+
   if (dayLine) {
-    const y = hasTitle ? (topY + usedTitleSize + Math.max(8, Math.floor(usedTitleSize * 0.2))) : topY
-    const normalizedDay = String(dayLine).replace(/\s+/g, '')
-    drawOutlined(normalizedDay, rightX, y, daySize, 'rgba(255,230,26,0.98)', maxWidth)
-  }
-}
-
-function drawThemePill(ctx, x, y, width, height, text, font, textColor) {
-  const radius = Math.max(10, Math.floor(height * 0.45))
-  const grad = ctx.createLinearGradient(x, y, x + width, y + height)
-  grad.addColorStop(0, 'rgba(0,122,255,0.4)')
-  grad.addColorStop(1, 'rgba(0,122,255,0.26)')
-  ctx.shadowColor = 'rgba(0,122,255,0.14)'
-  ctx.shadowBlur = Math.max(6, Math.floor(height * 0.35))
-  ctx.shadowOffsetY = Math.max(2, Math.floor(height * 0.08))
-  drawRoundRectPath(ctx, x, y, width, height, radius)
-  ctx.fillStyle = grad
-  ctx.fill()
-  ctx.shadowColor = 'rgba(0,0,0,0)'
-  ctx.shadowBlur = 0
-  ctx.shadowOffsetY = 0
-  drawRoundRectPath(ctx, x, y, width, height, radius)
-  ctx.strokeStyle = 'rgba(180,225,255,0.48)'
-  ctx.lineWidth = 1
-  ctx.stroke()
-  ctx.font = font
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  const padX = Math.max(10, Math.floor(height * 0.42))
-  ctx.fillStyle = textColor
-  ctx.fillText(text, x + padX, y + height / 2)
-}
-
-function drawCircularTimeText(ctx, text, centerX, centerY, radius, fontSize, useUniApi = false) {
-  const chars = Array.from(String(text || ''))
-  if (!chars.length) return
-
-  const arcSpan = Math.max(Math.PI * 0.9, Math.min(Math.PI * 1.35, chars.length * 0.16))
-  const start = Math.PI / 2 + arcSpan / 2
-
-  for (let i = 0; i < chars.length; i += 1) {
-    const angle = start - (chars.length === 1 ? 0 : (i * arcSpan) / (chars.length - 1))
-    const x = centerX + Math.cos(angle) * radius
-    const y = centerY + Math.sin(angle) * radius
-    if (ctx.save) ctx.save()
-    if (ctx.translate) ctx.translate(x, y)
-    if (ctx.rotate) ctx.rotate(angle + Math.PI / 2 + Math.PI)
-
-    if (useUniApi) {
-      if (ctx.setFontSize) ctx.setFontSize(Math.max(14, Math.floor(fontSize)))
-      if (ctx.setTextAlign) ctx.setTextAlign('center')
-      if (ctx.setTextBaseline) ctx.setTextBaseline('middle')
-      if (ctx.setFillStyle) ctx.setFillStyle('rgba(235,244,255,0.96)')
-      ctx.fillText(chars[i], 0, 0)
-    } else {
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.font = `500 ${Math.max(14, Math.floor(fontSize))}px sans-serif`
-      ctx.fillStyle = 'rgba(235,244,255,0.96)'
-      ctx.fillText(chars[i], 0, 0)
-    }
-
-    if (ctx.restore) ctx.restore()
-  }
-}
-
-function drawQrCircularBackdrop(ctx, centerX, centerY, size, pad, useUniApi = false) {
-  const outerR = size / 2 + pad
-
-  if (useUniApi) {
-    if (ctx.beginPath && ctx.arc) {
-      ctx.beginPath()
-      ctx.arc(centerX, centerY, outerR, 0, Math.PI * 2)
-      if (ctx.setFillStyle) ctx.setFillStyle('rgba(198,234,62,0.88)')
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(centerX, centerY, outerR, 0, Math.PI * 2)
-      if (ctx.setStrokeStyle) ctx.setStrokeStyle('rgba(8,194,214,0.90)')
-      if (ctx.setLineWidth) ctx.setLineWidth(Math.max(1, Math.floor(pad * 0.2)))
-      ctx.stroke()
-    }
-    return outerR
-  }
-
-  if (ctx.beginPath && ctx.arc) {
-    ctx.beginPath()
-    ctx.arc(centerX, centerY, outerR, 0, Math.PI * 2)
-    // ctx.shadowColor = 'rgba(8,194,214,0.88)'
-    // ctx.shadowBlur = Math.max(6, Math.floor(pad * 0.9))
-    // ctx.shadowOffsetY = Math.max(1, Math.floor(pad * 0.2))
-    ctx.fillStyle = 'rgba(198,234,62,0.88)'
+    const dayText = String(dayLine).replace(/\s+/g, '')
+    const daySize = Math.max(22, Math.floor(titleSize * 0.42))
+    api.setFont(`700 ${daySize}px sans-serif`, daySize)
+    const dayTextW = api.measureWidth(dayText)
+    const chipPadX = Math.max(14, Math.floor(daySize * 0.7))
+    const chipPadY = Math.max(8, Math.floor(daySize * 0.32))
+    const chipW = dayTextW + chipPadX * 2
+    const chipH = daySize + chipPadY * 2
+    const chipX = padX + accentW + Math.max(16, Math.floor(titleSize * 0.2))
+    const chipY = accentY + Math.floor((accentH - chipH) / 2)
+    drawRoundRectPath(ctx, chipX, chipY, chipW, chipH, chipH / 2)
+    api.setFill(accentColor)
     ctx.fill()
-    ctx.shadowColor = 'rgba(0,0,0,0)'
-    ctx.shadowBlur = 0
-    ctx.shadowOffsetY = 0
-
-    ctx.beginPath()
-    ctx.arc(centerX, centerY, outerR, 0, Math.PI * 2)
-    ctx.strokeStyle = 'rgba(198,234,62,0.88)'
-    ctx.lineWidth = Math.max(1, Math.floor(pad * 0.2))
-    ctx.stroke()
+    api.setFill('#0f172a')
+    api.setTextAlign('left')
+    api.setTextBaseline('middle')
+    ctx.fillText(dayText, chipX + chipPadX, chipY + chipH / 2)
   }
 
-  return outerR
+  // ===== 底部薄玻璃栏 =====
+  const footerH = Math.max(120, Math.floor(height * 0.12))
+  const footerY = height - footerH
+  if (ctx.createLinearGradient) {
+    const grad = ctx.createLinearGradient(0, footerY, 0, height)
+    grad.addColorStop(0, 'rgba(8, 12, 24, 0)')
+    grad.addColorStop(1, 'rgba(8, 12, 24, 0.78)')
+    api.setFill(grad)
+  } else {
+    api.setFill('rgba(8, 12, 24, 0.62)')
+  }
+  ctx.fillRect(0, footerY, width, footerH)
+
+  // ===== 底部右：QR（带白色背板） =====
+  const codeSize = Math.max(90, Math.floor(Math.min(width, height) * 0.11))
+  const codeMargin = padX
+  const miniCodeRect = {
+    x: width - codeMargin - codeSize,
+    y: footerY + Math.floor((footerH - codeSize) / 2),
+    size: codeSize,
+  }
+  if (miniCodeImage) {
+    const platePad = Math.max(8, Math.floor(codeSize * 0.08))
+    const plateRadius = Math.max(12, Math.floor(codeSize * 0.18))
+    drawRoundRectPath(
+      ctx,
+      miniCodeRect.x - platePad,
+      miniCodeRect.y - platePad,
+      miniCodeRect.size + platePad * 2,
+      miniCodeRect.size + platePad * 2,
+      plateRadius
+    )
+    api.setFill('rgba(255, 255, 255, 0.96)')
+    ctx.fill()
+    drawRoundMiniCode(ctx, miniCodeImage, miniCodeRect)
+  }
+
+  // ===== 底部左：品牌（琥珀大写）+ 时间（浅灰），竖排堆叠 =====
+  const footerTextSize = Math.max(22, Math.floor(width / 40))
+  const brandText = String(brand || 'FUNGROWTH').toUpperCase()
+  const brandY = footerY + footerH / 2 - footerTextSize * 0.55
+  const dateY = footerY + footerH / 2 + footerTextSize * 0.55
+
+  api.setFont(`700 ${footerTextSize}px sans-serif`, footerTextSize)
+  api.setFill(accentColor)
+  api.setTextAlign('left')
+  api.setTextBaseline('middle')
+  ctx.fillText(brandText, padX, brandY)
+
+  const dateTextSize = Math.max(18, Math.floor(footerTextSize * 0.78))
+  api.setFont(`500 ${dateTextSize}px sans-serif`, dateTextSize)
+  api.setFill('rgba(241, 245, 249, 0.82)')
+  ctx.fillText(timeStr, padX, dateY)
+
+  return { miniCodeRect, miniCodeStyle: 'rounded' }
+}
+
+/**
+ * 极简模板：底部半透明黑色长条 + 标题 + 日期，右上角小天数胶囊，右下角圆角小程序码。
+ */
+function drawMinimalTemplate(ctx, params) {
+  const { width, height, titleLine, dayLine, brand, timeStr, smallFont, baseFont, miniCodeImage } = params
+  const api = makeCanvasApi(ctx)
+  const useLegacy = api.legacy
+
+  // 顶部右上：天数胶囊
+  if (dayLine) {
+    const chipFontSize = Math.max(20, Math.floor(baseFont * 0.7))
+    api.setFont(`600 ${chipFontSize}px sans-serif`, chipFontSize)
+    const chipText = String(dayLine).replace(/\s+/g, '')
+    const padX = Math.max(14, Math.floor(chipFontSize * 0.8))
+    const padY = Math.max(8, Math.floor(chipFontSize * 0.34))
+    const textW = api.measureWidth(chipText)
+    const chipW = textW + padX * 2
+    const chipH = chipFontSize + padY * 2
+    const margin = Math.max(20, Math.floor(width / 36))
+    const chipX = width - margin - chipW
+    const chipY = margin
+    drawRoundRectPath(ctx, chipX, chipY, chipW, chipH, chipH / 2)
+    api.setFill('rgba(255, 255, 255, 0.92)')
+    ctx.fill()
+    api.setFill('#0f172a')
+    api.setTextAlign('left')
+    api.setTextBaseline('middle')
+    ctx.fillText(chipText, chipX + padX, chipY + chipH / 2)
+  }
+
+  // 底部长条
+  const barH = Math.max(140, Math.floor(height * 0.16))
+  const barY = height - barH
+  if (ctx.createLinearGradient) {
+    const grad = ctx.createLinearGradient(0, barY, 0, height)
+    grad.addColorStop(0, 'rgba(8, 12, 24, 0)')
+    grad.addColorStop(0.35, 'rgba(8, 12, 24, 0.55)')
+    grad.addColorStop(1, 'rgba(8, 12, 24, 0.82)')
+    api.setFill(grad)
+  } else {
+    api.setFill('rgba(8, 12, 24, 0.72)')
+  }
+  ctx.fillRect(0, barY, width, barH)
+
+  // 标题
+  const titleSize = Math.max(34, Math.floor(width / 18))
+  const margin = Math.max(28, Math.floor(width / 32))
+  const titleY = barY + Math.floor(barH * 0.35)
+  api.setFont(`700 ${titleSize}px sans-serif`, titleSize)
+  api.setFill('rgba(255,255,255,0.98)')
+  api.setTextAlign('left')
+  api.setTextBaseline('middle')
+  ctx.fillText(String(titleLine || '记录此刻'), margin, titleY)
+
+  // 副信息：时间 + 品牌
+  const subSize = Math.max(20, Math.floor(titleSize * 0.5))
+  const subY = barY + Math.floor(barH * 0.72)
+  api.setFont(`500 ${subSize}px sans-serif`, subSize)
+  api.setFill('rgba(218, 226, 240, 0.82)')
+  ctx.fillText(`${timeStr}  ·  ${brand}`, margin, subY)
+
+  // 右下角小程序码占位
+  const codeSize = Math.max(110, Math.floor(Math.min(width, height) * 0.13))
+  const codeMargin = Math.max(20, Math.floor(width / 36))
+  const miniCodeRect = {
+    x: width - codeMargin - codeSize,
+    y: barY + Math.floor((barH - codeSize) / 2),
+    size: codeSize,
+  }
+  if (miniCodeImage) {
+    // 极简模板的 QR 落在底部深色栏里，透明 QR 直接叠会黑+黑没对比。
+    // 这里画一块带圆角的米白色背板托底，再叠 QR，保证扫码可识别。
+    const platePad = Math.max(8, Math.floor(codeSize * 0.08))
+    const plateRadius = Math.max(12, Math.floor(codeSize * 0.18))
+    drawRoundRectPath(
+      ctx,
+      miniCodeRect.x - platePad,
+      miniCodeRect.y - platePad,
+      miniCodeRect.size + platePad * 2,
+      miniCodeRect.size + platePad * 2,
+      plateRadius
+    )
+    api.setFill('rgba(255, 255, 255, 0.96)')
+    ctx.fill()
+    drawRoundMiniCode(ctx, miniCodeImage, miniCodeRect)
+  }
+
+  return { miniCodeRect, miniCodeStyle: 'rounded' }
+}
+
+/**
+ * 拍立得模板：原图缩进上半部分，下方留宽白边写标题和日期。
+ */
+function drawPolaroidTemplate(ctx, params) {
+  const { width, height, photoRect, titleLine, dayLine, brand, timeStr, miniCodeImage } = params
+  const api = makeCanvasApi(ctx)
+
+  // 给原图区描一根极细的米色边线，更像实体相纸
+  api.setStroke('rgba(0,0,0,0.06)')
+  api.setLineWidth(1)
+  ctx.strokeRect(photoRect.x, photoRect.y, photoRect.w, photoRect.h)
+
+  const bandTop = photoRect.y + photoRect.h
+  const bandHeight = height - bandTop
+  const padX = Math.max(28, Math.floor(width * 0.05))
+
+  // 布局：QR 放最左、和白边垂直居中；标题在 QR 右侧顶部；副信息在标题下；天数靠右
+  // 这样 QR 和天数分别落在白边的左右两端，再也不会重叠。
+  const codeSize = Math.max(80, Math.min(Math.floor(bandHeight * 0.72), Math.floor(width * 0.13)))
+  const miniCodeRect = {
+    x: padX,
+    y: bandTop + Math.floor((bandHeight - codeSize) / 2),
+    size: codeSize,
+  }
+
+  const textLeftX = miniCodeRect.x + miniCodeRect.size + Math.max(20, Math.floor(width * 0.025))
+
+  // 天数（先算尺寸，方便预留右侧宽度）
+  const daySize = dayLine ? Math.max(28, Math.floor(width / 22)) : 0
+  api.setFont(`700 ${daySize}px sans-serif`, daySize)
+  const dayText = String(dayLine || '').replace(/\s+/g, '')
+  const dayTextWidth = dayLine ? api.measureWidth(dayText) : 0
+  const dayReserve = dayLine ? dayTextWidth + Math.max(16, Math.floor(width * 0.02)) : 0
+  const textMaxWidth = width - padX - textLeftX - dayReserve
+
+  // 标题（粗体大字，必要时自动缩字号防止顶到天数）
+  let titleSize = Math.max(34, Math.floor(width / 20))
+  api.setFont(`800 ${titleSize}px "PingFang SC", "Hiragino Sans", sans-serif`, titleSize)
+  const titleText = String(titleLine || '记录此刻')
+  while (titleSize > 22 && api.measureWidth(titleText) > textMaxWidth) {
+    titleSize -= 2
+    api.setFont(`800 ${titleSize}px "PingFang SC", "Hiragino Sans", sans-serif`, titleSize)
+  }
+  api.setFill('#1f2937')
+  api.setTextAlign('left')
+  api.setTextBaseline('top')
+  const titleY = bandTop + Math.max(18, Math.floor(bandHeight * 0.18))
+  ctx.fillText(titleText, textLeftX, titleY)
+
+  // 副信息：时间 · 品牌
+  const subSize = Math.max(18, Math.floor(titleSize * 0.45))
+  api.setFont(`500 ${subSize}px sans-serif`, subSize)
+  api.setFill('#94a3b8')
+  api.setTextAlign('left')
+  api.setTextBaseline('top')
+  const subY = titleY + titleSize + Math.max(10, Math.floor(titleSize * 0.18))
+  ctx.fillText(`${timeStr}  ·  ${brand}`, textLeftX, subY)
+
+  // 天数：右侧大字，垂直居中对齐 QR / 整个白边
+  if (dayLine) {
+    api.setFont(`700 ${daySize}px sans-serif`, daySize)
+    api.setFill('#c98a1a')
+    api.setTextAlign('right')
+    api.setTextBaseline('middle')
+    ctx.fillText(dayText, width - padX, bandTop + bandHeight / 2)
+  }
+
+  if (miniCodeImage) {
+    drawRoundMiniCode(ctx, miniCodeImage, miniCodeRect)
+  }
+
+  return { miniCodeRect, miniCodeStyle: 'rounded' }
 }
 
 function drawWatermarkWeixin2d(maxSide, done) {
@@ -557,12 +899,11 @@ function drawWatermarkWeixin2d(maxSide, done) {
     src: originalImg.value,
     success: (info) => {
       setRenderStage('正在绘制底图...', 28)
-      const sourceWidth = info.width
-      const sourceHeight = info.height
-      const MAX_SIDE = maxSide
-      const scale = Math.min(1, MAX_SIDE / Math.max(sourceWidth, sourceHeight))
-      const width = Math.max(1, Math.floor(sourceWidth * scale))
-      const height = Math.max(1, Math.floor(sourceHeight * scale))
+      const template = currentTemplate.value
+      const layout = template.computeLayout(info.width, info.height, maxSide)
+      const width = layout.canvasW
+      const height = layout.canvasH
+      const photoRect = layout.photoRect
       canvasWidth.value = width
       canvasHeight.value = height
 
@@ -570,7 +911,9 @@ function drawWatermarkWeixin2d(maxSide, done) {
         queryWeixinCanvas2d(
           ({ node: canvas }) => {
             const ctx = canvas.getContext('2d')
-            const dpr = (typeof wx !== 'undefined' && wx.getSystemInfoSync ? wx.getSystemInfoSync().pixelRatio : 1) || 1
+            // pixelRatio 改用 getWindowInfo（getSystemInfoSync 已废弃），旧基础库回退
+            const dpr = (typeof wx !== 'undefined' && wx.getWindowInfo ? wx.getWindowInfo().pixelRatio
+              : (typeof wx !== 'undefined' && wx.getSystemInfoSync ? wx.getSystemInfoSync().pixelRatio : 1)) || 1
             canvas.width = Math.max(1, Math.floor(width * dpr))
             canvas.height = Math.max(1, Math.floor(height * dpr))
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -580,77 +923,34 @@ function drawWatermarkWeixin2d(maxSide, done) {
               canvas,
               info.path || originalImg.value,
               (baseImg) => {
-                ctx.drawImage(baseImg, 0, 0, width, height)
+                const bgFill = template.getBackground()
+
+                if (bgFill) {
+                  ctx.fillStyle = bgFill
+                  ctx.fillRect(0, 0, width, height)
+                }
+                ctx.drawImage(baseImg, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
                 const brand = 'fungrowth'
                 const timeStr = new Date().toLocaleString()
                 const baseFont = Math.max(22, Math.floor(width / 24))
                 const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
-                const codeGap = Math.max(8, Math.floor(width / 100))
-
-                setRenderStage('正在添加品牌时间水印...', 56)
-                const { frame } = drawPosterFrameBrand(ctx, width, height, brand)
-                const inset = Math.max(8, Math.floor(frame * 0.42))
                 const { titleLine, dayLine } = getPosterHeadlineLines()
-                drawPosterHeadline(ctx, width - frame - inset, frame + inset, titleLine, dayLine, width)
 
-                ctx.textAlign = 'left'
-                ctx.textBaseline = 'middle'
-                ctx.font = `400 ${smallFont}px sans-serif`
-                const timeTextHeight = smallFont
-
-                const codeSize = Math.max(120, Math.floor(Math.min(width, height) * 0.18))
-                const codeRect = {
-                  x: frame + inset,
-                  y: Math.max(
-                    frame + inset,
-                    height - frame - inset - codeSize - codeGap - timeTextHeight
-                  ),
-                  size: codeSize
-                }
-
-                const timeTextX = codeRect.x + codeRect.size / 2
-                const timeTextY = Math.min(
-                  height - frame - inset - Math.max(4, Math.floor(smallFont * 0.2)),
-                  codeRect.y + codeRect.size + codeGap + smallFont * 0.7
-                )
-                if (!props.miniProgramCodeSrc) {
-                  ctx.font = `500 ${smallFont}px sans-serif`
-                  ctx.textAlign = 'center'
-                  ctx.fillStyle = 'rgba(235,244,255,0.96)'
-                  ctx.shadowColor = 'rgba(0,0,0,0.35)'
-                  ctx.shadowBlur = Math.max(4, Math.floor(smallFont * 0.32))
-                  ctx.shadowOffsetY = 1
-                  ctx.fillText(timeStr, timeTextX, timeTextY)
-                  ctx.shadowColor = 'rgba(0,0,0,0)'
-                  ctx.shadowBlur = 0
-                  ctx.shadowOffsetY = 0
-                }
-
-                if (customWatermark.value && false) {
-                  setRenderStage('正在添加自定义水印...', 72)
-                  ctx.font = `500 ${smallFont}px sans-serif`
-                  const topPadding = margin
-                  const customText = customWatermark.value
-                  const customWidth = ctx.measureText(customText).width
-                  const maxCustomBoxWidth = width - margin * 2
-                  const customBoxWidth = Math.min(customWidth + padding * 2, maxCustomBoxWidth)
-                  const customBoxHeight = smallFont + padding * 2
-                  const customBoxX = Math.max(margin, width - margin - customBoxWidth)
-                  const customRadius = Math.max(8, Math.floor(padding))
-                  const customGradient = ctx.createLinearGradient(customBoxX, topPadding, customBoxX, topPadding + customBoxHeight)
-                  customGradient.addColorStop(0, 'rgba(34,42,66,0.56)')
-                  customGradient.addColorStop(1, 'rgba(20,26,40,0.42)')
-                  drawRoundRectPath(ctx, customBoxX, topPadding, customBoxWidth, customBoxHeight, customRadius)
-                  ctx.fillStyle = customGradient
-                  ctx.fill()
-                  drawRoundRectPath(ctx, customBoxX, topPadding, customBoxWidth, customBoxHeight, customRadius)
-                  ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-                  ctx.lineWidth = 1
-                  ctx.stroke()
-                  ctx.textBaseline = 'middle'
-                  ctx.fillStyle = 'rgba(245,249,255,0.95)'
-                  ctx.fillText(customText, customBoxX + padding, topPadding + customBoxHeight / 2)
+                const decorate = (miniCodeImage) => {
+                  setRenderStage('正在添加品牌时间水印...', 56)
+                  template.decorate(ctx, {
+                    width,
+                    height,
+                    photoRect,
+                    titleLine,
+                    dayLine,
+                    brand,
+                    timeStr,
+                    baseFont,
+                    smallFont,
+                    miniCodeImage,
+                  })
                 }
 
                 const export2d = () => {
@@ -686,11 +986,15 @@ function drawWatermarkWeixin2d(maxSide, done) {
                     finished = true
                     export2d()
                   }
-                  const watchdog = setTimeout(finishOnce, 1500)
+                  const watchdog = setTimeout(() => {
+                    decorate(null)
+                    finishOnce()
+                  }, 1500)
                   resolveMiniCodePath((codePath) => {
                     if (finished) return
                     clearTimeout(watchdog)
                     if (!codePath) {
+                      decorate(null)
                       finishOnce()
                       return
                     }
@@ -698,36 +1002,18 @@ function drawWatermarkWeixin2d(maxSide, done) {
                       canvas,
                       codePath,
                       (codeImg) => {
-                        const { x, y, size } = codeRect || getMiniCodeRect(width, height, margin)
-                        const pad = Math.max(8, Math.floor(size * 0.07))
-                        const cx = x + size / 2
-                        const cy = y + size / 2
-                        const outerR = drawQrCircularBackdrop(ctx, cx, cy, size, pad, false)
-
-                        ctx.save()
-                        ctx.beginPath()
-                        ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
-                        ctx.clip()
-                        ctx.drawImage(codeImg, x, y, size, size)
-                        ctx.restore()
-
-                        drawCircularTimeText(
-                          ctx,
-                          timeStr,
-                          cx,
-                          cy,
-                          outerR + Math.max(14, Math.floor(smallFont * 0.9)),
-                          Math.max(14, Math.floor(smallFont * 0.86)),
-                          false
-                        )
+                        const transparentQr = buildTransparentQR(codeImg, 400)
+                        decorate(transparentQr)
                         finishOnce()
                       },
                       () => {
+                        decorate(null)
                         finishOnce()
                       }
                     )
                   })
                 } else {
+                  decorate(null)
                   export2d()
                 }
               },
@@ -848,13 +1134,16 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
       setRenderStage('正在绘制底图...', 28)
       const sourceWidth = img.naturalWidth || img.width
       const sourceHeight = img.naturalHeight || img.height
-      // 限制长边，既防止超大图导致卡顿，也避免导出异常裁切
-      const MAX_SIDE = maxSide
-      const scale = Math.min(1, MAX_SIDE / Math.max(sourceWidth, sourceHeight))
-      const width = Math.max(1, Math.floor(sourceWidth * scale))
-      const height = Math.max(1, Math.floor(sourceHeight * scale))
+      // 模板自己算 canvas 尺寸和 photoRect，拍立得这种"图 + 白边"模板可以保留原图比例
+      const template = currentTemplate.value
+      const layout = template.computeLayout(sourceWidth, sourceHeight, maxSide)
+      const width = layout.canvasW
+      const height = layout.canvasH
+      const photoRect = layout.photoRect
       canvas.width = width
       canvas.height = height
+      canvasWidth.value = width
+      canvasHeight.value = height
       const ctx = canvas.getContext('2d')
       if (!ctx) {
         resultImg.value = originalImg.value
@@ -863,74 +1152,34 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
         return
       }
       ctx.clearRect(0, 0, width, height)
-      ctx.drawImage(img, 0, 0, width, height)
+
+      const bgFill = template.getBackground()
+      if (bgFill) {
+        ctx.fillStyle = bgFill
+        ctx.fillRect(0, 0, width, height)
+      }
+      ctx.drawImage(img, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
       const brand = 'fungrowth'
       const timeStr = new Date().toLocaleString()
       const baseFont = Math.max(22, Math.floor(width / 24))
       const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
-      const margin = Math.max(20, Math.floor(width / 40))
-
-      setRenderStage('正在添加品牌时间水印...', 56)
-      const { frame } = drawPosterFrameBrand(ctx, width, height, brand)
-      const inset = Math.max(8, Math.floor(frame * 0.42))
       const { titleLine, dayLine } = getPosterHeadlineLines()
-      drawPosterHeadline(ctx, width - frame - inset, frame + inset, titleLine, dayLine, width)
 
-      const codeGap = Math.max(8, Math.floor(width / 100))
-      const codeSize = Math.max(120, Math.floor(Math.min(width, height) * 0.18))
-      const codeRect = {
-        x: frame + inset,
-        y: Math.max(
-          frame + inset,
-          height - frame - inset - codeSize - codeGap - smallFont
-        ),
-        size: codeSize
-      }
-
-      const timeTextX = codeRect.x + codeRect.size / 2
-      const timeTextY = Math.min(
-        height - frame - inset - Math.max(4, Math.floor(smallFont * 0.2)),
-        codeRect.y + codeRect.size + codeGap + smallFont * 0.7
-      )
-      if (!props.miniProgramCodeSrc) {
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.font = `500 ${smallFont}px sans-serif`
-        ctx.fillStyle = 'rgba(235,244,255,0.96)'
-        ctx.shadowColor = 'rgba(0,0,0,0.35)'
-        ctx.shadowBlur = Math.max(4, Math.floor(smallFont * 0.32))
-        ctx.shadowOffsetY = 1
-        ctx.fillText(timeStr, timeTextX, timeTextY)
-        ctx.shadowColor = 'rgba(0,0,0,0)'
-        ctx.shadowBlur = 0
-        ctx.shadowOffsetY = 0
-      }
-
-      // 左上角自定义水印
-      if (customWatermark.value && false) {
-        setRenderStage('正在添加自定义水印...', 72)
-        ctx.font = `500 ${smallFont}px sans-serif`
-        const topPadding = margin
-        const customText = customWatermark.value
-        const customWidth = ctx.measureText(customText).width
-        const maxCustomBoxWidth = width - margin * 2
-        const customBoxWidth = Math.min(customWidth + padding * 2, maxCustomBoxWidth)
-        const customBoxHeight = smallFont + padding * 2
-        const customBoxX = Math.max(margin, width - margin - customBoxWidth)
-        const customRadius = Math.max(8, Math.floor(padding))
-        const customGradient = ctx.createLinearGradient(customBoxX, topPadding, customBoxX, topPadding + customBoxHeight)
-        customGradient.addColorStop(0, 'rgba(34,42,66,0.56)')
-        customGradient.addColorStop(1, 'rgba(20,26,40,0.42)')
-        drawRoundRectPath(ctx, customBoxX, topPadding, customBoxWidth, customBoxHeight, customRadius)
-        ctx.fillStyle = customGradient
-        ctx.fill()
-        drawRoundRectPath(ctx, customBoxX, topPadding, customBoxWidth, customBoxHeight, customRadius)
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-        ctx.lineWidth = 1
-        ctx.stroke()
-        ctx.fillStyle = 'rgba(245,249,255,0.95)'
-        ctx.fillText(customText, customBoxX + padding, topPadding + padding)
+      const decorate = (miniCodeImage) => {
+        setRenderStage('正在添加品牌时间水印...', 56)
+        template.decorate(ctx, {
+          width,
+          height,
+          photoRect,
+          titleLine,
+          dayLine,
+          brand,
+          timeStr,
+          baseFont,
+          smallFont,
+          miniCodeImage,
+        })
       }
 
       const exportImage = () => {
@@ -946,46 +1195,24 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
         }
       }
 
-      const drawMiniCodeAndExport = () => {
-        if (!props.miniProgramCodeSrc) {
-          exportImage()
-          return
-        }
+      if (props.miniProgramCodeSrc) {
         setRenderStage('正在添加小程序码...', 80)
         const codeImg = new Image()
         codeImg.crossOrigin = 'anonymous'
         codeImg.src = props.miniProgramCodeSrc
         codeImg.onload = () => {
-          const { x, y, size } = codeRect
-          const pad = Math.max(8, Math.floor(size * 0.07))
-          const cx = x + size / 2
-          const cy = y + size / 2
-          const outerR = drawQrCircularBackdrop(ctx, cx, cy, size, pad, false)
-
-          ctx.save()
-          ctx.beginPath()
-          ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
-          ctx.clip()
-          ctx.drawImage(codeImg, x, y, size, size)
-          ctx.restore()
-
-          drawCircularTimeText(
-            ctx,
-            timeStr,
-            cx,
-            cy,
-            outerR + Math.max(14, Math.floor(smallFont * 0.9)),
-            Math.max(14, Math.floor(smallFont * 0.86)),
-            false
-          )
+          const transparentQr = buildTransparentQR(codeImg, 400)
+          decorate(transparentQr)
           exportImage()
         }
         codeImg.onerror = () => {
+          decorate(null)
           exportImage()
         }
+      } else {
+        decorate(null)
+        exportImage()
       }
-
-      drawMiniCodeAndExport()
     }
     img.onerror = () => {
       resultImg.value = originalImg.value
@@ -1001,19 +1228,23 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
     src: originalImg.value,
     success: (info) => {
       setRenderStage('正在绘制底图...', 28)
-      const sourceWidth = info.width
-      const sourceHeight = info.height
-      const MAX_SIDE = maxSide
-      const scale = Math.min(1, MAX_SIDE / Math.max(sourceWidth, sourceHeight))
-      const width = Math.max(1, Math.floor(sourceWidth * scale))
-      const height = Math.max(1, Math.floor(sourceHeight * scale))
+      const template = currentTemplate.value
+      const layout = template.computeLayout(info.width, info.height, maxSide)
+      const width = layout.canvasW
+      const height = layout.canvasH
+      const photoRect = layout.photoRect
       canvasWidth.value = width
       canvasHeight.value = height
 
       nextTick(() => {
         const baseImgPath = info.path || originalImg.value
+        const bgFill = template.getBackground()
         try {
-          ctx.drawImage(baseImgPath, 0, 0, width, height)
+          if (bgFill) {
+            ctx.setFillStyle(bgFill)
+            ctx.fillRect(0, 0, width, height)
+          }
+          ctx.drawImage(baseImgPath, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
         } catch (e) {
           console.error('绘制底图失败:', e)
           resultImg.value = originalImg.value
@@ -1026,52 +1257,22 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
         const timeStr = new Date().toLocaleString()
         const baseFont = Math.max(22, Math.floor(width / 24))
         const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
-
-        setRenderStage('正在添加品牌时间水印...', 56)
-        const margin = Math.max(20, Math.floor(width / 40))
-        const { frame } = drawPosterFrameBrand(ctx, width, height, brand)
-        const inset = Math.max(8, Math.floor(frame * 0.42))
         const { titleLine, dayLine } = getPosterHeadlineLines()
-        drawPosterHeadline(ctx, width - frame - inset, frame + inset, titleLine, dayLine, width)
 
-        const codeGap = Math.max(8, Math.floor(width / 100))
-        const codeSize = Math.max(120, Math.floor(Math.min(width, height) * 0.18))
-        const codeRect = {
-          x: frame + inset,
-          y: Math.max(
-            frame + inset,
-            height - frame - inset - codeSize - codeGap - smallFont
-          ),
-          size: codeSize
-        }
-
-        const timeTextX = codeRect.x + codeRect.size / 2
-        const timeTextY = Math.min(
-          height - frame - inset - Math.max(4, Math.floor(smallFont * 0.2)),
-          codeRect.y + codeRect.size + codeGap + smallFont * 0.7
-        )
-        if (!props.miniProgramCodeSrc) {
-          if (ctx.setTextAlign) ctx.setTextAlign('center')
-          ctx.setFontSize(smallFont)
-          ctx.setFillStyle('rgba(235,244,255,0.96)')
-          ctx.fillText(timeStr, timeTextX, timeTextY)
-        }
-
-        // 自定义水印（右上）
-        if (customWatermark.value && false) {
-          setRenderStage('正在添加自定义水印...', 72)
-          const topPadding = margin
-          const customText = customWatermark.value
-          const customWidth = customText.length * smallFont * 0.6
-          const maxCustomBoxWidth = width - margin * 2
-          const customBoxWidth = Math.min(customWidth + padding * 2, maxCustomBoxWidth)
-          const customBoxHeight = smallFont + padding * 2
-          const customBoxX = Math.max(margin, width - margin - customBoxWidth)
-          ctx.setFillStyle('rgba(0,0,0,0.45)')
-          ctx.fillRect(customBoxX, topPadding, customBoxWidth, customBoxHeight)
-          ctx.setFontSize(smallFont)
-          ctx.setFillStyle('rgba(255,255,255,0.95)')
-          ctx.fillText(customText, customBoxX + padding, topPadding + padding)
+        const decorate = (miniCodeImage) => {
+          setRenderStage('正在添加品牌时间水印...', 56)
+          template.decorate(ctx, {
+            width,
+            height,
+            photoRect,
+            titleLine,
+            dayLine,
+            brand,
+            timeStr,
+            baseFont,
+            smallFont,
+            miniCodeImage,
+          })
         }
 
         const exportCanvas = () => {
@@ -1123,47 +1324,20 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
             exportCanvas()
           }
           const watchdog = setTimeout(() => {
+            decorate(null)
             finishOnce()
           }, 1500)
 
           resolveMiniCodePath((codePath) => {
             if (finished) return
             clearTimeout(watchdog)
-            if (codePath) {
-              try {
-                const { x, y, size } = codeRect
-                const pad = Math.max(8, Math.floor(size * 0.07))
-                const cx = x + size / 2
-                const cy = y + size / 2
-                const outerR = drawQrCircularBackdrop(ctx, cx, cy, size, pad, true)
-
-                if (ctx.save && ctx.clip && ctx.restore && ctx.arc) {
-                  ctx.save()
-                  ctx.beginPath()
-                  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2)
-                  ctx.clip()
-                  ctx.drawImage(codePath, x, y, size, size)
-                  ctx.restore()
-                } else {
-                  ctx.drawImage(codePath, x, y, size, size)
-                }
-
-                drawCircularTimeText(
-                  ctx,
-                  timeStr,
-                  cx,
-                  cy,
-                  outerR + Math.max(14, Math.floor(smallFont * 0.9)),
-                  Math.max(14, Math.floor(smallFont * 0.86)),
-                  true
-                )
-              } catch (e) {
-                console.error('绘制小程序码失败:', e)
-              }
-            }
+            // 旧版 uni-app canvas 的 drawImage 直接接受路径字符串，
+            // 这里把 codePath 当作图像传给模板，模板内 drawImage(codePath,...) 也能工作。
+            decorate(codePath || null)
             finishOnce()
           })
         } else {
+          decorate(null)
           exportCanvas()
         }
       })
@@ -1269,170 +1443,362 @@ function handleClose() {
 </script>
 
 <style scoped>
+/* ===== Dark photo-studio aesthetic =====
+ * 整体走"暗色摄影 app"调性：照片是主角，控件让位；
+ * 配色统一在 slate-900 系暗底 + 琥珀色 (#fbbf24) accent，与三套水印模板的色彩家族一致。
+ */
+
 .wm-overlay {
   position: fixed;
   left: 0;
   top: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
   display: flex;
   justify-content: center;
-  align-items: center;
-  z-index: 9999;
+  align-items: flex-end;
 }
 
-.wm-container {
-  background: #fff;
-  border-radius: 16rpx;
-  width: 90%;
+.wm-shell {
+  width: 100%;
+  max-width: 760rpx;
+  background: linear-gradient(180deg, #0b1120 0%, #1e293b 100%);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.wm-container--full {
-  height: 90%;
+.wm-shell--full {
+  height: 100%;
 }
 
-.wm-container--half {
-  height: 60%;
+.wm-shell--half {
+  height: 75%;
+  border-top-left-radius: 32rpx;
+  border-top-right-radius: 32rpx;
 }
 
-.wm-header {
-  padding: 20rpx;
+/* ===== Top bar ===== */
+.wm-topbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #eee;
+  padding: 24rpx 28rpx 12rpx;
 }
 
-.wm-title {
-  font-size: 32rpx;
-  font-weight: 600;
-}
-
-.wm-close {
-  font-size: 40rpx;
-}
-
-.wm-body {
-  padding: 20rpx;
+.wm-topbar__meta {
+  flex: 1;
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 10rpx;
+  min-width: 0;
+}
+
+.wm-topbar__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.5rpx;
+}
+
+.wm-topbar__divider {
+  color: rgba(248, 250, 252, 0.3);
+  font-size: 22rpx;
+}
+
+.wm-topbar__subtitle {
+  font-size: 22rpx;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.wm-topbar__close {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.wm-topbar__close:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wm-topbar__close-icon {
+  font-size: 40rpx;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1;
+}
+
+/* ===== Photo preview stage ===== */
+.wm-stage {
   flex: 1;
   min-height: 0;
+  padding: 8rpx 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wm-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 24rpx;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 30rpx 60rpx rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1rpx rgba(255, 255, 255, 0.05);
 }
 
 .wm-preview {
   width: 100%;
-  border-radius: 8rpx;
-  background: #f5f5f5;
-  flex: 1;
-  min-height: 0;
+  height: 100%;
 }
 
-.wm-loading {
+.wm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.wm-empty__icon {
+  font-size: 80rpx;
+  opacity: 0.5;
+}
+
+.wm-empty__text {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===== Progress overlay ===== */
+.wm-progress {
   position: absolute;
-  left: 50%;
-  top: 45%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  padding: 16rpx 24rpx;
-  border-radius: 999rpx;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 24rpx;
+  justify-content: center;
+  padding: 0 32rpx;
 }
 
-.wm-loading-main {
+.wm-progress__card {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  width: 100%;
+  max-width: 480rpx;
+  padding: 22rpx 26rpx;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1rpx solid rgba(251, 191, 36, 0.18);
+  border-radius: 20rpx;
+  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.5);
+}
+
+.wm-progress__pulse {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: #fbbf24;
+  flex-shrink: 0;
+  animation: wmPulse 1.1s infinite ease-in-out;
+  box-shadow: 0 0 16rpx rgba(251, 191, 36, 0.5);
+}
+
+.wm-progress__main {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  min-width: 240rpx;
+  min-width: 0;
 }
 
-.wm-loading-dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-  background: #fff;
-  animation: wmPulse 1s infinite ease-in-out;
+.wm-progress__stage {
+  font-size: 22rpx;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.wm-loading-text {
-  font-size: 24rpx;
-}
-
-.wm-progress-track {
+.wm-progress__track {
   width: 100%;
-  height: 8rpx;
+  height: 6rpx;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.24);
   overflow: hidden;
 }
 
-.wm-progress-bar {
+.wm-progress__bar {
   height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #60a5fa 0%, #34d399 100%);
-  transition: width 0.16s ease;
+  transition: width 0.18s ease;
+}
+
+.wm-progress__percent {
+  font-size: 22rpx;
+  color: #fbbf24;
+  font-weight: 600;
+  font-feature-settings: 'tnum';
+  flex-shrink: 0;
 }
 
 @keyframes wmPulse {
-  0% { transform: scale(0.8); opacity: 0.6; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(0.8); opacity: 0.6; }
+  0% { transform: scale(0.85); opacity: 0.7; }
+  50% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(0.85); opacity: 0.7; }
 }
 
-.wm-input-row {
-  margin-top: auto;
-  padding-top: 12rpx;
-  width: 100%;
-  overflow: hidden;
+/* ===== Custom watermark input ===== */
+.wm-input {
+  padding: 12rpx 32rpx 0;
 }
 
-input {
+.wm-input__field {
   width: 100%;
-  max-width: 100%;
+  height: 76rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  font-size: 26rpx;
   box-sizing: border-box;
-  border: 1px solid #ccc;
-  border-radius: 8rpx;
-  height: 72rpx;
-  line-height: 72rpx;
-  padding: 0 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
 }
 
-.wm-actions {
-  margin-top: 12rpx;
-  padding-top: 12rpx;
-  display: flex;
+.wm-input__placeholder {
+  color: rgba(248, 250, 252, 0.35);
+}
+
+/* ===== Template chips ===== */
+.wm-templates {
+  padding: 18rpx 32rpx 6rpx;
+}
+
+.wm-templates__label {
+  display: block;
+  font-size: 22rpx;
+  color: rgba(248, 250, 252, 0.45);
+  margin: 0 4rpx 12rpx;
+  font-weight: 500;
+  letter-spacing: 1rpx;
+}
+
+.wm-templates__scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.wm-templates__row {
+  display: inline-flex;
   gap: 12rpx;
+  padding: 2rpx 4rpx 8rpx;
+}
+
+.wm-template-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 16rpx 26rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.7);
+  font-size: 24rpx;
+  font-weight: 500;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.wm-template-chip__emoji {
+  font-size: 28rpx;
+}
+
+.wm-template-chip__name {
+  font-size: 24rpx;
+}
+
+.wm-template-chip--active {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.24) 0%, rgba(245, 158, 11, 0.18) 100%);
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+/* ===== Action buttons ===== */
+.wm-actions {
+  padding: 22rpx 32rpx 28rpx;
+  display: flex;
+  gap: 14rpx;
 }
 
 .wm-btn {
   flex: 1;
-  height: 72rpx;
-  line-height: 72rpx;
-  font-size: 26rpx;
-  border-radius: 40rpx;
+  height: 96rpx;
+  border-radius: 22rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  border: none;
+  margin: 0;
   padding: 0;
+  line-height: 1;
+  color: #f8fafc;
+  transition: opacity 0.2s, transform 0.1s;
 }
 
-.wm-btn--ghost {
-  background: #f5f5f5;
-  color: #333;
-  border: 1px solid #e6e6e6;
+.wm-btn::after {
+  border: none;
 }
 
-.wm-btn--primary {
-  background: #111;
-  color: #fff;
-  border: 1px solid #111;
+.wm-btn:active {
+  transform: scale(0.97);
 }
 
 .wm-btn[disabled] {
-  opacity: 0.5;
+  opacity: 0.35;
+}
+
+.wm-btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.wm-btn--primary {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1f2937;
+  box-shadow: 0 10rpx 28rpx rgba(251, 191, 36, 0.28);
+}
+
+.wm-btn__icon {
+  font-size: 30rpx;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.wm-btn__text {
+  font-size: 26rpx;
+  font-weight: 600;
 }
 </style>

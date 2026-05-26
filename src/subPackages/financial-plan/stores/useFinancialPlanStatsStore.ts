@@ -11,7 +11,7 @@ import type {
   AssetProfitSummary,
   ProfitSummary,
   ProgressSnapshot,
-} from '../../../../../api/financial-plan'
+} from '../api/financial-plan'
 
 /** 判断当前运行环境是否支持 uni 提示。 */
 function hasUniToast(): boolean {

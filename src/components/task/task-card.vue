@@ -47,6 +47,10 @@
       <template v-if="mode !== 'share'">
         <view class="task-actions">
           <template v-if="!isReadOnly">
+            <!-- 编辑入口：跳转任务编辑页（支持修改/删除） -->
+            <view class="task-edit-btn" @click.stop="handleEdit">
+              <text class="edit-icon">✏️</text>
+            </view>
             <!-- 按时间任务的 勾选框 (未完成=空心方框 / 完成=带对勾) -->
             <view
                 class="task-check-box"
@@ -162,6 +166,9 @@ const handleItemClick = () => {
 
 const switchToCheckinCalendar = (taskId) => {
   uni.navigateTo({ url: `/pages/task/checkin-calendar?taskId=${taskId}` });
+}
+const handleEdit = () => {
+  emit('edit-task', props.task);
 }
 const delayClick = () => {
   emit('delay-click', props.task)
@@ -290,6 +297,23 @@ const toggleSelection = () => {
 }
 .task-point--completed {
   color: #4caf50 !important;
+}
+
+/* --- 编辑按钮 全部rpx --- */
+.task-edit-btn {
+  width: 40rpx;
+  height: 40rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.task-edit-btn:active {
+  opacity: 0.6;
+}
+.edit-icon {
+  font-size: 30rpx;
+  line-height: 1;
 }
 
 /* ✅ ✅ ✅ 自定义勾选框 - 你调整的白底蓝勾样式 全部rpx 最终版 */

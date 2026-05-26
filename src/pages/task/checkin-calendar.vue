@@ -15,11 +15,25 @@
         :current-member="currentMember"
         @check-task="onTaskCheck"
         @delay-click="onTaskDelay"
+        @edit-task="openEditSheet"
     />
     <schedule-bottom-bar
         @member-change="handleMemberChange"
         :buttons = "buttons"
         @buttonClick ="handleButtonClick"
+    />
+
+    <!-- 任务编辑底部弹层 -->
+    <TaskEditSheet
+      :visible="editSheetVisible"
+      :edit-id="editSheetId"
+      :goal-list="editGoalList"
+      :cur-date="currentDate"
+      :group-id="currentGroup?.id"
+      :target-user-id="currentMember?.userId"
+      @close="editSheetVisible = false"
+      @saved="handleSaved"
+      @deleted="handleDeleted"
     />
   </view>
 </template>
@@ -33,6 +47,8 @@ import DateUtils from "../../utils/util";
 import apiTs from "../../utils/apiTs";
 import TaskCard from "../../components/task/task-card.vue";
 import TaskListContainer from "../../components/task/task-list-container.vue";
+import TaskEditSheet from "../../components/task/task-edit-sheet.vue";
+import { getStoredData, getStoredKey, STORAGE_KEYS } from "../../utils/storageManager";
 import {onLoad} from "@dcloudio/uni-app";
 
 const listShow = ref(true)
@@ -50,6 +66,11 @@ const taskList = ref([]) // Task[] 类型会自动推断
 const calendarData = ref([])
 const curTask = ref();
 const curTaskId = ref();
+
+// 任务编辑底部弹层
+const editSheetVisible = ref(false);
+const editSheetId = ref(null);
+const editGoalList = ref([]);
 
 
 // --- 生命周期 ---
@@ -69,10 +90,32 @@ const handleButtonClick = (buttonCode) => {
       if (!curTask.value || !curTask.value.id){
         return;
       }
-      uni.navigateTo({ url: `/pages/task/edit?id=${curTask.value.id}` });
+      openEditSheet(curTask.value);
       return;
   }
 };
+
+// ===== 任务编辑底部弹层 =====
+function loadEditGoalList() {
+  if (!currentMember.value?.userId) { editGoalList.value = []; return; }
+  const key = getStoredKey(STORAGE_KEYS.USER_ALL_GOAL, currentMember.value.userId);
+  editGoalList.value = getStoredData(key) || [];
+}
+function openEditSheet(task) {
+  if (!task?.id) return;
+  loadEditGoalList();
+  editSheetId.value = task.id;
+  editSheetVisible.value = true;
+}
+async function handleSaved() {
+  editSheetVisible.value = false;
+  if (curTaskId.value) await initCurTask(curTaskId.value);
+  await fetchScheduleData();
+}
+function handleDeleted() {
+  editSheetVisible.value = false;
+  uni.navigateBack({ delta: 1 });
+}
 
 const initCurTask = async (taskId) => {
   const req = {

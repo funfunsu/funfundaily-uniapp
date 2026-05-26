@@ -25,17 +25,24 @@
             @check-task="emit('check-task', $event)"
             @delay-click="emit('delay-click', $event)"
             @toggle-select="emit('toggle-select', $event)"
+            @add-task="emit('add-task')"
+            @edit-task="emit('edit-task', $event)"
         />
       </view>
     </view>
-    <!-- 无任务兜底 -->
-    <view v-show="goalTaskList.length === 0" class="empty-task">今日暂无任务</view>
+    <!-- 无任务兜底：normal 模式下展示新手引导卡片，其余模式保留简单文案 -->
+    <task-onboarding-guide
+        v-if="goalTaskList.length === 0 && mode === 'normal'"
+        @create-task="emit('create-task')"
+    />
+    <view v-show="goalTaskList.length === 0 && mode !== 'normal'" class="empty-task">今日暂无任务</view>
   </view>
 </template>
 
 <script setup>
 import {defineProps, defineEmits, ref, onMounted, watch} from 'vue'
 import TaskListContainer from "./task-list-container.vue";
+import TaskOnboardingGuide from "./task-onboarding-guide.vue";
 import {getStoredData, getStoredKey, setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
 import DateUtils from "../../utils/util";
 import apiTs from "../../utils/apiTs";
@@ -110,7 +117,10 @@ const emit = defineEmits([
   'check-task',
   'delay-click',
   'toggle-select',
-  'goal-title-click' // 目标标题点击事件
+  'goal-title-click', // 目标标题点击事件
+  'create-task', // 新手引导卡片：创建第一个任务
+  'add-task', // 透传：列表内新增任务
+  'edit-task' // 透传：列表内编辑任务
 ])
 
 // ✅ 3. 组件内部独立方法 - 分组折叠/展开 (原页面逻辑不变)

@@ -53,9 +53,9 @@ import {
   type ApiResponseEnvelope,
   type FinancialPlanApiContract,
   type FinancialPlanErrorCode,
-} from '../../../../../api/financial-plan'
-import type { RealizationOperation, RealizationBatch } from '../../../../../api/financial-plan-types'
-import type { Api13UpdateRealizationBatchRequest } from '../../../../../api/financial-plan'
+} from './financial-plan'
+import type { RealizationOperation, RealizationBatch } from './financial-plan-types'
+import type { Api13UpdateRealizationBatchRequest } from './financial-plan'
 
 const financialPlanErrorCodeSet = new Set<string>(Object.values(financialPlanErrorCode))
 

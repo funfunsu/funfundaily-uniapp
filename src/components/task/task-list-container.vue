@@ -64,7 +64,9 @@ const emit = defineEmits([
   'task-item-click',
   'check-task',
   'delay-click',
-  'toggle-select'
+  'toggle-select',
+  'add-task',  // 新增任务（由页面用底部弹层承接）
+  'edit-task'  // 编辑任务（由页面用底部弹层承接）
 ])
 
 // ✅ 3. 组件内部所有方法，逻辑和原页面完全一致，只是触发事件改为emit
@@ -79,16 +81,17 @@ const toggleSelect = (task) => {
   emit('toggle-select', task)
 };
 
-// 点击添加任务按钮
+// 点击添加任务按钮：交给页面用底部弹层处理
 const onAddTaskClick = () => {
-  uni.navigateTo({ url: '/pages/task/edit' });
+  emit('add-task')
 }
 
 // 任务项点击
 const onTaskItemClick = (taskId) => {
   // emit('task-item-click', taskId)
 }
-const onEditTask = (task) => { uni.navigateTo({ url: `/pages/task/edit?id=${task.id}` }); }
+// 编辑任务：交给页面用底部弹层处理
+const onEditTask = (task) => { emit('edit-task', task) }
 
 
 

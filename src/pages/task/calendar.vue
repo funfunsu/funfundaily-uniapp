@@ -13,9 +13,24 @@
         :current-member="currentMember"
         @check-task="onTaskCheck"
         @delay-click="onTaskDelay"
+        @add-task="onAddTaskClick"
+        @edit-task="openEditSheet"
     />
     <schedule-bottom-bar
         @member-change="handleMemberChange"
+    />
+
+    <!-- 任务编辑底部弹层 -->
+    <TaskEditSheet
+      :visible="editSheetVisible"
+      :edit-id="editSheetId"
+      :goal-list="editGoalList"
+      :cur-date="currentDate"
+      :group-id="currentGroup?.id"
+      :target-user-id="currentMember?.userId"
+      @close="editSheetVisible = false"
+      @saved="handleEditSheetDone"
+      @deleted="handleEditSheetDone"
     />
   </view>
 </template>
@@ -30,6 +45,8 @@ import apiTs from "../../utils/apiTs";
 import TaskCard from "../../components/task/task-card.vue";
 import TaskListContainer from "../../components/task/task-list-container.vue";
 import TaskUtil from "../../utils/taskUtil";
+import TaskEditSheet from "../../components/task/task-edit-sheet.vue";
+import { getStoredData, getStoredKey, STORAGE_KEYS } from "../../utils/storageManager";
 
 const listShow = ref(true)
 const currentMember = ref({}); // 使用 ref
@@ -39,6 +56,11 @@ const currentDate =  ref(new Date())
 
 const mode = ref('normal');
 const selectedTaskIds = ref(new Set());
+
+// 任务编辑底部弹层
+const editSheetVisible = ref(false);
+const editSheetId = ref(null);
+const editGoalList = ref([]);
 
 const taskList = ref([]) // Task[] 类型会自动推断
 // ✅ 模拟任务数据：格式固定【date:YYYY-MM-DD, count:数字】
@@ -140,6 +162,28 @@ async function fetchScheduleData() {
     console.error('获取日程信息失败:', e);
     // 可以在这里添加用户提示，比如 uni.showToast
   }
+}
+
+// ===== 任务编辑底部弹层 =====
+function loadEditGoalList() {
+  if (!currentMember.value?.userId) { editGoalList.value = []; return; }
+  const key = getStoredKey(STORAGE_KEYS.USER_ALL_GOAL, currentMember.value.userId);
+  editGoalList.value = getStoredData(key) || [];
+}
+function onAddTaskClick() {
+  loadEditGoalList();
+  editSheetId.value = null;
+  editSheetVisible.value = true;
+}
+function openEditSheet(task) {
+  if (!task?.id) return;
+  loadEditGoalList();
+  editSheetId.value = task.id;
+  editSheetVisible.value = true;
+}
+async function handleEditSheetDone() {
+  editSheetVisible.value = false;
+  await fetchScheduleData();
 }
 
 onMounted(() => { })

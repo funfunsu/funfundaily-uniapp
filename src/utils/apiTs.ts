@@ -47,7 +47,13 @@ const apiTs = {
         // 添加日程
         save: (data: ScheduleAddRequest): Promise<boolean> => api.post<boolean>('/api/schedule/save', data),
         copy: (data: ScheduleCopyRequest): Promise<boolean> => api.post<boolean>('/api/schedule/copy', data),
-        delete: (id): Promise<boolean> => api.delete<boolean>(`/api/schedule/${id}`, {})
+        delete: (id): Promise<boolean> => api.delete<boolean>(`/api/schedule/${id}`, {}),
+        // 停止关注 / 恢复关注：closeStatus = 'CLOSE' | 'OPEN'
+        close: (data: any): Promise<boolean> => api.post<boolean>('/api/schedule/close', data),
+        // 已停止关注列表（用于恢复入口）
+        closedList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/closed/list', data),
+        // 月度计划：群组维度的原始列表（不按天展开），前端按月份归属
+        planList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/plan/list', data)
     },
     // 积分相关接口
     point: {
@@ -188,6 +194,18 @@ const apiTs = {
         create: (data: any): Promise<Share> => api.post<Share>('/api/share/create', data),
         getContent: (token: string): Promise<any> => api.get(`/api/share/${token}`),
         accept: (token: string): Promise<any> => api.post(`/api/share/accept/${token}`),
+        // 生成分享二维码（微信小程序码），返回 { qrBase64, contentType }
+        qrcode: (data: { token: string; page?: string }): Promise<{ qrBase64: string; contentType: string }> =>
+            api.post<{ qrBase64: string; contentType: string }>('/api/share/qrcode', data),
+    },
+    invitation: {
+        list: (groupId: number | string): Promise<any[]> => api.get<any[]>('/api/invitation/list', { groupId }),
+        get: (id: number | string): Promise<any> => api.get<any>(`/api/invitation/${id}`),
+        save: (data: any): Promise<any> => api.post<any>('/api/invitation/save', data),
+        delete: (id: number | string): Promise<any> => api.delete<any>(`/api/invitation/${id}`),
+        // 受邀人「收下邀请」：依据原邀请 id 生成一条收到记录
+        accept: (data: { invitationId: number | string; recipientName?: string }): Promise<any> =>
+            api.post<any>('/api/invitation/accept', data),
     },
     universal_records:{
         // 添加打卡
