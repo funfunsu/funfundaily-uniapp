@@ -186,6 +186,32 @@
       ]
     },
     {
+      "root": "subPackages/abstain",
+      "pages": [
+        {
+          "path": "pages/list/index",
+          "style": {
+            "navigationBarTitleText": "戒断日记",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/calendar/index",
+          "style": {
+            "navigationBarTitleText": "戒断统计",
+            "enablePullDownRefresh": false
+          }
+        },
+        {
+          "path": "pages/share/index",
+          "style": {
+            "navigationBarTitleText": "戒断日记",
+            "enablePullDownRefresh": false
+          }
+        }
+      ]
+    },
+    {
       "root": "subPackages/study-tools",
       "pages": [
         {
