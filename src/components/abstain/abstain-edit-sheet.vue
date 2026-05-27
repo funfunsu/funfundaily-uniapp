@@ -20,11 +20,12 @@
 
         <view class="field">
           <text class="field__label">戒断结束日期</text>
-          <picker mode="date" :value="form.endDate" :start="minDate" @change="onEndDateChange">
-            <view class="field__input aes-picker">
-              <text :class="{ 'aes-picker--ph': !form.endDate }">{{ form.endDate || '选择目标坚持到的日期' }}</text>
-            </view>
-          </picker>
+          <DatePicker
+            v-model="form.endDate"
+            mode="date"
+            placeholder="选择目标坚持到的日期"
+            title="选择戒断结束日期"
+          />
           <text class="aes-hint">开始时间默认为创建时间{{ isEdit ? '（不可改）' : '' }}</text>
         </view>
 
@@ -53,6 +54,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { toDateKey } from '../../utils/abstainUtil'
+import DatePicker from '../fun-components/date-picker.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -64,7 +66,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save'])
 
 const isEdit = computed(() => !!(props.event && props.event.id))
-const minDate = toDateKey(new Date())
 
 const form = ref({ itemTitle: '', endDate: '', itemDesc: '' })
 
@@ -84,8 +85,6 @@ watch(
   },
   { immediate: true }
 )
-
-const onEndDateChange = (e) => { form.value.endDate = e.detail.value }
 
 function handleSave() {
   const title = (form.value.itemTitle || '').trim()
@@ -126,8 +125,6 @@ function handleClose() { emit('close') }
 .aes-close__icon { font-size: 40rpx; color: #64748b; line-height: 1; }
 .aes-body { max-height: 60vh; }
 .aes-ph { color: #b8c2cf; }
-.aes-picker { display: flex; align-items: center; }
-.aes-picker--ph { color: #b8c2cf; }
 .aes-hint { font-size: 22rpx; color: #94a3b8; margin-top: 8rpx; display: block; }
 .aes-actions { display: flex; gap: 20rpx; padding-top: 24rpx; }
 .aes-btn { flex: 1; height: 88rpx; border-radius: 44rpx; border: none; display: flex; align-items: center; justify-content: center; }
