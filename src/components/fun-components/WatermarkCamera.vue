@@ -137,6 +137,7 @@
 <script setup>
 import { ref, onMounted, watch, getCurrentInstance, computed, nextTick } from 'vue'
 import { APP_BRAND } from '../../utils/appBrand'
+import { saveImageToAlbum } from '../../utils/album'
 
 const props = defineProps({
   // 是否全屏覆盖，false 时为半屏弹层
@@ -1435,15 +1436,15 @@ function handleSave() {
       return
     }
 
-    uni.saveImageToPhotosAlbum({
-      filePath: resultImg.value,
-      success: () => {
+    saveImageToAlbum(resultImg.value)
+      .then(() => {
         uni.showToast({ title: '已保存到相册', icon: 'success' })
-      },
-      fail: () => {
-        uni.showToast({ title: '保存失败，请检查权限', icon: 'none' })
-      }
-    })
+      })
+      .catch((err) => {
+        console.error('保存到相册失败:', err)
+        const canceled = err && /取消/.test(err.message || '')
+        uni.showToast({ title: canceled ? '已取消保存' : '保存失败，请在设置中开启相册权限', icon: 'none' })
+      })
   }
 
   renderHdThen(doSave, '正在生成高清导出图...')

@@ -58,6 +58,7 @@
 <script setup>
 import { ref, watch, getCurrentInstance, nextTick } from 'vue'
 import { APP_BRAND } from '../../utils/appBrand'
+import { saveImageToAlbum } from '../../utils/album'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -360,11 +361,12 @@ function handleSave() {
   return
   // #endif
   // #ifndef H5
-  uni.saveImageToPhotosAlbum({
-    filePath: resultImg.value,
-    success: () => uni.showToast({ title: '已保存到相册', icon: 'success' }),
-    fail: () => uni.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
-  })
+  saveImageToAlbum(resultImg.value)
+    .then(() => uni.showToast({ title: '已保存到相册', icon: 'success' }))
+    .catch((err) => {
+      const canceled = err && /取消/.test(err.message || '')
+      uni.showToast({ title: canceled ? '已取消保存' : '保存失败，请在设置中开启相册权限', icon: 'none' })
+    })
   // #endif
 }
 
