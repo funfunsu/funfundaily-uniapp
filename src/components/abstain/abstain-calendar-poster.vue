@@ -87,7 +87,7 @@ const HEADER_H = 240
 const WEEK_H = 56
 const CELL_H = 84
 const GRID_ROWS = 6
-const FOOTER_H = 300
+const FOOTER_H = 360
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
 watch(

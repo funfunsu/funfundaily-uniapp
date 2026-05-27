@@ -86,7 +86,7 @@ const WIDTH = 600
 const PAD = 40
 const HEADER_H = 200
 const ROW_H = 96
-const FOOTER_H = 320
+const FOOTER_H = 360
 
 const isH5 = () => typeof process !== 'undefined' && process.env && process.env.UNI_PLATFORM === 'h5'
 
