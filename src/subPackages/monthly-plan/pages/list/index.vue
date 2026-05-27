@@ -144,16 +144,13 @@
       <!-- 一次性：选年 + 月 -->
       <view v-if="form.repeatType === 'none'" class="field">
         <text class="field__label">所在月份</text>
-        <picker
-          mode="date"
-          fields="month"
-          :value="form.yearMonth"
-          :start="pickerStart"
-          :end="pickerEnd"
-          @change="onYearMonthChange"
-        >
-          <view class="picker-box">{{ formatYearMonth(form.yearMonth) }}</view>
-        </picker>
+        <DatePicker
+          v-model="form.yearMonth"
+          mode="month"
+          :year-range="planYearRange"
+          placeholder="选择所在月份"
+          title="选择所在月份"
+        />
       </view>
 
       <!-- 每年：只选月 -->
@@ -194,6 +191,7 @@ import DateUtils from '../../../../utils/util'
 import { ensureCurrentGroup, ensureCurrentMember } from '../../../../utils/currentGroupResolver'
 import { STORAGE_KEYS, getStoredData, setStoredData, removeStoredData } from '../../../../utils/storageManager'
 import BottomSheet from '../../../../components/fun-components/bottom-sheet.vue'
+import DatePicker from '../../../../components/fun-components/date-picker.vue'
 
 const PLAN_TYPE = 'monthlyPlan'
 // 周期性计划的收尾：自基准年起向后 20 年，与「大事记」事件页一致的远期处理
@@ -223,9 +221,8 @@ const currentGroupIndex = computed(() => {
 })
 
 const monthOptions = Array.from({ length: 12 }, (_, i) => `${i + 1}月`)
-// 一次性计划允许选择的年月范围（往前 5 年 ~ 往后 30 年）
-const pickerStart = `${thisYear - 5}-01`
-const pickerEnd = `${thisYear + 30}-12`
+// 一次性计划允许选择的年份范围（往前 5 年 ~ 往后 30 年），供 date-picker month 模式使用
+const planYearRange = [thisYear - 5, thisYear + 30]
 
 // ---------- 解析工具：从日期字符串里取年/月，避免各端 new Date 解析差异 ----------
 function parseYearMonth(str) {
@@ -378,9 +375,6 @@ function closeForm() {
   editingId.value = null
 }
 
-function onYearMonthChange(e) {
-  form.value.yearMonth = e.detail.value // 'YYYY-MM'
-}
 function onMonthChange(e) {
   form.value.month = Number(e.detail.value) + 1
 }
@@ -536,12 +530,6 @@ async function removePlan() {
 function pad2(n) {
   return n < 10 ? `0${n}` : `${n}`
 }
-function formatYearMonth(ym) {
-  const parsed = parseYearMonth(ym)
-  if (!parsed) return '请选择月份'
-  return `${parsed.year}年${parsed.month}月`
-}
-
 onShow(() => {
   fetchPlans()
 })
