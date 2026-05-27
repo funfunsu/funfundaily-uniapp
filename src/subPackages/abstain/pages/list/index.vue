@@ -1,10 +1,19 @@
 <template>
   <view class="page">
     <view class="content">
+      <!-- 顶部 hero -->
+      <view class="abstain-hero">
+        <view class="abstain-hero__text">
+          <text class="abstain-hero__title">戒断日记</text>
+          <text class="abstain-hero__sub">{{ eventList.length ? `${eventList.length} 个目标坚持中 · 今天也要加油 💪` : '记录每一次自律，见证更好的自己' }}</text>
+        </view>
+        <view class="abstain-hero__badge"><text class="abstain-hero__emoji">🌿</text></view>
+      </view>
+
       <view v-if="!loading && eventList.length === 0" class="empty">
-        <text class="empty__icon">🚭</text>
+        <view class="empty__art"><text class="empty__icon">🚭</text></view>
         <text class="empty__title">还没有戒断事件</text>
-        <text class="empty__text">点击右下角「新建」，开始记录你的坚持</text>
+        <text class="empty__text">点击右下角「新建」，立下第一个戒断目标，<br/>每天给自己一个「达成」的勋章 ✨</text>
       </view>
 
       <abstain-event-card
@@ -241,10 +250,33 @@ onShow(() => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: #f5f6f8; display: flex; flex-direction: column; }
-.content { flex: 1; padding: 20rpx 24rpx 200rpx; box-sizing: border-box; }
-.empty { display: flex; flex-direction: column; align-items: center; padding: 120rpx 40rpx; }
-.empty__icon { font-size: 96rpx; margin-bottom: 24rpx; }
-.empty__title { font-size: 32rpx; color: #1f2937; font-weight: 600; margin-bottom: 12rpx; }
-.empty__text { font-size: 26rpx; color: #94a3b8; }
+.page { min-height: 100vh; background: linear-gradient(180deg, #ecfdf5 0%, #f5f6f8 280rpx); display: flex; flex-direction: column; }
+.content { flex: 1; padding: 24rpx 24rpx 200rpx; box-sizing: border-box; }
+
+/* 顶部 hero */
+.abstain-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 24rpx; padding: 30rpx 32rpx; margin-bottom: 24rpx;
+  box-shadow: 0 10rpx 28rpx rgba(16, 185, 129, 0.28);
+}
+.abstain-hero__text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.abstain-hero__title { font-size: 38rpx; font-weight: 900; color: #ffffff; }
+.abstain-hero__sub { font-size: 24rpx; color: rgba(255, 255, 255, 0.92); margin-top: 8rpx; }
+.abstain-hero__badge {
+  width: 88rpx; height: 88rpx; border-radius: 50%; flex-shrink: 0; margin-left: 16rpx;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.abstain-hero__emoji { font-size: 48rpx; line-height: 1; }
+
+.empty { display: flex; flex-direction: column; align-items: center; padding: 90rpx 40rpx; }
+.empty__art {
+  width: 180rpx; height: 180rpx; border-radius: 50%; margin-bottom: 28rpx;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0) 70%);
+  display: flex; align-items: center; justify-content: center;
+}
+.empty__icon { font-size: 96rpx; }
+.empty__title { font-size: 32rpx; color: #1f2937; font-weight: 700; margin-bottom: 12rpx; }
+.empty__text { font-size: 26rpx; color: #94a3b8; text-align: center; line-height: 1.7; }
 </style>
