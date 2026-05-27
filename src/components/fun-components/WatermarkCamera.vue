@@ -136,6 +136,7 @@
 
 <script setup>
 import { ref, onMounted, watch, getCurrentInstance, computed, nextTick } from 'vue'
+import { APP_BRAND } from '../../utils/appBrand'
 
 const props = defineProps({
   // 是否全屏覆盖，false 时为半屏弹层
@@ -946,7 +947,7 @@ function drawWatermarkWeixin2d(maxSide, done) {
                 }
                 ctx.drawImage(baseImg, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
-                const brand = 'fungrowth'
+                const brand = APP_BRAND
                 const timeStr = new Date().toLocaleString()
                 const baseFont = Math.max(22, Math.floor(width / 24))
                 const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
@@ -1175,7 +1176,7 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
       }
       ctx.drawImage(img, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
-      const brand = 'fungrowth'
+      const brand = APP_BRAND
       const timeStr = new Date().toLocaleString()
       const baseFont = Math.max(22, Math.floor(width / 24))
       const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
@@ -1268,7 +1269,7 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
           return
         }
 
-        const brand = 'fungrowth'
+        const brand = APP_BRAND
         const timeStr = new Date().toLocaleString()
         const baseFont = Math.max(22, Math.floor(width / 24))
         const smallFont = Math.max(18, Math.floor(baseFont * 0.82))

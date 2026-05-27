@@ -57,6 +57,7 @@
 
 <script setup>
 import { ref, watch, getCurrentInstance, nextTick } from 'vue'
+import { APP_BRAND } from '../../utils/appBrand'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -167,7 +168,7 @@ function paint(ctx, api, width, height, qrImg) {
   api.setTextAlign('left')
   api.setTextBaseline('top')
   api.setFont('600 26px sans-serif', 26)
-  ctx.fillText('fun成长 · 戒断日记', PAD, 40)
+  ctx.fillText(`${APP_BRAND} · 戒断日记`, PAD, 40)
 
   api.setFill('#ffffff')
   api.setFont('800 44px "PingFang SC", sans-serif', 44)
@@ -252,7 +253,7 @@ function paint(ctx, api, width, height, qrImg) {
   ctx.fillText('长按识别二维码 · 看TA的坚持', width / 2, qrY + qrSize + 22)
   api.setFill('#94a3b8')
   api.setFont('400 20px sans-serif', 20)
-  ctx.fillText('用微信打开 fun成长 小程序', width / 2, qrY + qrSize + 56)
+  ctx.fillText(`用微信打开 ${APP_BRAND} 小程序`, width / 2, qrY + qrSize + 56)
 }
 
 function truncate(api, text, maxWidth) {
