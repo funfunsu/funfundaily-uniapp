@@ -5,6 +5,20 @@
       <text class="page-subtitle">记录生活中的重要时刻</text>
     </view>
 
+    <!-- 分类页签：持续关注（已发生）/ 期待发生（未发生，倒计时） -->
+    <view class="category-tabs">
+      <view
+        v-for="c in categoryTabs"
+        :key="c.id"
+        class="category-tab"
+        :class="{ 'category-tab--active': activeCategory === c.id }"
+        @click="activeCategory = c.id"
+      >
+        <text class="category-tab__label">{{ c.label }}</text>
+        <text class="category-tab__count">{{ c.count }}</text>
+      </view>
+    </view>
+
     <!-- 目标筛选栏：默认「全部」，可按目标筛选事项 -->
     <scroll-view
       v-if="goalFilters.length > 1"
@@ -53,11 +67,11 @@
           <view class="event-info">
             <view class="event-title-row">
               <text class="event-title">{{ item.itemTitle || '未命名事件' }}</text>
-              <view class="event-duration" :class="{ 'recent-duration': isRecentEvent(item) }">
+              <view class="event-duration" :class="{ 'recent-duration': isRecentEvent(item), 'future-duration': isFutureItem(item) }">
                 <text class="duration-text">{{ item.daysDesc }}</text>
               </view>
             </view>
-            <text class="event-time">开始于 {{ formatEventTime(item.startTime || item.repeatStartDay) }}</text>
+            <text class="event-time">{{ isFutureItem(item) ? '目标日 ' : '开始于 ' }}{{ formatEventTime(item.startTime || item.repeatStartDay) }}</text>
           </view>
         </view>
         
@@ -74,7 +88,7 @@
       <template v-if="eventList.length === 0">
         <text class="empty-icon">🎉</text>
         <text class="empty-text">记录人生的重要时刻</text>
-        <text class="empty-subtext">生日、纪念日、宝宝出生……把每个值得记住的日子存下来，自动帮你数「已经第几天」。</text>
+        <text class="empty-subtext">生日、纪念日、宝宝出生帮你数「已经第几天」；退休、毕业、旅行帮你倒数「还有几天」。</text>
 
         <view class="quick-create">
           <text class="quick-create__hint">选个常见的，一键开始 👇</text>
@@ -139,11 +153,11 @@
     >
       <view class="detail-content">
         <view class="detail-item">
-          <text class="detail-label">开始时间</text>
+          <text class="detail-label">{{ selectedEvent && isFutureItem(selectedEvent) ? '目标时间' : '开始时间' }}</text>
           <text class="detail-value">{{ formatEventTime(selectedEvent?.startTime || selectedEvent?.repeatStartDay) }}</text>
         </view>
         <view class="detail-item">
-          <text class="detail-label">已开始</text>
+          <text class="detail-label">{{ selectedEvent && isFutureItem(selectedEvent) ? '倒计时' : '已开始' }}</text>
           <text class="detail-value detail-value--accent">{{ selectedEvent?.daysDesc }}</text>
         </view>
         <view class="detail-item" v-if="selectedEvent?.parentId">
@@ -279,8 +293,31 @@ const buttons = ref([  {code: 'addEvent', text: '添加事件'}
 // 当前选中的目标筛选：'all' = 全部；0 = 未分类；其它为目标 id
 const activeFilter = ref('all');
 
+// 当前选中的分类：'all' = 全部；'follow' = 持续关注（已发生）；'anticipate' = 期待发生（未发生，倒计时）
+const activeCategory = ref('all');
+
+// 事件是否「未发生」（期待发生）：目标日期晚于今天（按自然日比较，忽略时分秒）
+const isFutureItem = (e) => {
+  const t = e.startTime || e.repeatStartDay;
+  if (!t) return false;
+  const d = new Date(t);
+  const startDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return startDay.getTime() > today.getTime();
+};
+
 // id 兼容字符串/数字比较
 const sameId = (a, b) => String(a) === String(b);
+
+// 分类页签：全部 / 持续关注（已发生）/ 期待发生（未发生）
+const followCount = computed(() => eventList.value.filter(e => !isFutureItem(e)).length);
+const anticipateCount = computed(() => eventList.value.filter(e => isFutureItem(e)).length);
+const categoryTabs = computed(() => ([
+  { id: 'all', label: '全部', count: eventList.value.length },
+  { id: 'follow', label: '持续关注', count: followCount.value },
+  { id: 'anticipate', label: '期待发生', count: anticipateCount.value },
+]));
 
 const getGoalEventCount = (goalId) => {
   return eventList.value.filter(e => sameId(e.parentId, goalId)).length;
@@ -304,10 +341,20 @@ const goalFilters = computed(() => {
 });
 
 const displayEvents = computed(() => {
+  let list = eventList.value;
+  // 分类筛选：持续关注（已发生）/ 期待发生（未发生）
+  if (activeCategory.value === 'follow') list = list.filter(e => !isFutureItem(e));
+  else if (activeCategory.value === 'anticipate') list = list.filter(e => isFutureItem(e));
+  // 目标筛选
   const f = activeFilter.value;
-  if (f === 'all') return eventList.value;
-  if (f === 0) return eventList.value.filter(e => !e.parentId || Number(e.parentId) === 0);
-  return eventList.value.filter(e => sameId(e.parentId, f));
+  if (f === 0) list = list.filter(e => !e.parentId || Number(e.parentId) === 0);
+  else if (f !== 'all') list = list.filter(e => sameId(e.parentId, f));
+  // 期待发生：临近的排前面（升序）；其它：最新的排前面（降序）
+  return [...list].sort((a, b) => {
+    const ta = new Date(a.startTime || a.repeatStartDay).getTime();
+    const tb = new Date(b.startTime || b.repeatStartDay).getTime();
+    return activeCategory.value === 'anticipate' ? ta - tb : tb - ta;
+  });
 });
 
 // 弹窗相关
@@ -565,12 +612,31 @@ function copyShareText() {
   });
 }
 
-// 计算距今时间描述
+// 计算距今时间描述：已发生 → 「第X天」；未发生 → 「还有X天」倒计时
 const calcDaysDesc = (eventTimeStr) => {
   if (!eventTimeStr) return '时间未知';
   const start = new Date(eventTimeStr);
   const now = new Date();
-  
+
+  // 未发生（期待发生）：按自然日倒数
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayDiff = Math.round((startDay.getTime() - today.getTime()) / 86400000);
+  if (dayDiff > 0) {
+    const years = Math.floor(dayDiff / 365);
+    const remDays = dayDiff % 365;
+    const months = Math.floor(remDays / 30);
+    const days = remDays % 30;
+    if (years > 0 || months > 0) {
+      let desc = '还有';
+      if (years > 0) desc += `${years}年`;
+      if (months > 0) desc += `${months}个月`;
+      if (days > 0) desc += `${days}天`;
+      return desc;
+    }
+    return `还有${dayDiff}天`;
+  }
+
   const timeDiff = Math.abs(now.getTime() - start.getTime());
   const totalDays = Math.floor(timeDiff / 86400000) + 1;
   
@@ -646,21 +712,20 @@ const getGoalName = (goalId) => {
 async function fetchAllData() {
   try {
     if (!currentMember.value) return;
-    const reqBase = {
-      fromDate: DateUtils.getDateStr(currentDate.value),
-      toDate: DateUtils.getNextDayStr(currentDate.value),
+    const ctxBase = {
       targetUserId: currentMember.value.userId,
       groupId: currentMember.value.groupId,
     };
-    
+
+    // 用扁平 active 列表（不按天展开），让「未发生」的未来事件也能取到，从而支持倒计时。
     const [goalRes, eventRes, closedRes] = await Promise.all([
-      apiTs.checkin.task.list({ ...reqBase, scheduleItemType: 'goal' }),
-      apiTs.checkin.task.list({ ...reqBase, scheduleItemType: 'event' }),
-      apiTs.schedule.closedList({ groupId: currentMember.value.groupId, targetUserId: currentMember.value.userId, scheduleItemType: 'event' })
+      apiTs.schedule.activeList({ ...ctxBase, scheduleItemType: 'goal' }),
+      apiTs.schedule.activeList({ ...ctxBase, scheduleItemType: 'event' }),
+      apiTs.schedule.closedList({ ...ctxBase, scheduleItemType: 'event' })
     ]);
 
-    const rawGoals = goalRes.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
-    const rawEvents = eventRes.find(element => element.date === DateUtils.getDateStr(currentDate.value))?.schedules || [];
+    const rawGoals = Array.isArray(goalRes) ? goalRes : [];
+    const rawEvents = Array.isArray(eventRes) ? eventRes : [];
 
     // 已停止关注的事件（扁平列表），按开始时间倒序，供恢复入口使用
     closedEvents.value = (closedRes || []).map(item => ({
@@ -770,6 +835,42 @@ const onDatetimeConfirm = (value) => {
 .page-header {
   text-align: center;
   margin-bottom: 28rpx;
+}
+
+/* 分类页签：持续关注 / 期待发生 */
+.category-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+.category-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
+  background: #ffffff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+.category-tab--active {
+  background: linear-gradient(135deg, #007AFF 0%, #2196F3 100%);
+}
+.category-tab__label {
+  font-size: 26rpx;
+  color: #475569;
+  font-weight: 600;
+}
+.category-tab--active .category-tab__label {
+  color: #ffffff;
+}
+.category-tab__count {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+.category-tab--active .category-tab__count {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* 目标筛选栏 */
@@ -1035,6 +1136,13 @@ const onDatetimeConfirm = (value) => {
 
 .recent-duration:hover {
   box-shadow: 0 6rpx 12rpx rgba(0, 122, 255, 0.22);
+}
+
+/* 期待发生（倒计时）徽标：橙色强调 */
+.future-duration {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+  box-shadow: 0 4rpx 10rpx rgba(245, 158, 11, 0.18);
 }
 
 .duration-text {
