@@ -232,6 +232,13 @@
           :goal-list="goalList"
         />
       </view>
+      <view class="field" style="flex-direction:row; align-items:center; justify-content:space-between;">
+        <view style="display:flex; flex-direction:column;">
+          <text class="field__label" style="margin-bottom:0;">列入月度计划</text>
+          <text style="font-size:22rpx; color:#94a3b8;">同步生成一条月度计划，编辑/删除联动</text>
+        </view>
+        <switch :checked="eventForm.includeMonthlyPlan" color="#4f46e5" @change="onEventMonthlyPlanChange" />
+      </view>
     </BottomSheet>
 
     <!-- 分享弹窗 -->
@@ -377,8 +384,13 @@ const watermarkShareTitle = ref('水印照片');
 const eventForm = ref({
   name: '',
   datetime: '',
-  parentId: 0
+  parentId: 0,
+  includeMonthlyPlan: false
 });
+
+const onEventMonthlyPlanChange = (e) => {
+  eventForm.value.includeMonthlyPlan = e.detail.value;
+};
 
 // 页面加载时获取成员信息
 onMounted(() => {
@@ -414,7 +426,8 @@ function onAddEventClick() {
     name: '',
     // 默认今天，避免新用户被空时间卡住（弹窗里可改）
     datetime: DateUtils.getDateStr(new Date()),
-    parentId: resolvePresetParent()
+    parentId: resolvePresetParent(),
+    includeMonthlyPlan: false
   };
   isShowAddEventPopup.value = true;
 }
@@ -425,7 +438,8 @@ function quickCreate(preset) {
   eventForm.value = {
     name: preset.name,
     datetime: DateUtils.getDateStr(new Date()),
-    parentId: resolvePresetParent()
+    parentId: resolvePresetParent(),
+    includeMonthlyPlan: false
   };
   isShowAddEventPopup.value = true;
 }
@@ -437,7 +451,8 @@ function editEvent(event) {
   eventForm.value = {
     name: event.itemTitle || '',
     datetime: event.repeatStartDay || DateUtils.getDateStr(new Date(event.startTime)),
-    parentId: event.parentId || 0
+    parentId: event.parentId || 0,
+    includeMonthlyPlan: !!(event.showExtra?.hasMonthlyPlan ?? event.extra?.includeMonthlyPlan)
   };
   isShowAddEventPopup.value = true;
   closeDetailPopup();
@@ -786,7 +801,8 @@ async function submitEventForm() {
       repeatStartDay: DateUtils.getDateStr(eventTime),
       startTime: DateUtils.getDayStartTimeStr(eventTime),
       repeatType: 'none',
-      parentId: eventForm.value.parentId
+      parentId: eventForm.value.parentId,
+      extra: { includeMonthlyPlan: !!eventForm.value.includeMonthlyPlan }
     };
 
     // 如果是编辑模式，添加id

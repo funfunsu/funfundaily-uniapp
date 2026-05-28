@@ -25,8 +25,13 @@
     </view>
   </view>
 
-  <!-- 中间内容区域 -->
-  <view class="content-container">
+  <!-- 中间内容区域：可上下滚动 0-24 小时，进入默认定位到 8:00 -->
+  <scroll-view
+      class="content-container"
+      scroll-y
+      :scroll-top="defaultScrollTop"
+      :scroll-with-animation="false"
+  >
     <view class="content-wrapper">
 
       <view class="flex-row">
@@ -44,7 +49,7 @@
 
         <view class="dates-container" style="width: 88%;">
           <view v-if="isScheduleEmpty" class="no-schedule-container">
-            <button class="create-schedule-btn" @click="toggleGrid(dates[0],hours[0])">
+            <button class="create-schedule-btn" @click="toggleGrid(dates[0],'8:00')">
               + 添加一个日程
             </button>
           </view>
@@ -90,7 +95,7 @@
         </view>
       </view>
     </view>
-  </view>
+  </scroll-view>
 </template>
 
 <script setup>
@@ -111,6 +116,7 @@ const props = defineProps({
   hours: {
     type: Array,
     default: () => [
+      '0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00',
       '8:00', '9:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
     ]
@@ -126,6 +132,8 @@ const props = defineProps({
 // State
 const selectedEvents = ref(new Set());
 const dates = ref([]);
+// 进入默认定位到 8:00（行高 60px，时间轴从 0:00 起，content-wrapper 顶部 padding 40px 让首格落在表头下）
+const defaultScrollTop = ref(8 * 60);
 const personColorMap = reactive({})
 const availableColors = ['blue', '1', '2', '3', '4', '5', '6']; // 定义可用的颜色类名
 
@@ -189,7 +197,9 @@ const getEventStyle = (schedule) => {
   const startMinute = parseInt(startTime.split(':')[1]);
 
   const hourHeight = 60;
-  const topOffset = (startHour - 8) * hourHeight + (startMinute / 60) * hourHeight;
+  // 锚点取时间轴第一格的小时（当前为 0:00），使事件定位随轴起点自适应
+  const gridStartHour = parseInt((props.hours?.[0] || '0:00').split(':')[0]) || 0;
+  const topOffset = (startHour - gridStartHour) * hourHeight + (startMinute / 60) * hourHeight;
   const eventHeight = durationHours * hourHeight;
 
   return {
@@ -342,16 +352,11 @@ defineExpose({
   width: 100%;
 }
 
-/* 中间内容区域 */
+/* 中间内容区域：scroll-view，需要明确高度才能内部滚动 */
 .content-container {
-  flex: 1; /* 占据父容器剩余空间 */
-  /* 关键：允许自身滚动 */
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  height: 100%; /* 父容器为 100vh 的 flex 列，高度确定 */
   position: relative;
-  /* 确保它有明确的块级显示 */
-  display: flex;
-  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
 }
 
 .content-wrapper {

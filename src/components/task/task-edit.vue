@@ -142,6 +142,15 @@
             <view class="t-stepper__btn" @click="stepScore(1)">＋</view>
           </view>
         </view>
+
+        <!-- 月度计划：仅「待办 / 目标 / 每年习惯」(repeatType none|yearly) 可关联 -->
+        <view v-if="canIncludeMonthlyPlan" class="t-row t-row--solo">
+          <view class="t-mp-text">
+            <text class="t-row__label">列入月度计划</text>
+            <text class="t-seg-hint" style="margin-top:4rpx">同步生成一条月度计划，编辑/删除联动</text>
+          </view>
+          <switch :checked="includeMonthlyPlan" color="#2196f3" @change="onIncludeMonthlyPlanChange" />
+        </view>
       </view>
     </view>
   </view>
@@ -186,6 +195,15 @@ const handleSelectGoal = (goal) => {
 
 // 定义自定义事件，可选通知父组件数据就绪
 const emit = defineEmits(['schedule-ready']);
+
+// 「列入月度计划」开关：仅 repeatType ∈ {none, yearly} 时可用
+const includeMonthlyPlan = ref(false);
+const canIncludeMonthlyPlan = computed(() =>
+  ['none', 'yearly'].includes(localSchedule.value?.repeatType)
+);
+const onIncludeMonthlyPlanChange = (e) => {
+  includeMonthlyPlan.value = e.detail.value;
+};
 
 // ✅ 初始化给兜底完整结构，模板渲染时永远有值，杜绝undefined报错
 const localSchedule = ref({
@@ -448,6 +466,7 @@ onMounted(() => {
     // localSchedule.value.repeatStartDay = DateUtils.getDateStr(props.curDate)
   }
   Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+  includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
   localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 初始化 localRepeatDuration
   emit('schedule-ready', true);
 });
@@ -459,6 +478,7 @@ watch(
       const copyData = deepClone(scheduleData);
       localSchedule.value = copyData;
       Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+      includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
       localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 同步 localRepeatDuration
       emit('schedule-ready', true);
     },
@@ -470,6 +490,8 @@ defineExpose({
   getFinalSchedule: () => {
     if (scheduleExtra.taskType === 'Todo') scheduleExtra.totalCount = 1; // 待办固定 1 次
     localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    // 仅在可关联时写入勾选值，否则强制 false，避免后端误建月度计划
+    localSchedule.value.extra.includeMonthlyPlan = canIncludeMonthlyPlan.value && includeMonthlyPlan.value;
     return localSchedule.value;
   }
 })
@@ -606,6 +628,7 @@ defineExpose({
 }
 .t-row--last { border-bottom: none; }
 .t-row--solo { border-bottom: none; margin-top: 8rpx; }
+.t-mp-text { display: flex; flex-direction: column; min-width: 0; }
 .t-row--col {
   flex-direction: column;
   align-items: stretch;

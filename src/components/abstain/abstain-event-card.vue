@@ -7,7 +7,7 @@
     <view class="aec-head">
       <view class="aec-title-wrap" @click="$emit('open-calendar', event)">
         <text class="aec-title">{{ event.itemTitle || '未命名' }}</text>
-        <text class="aec-title-hint">查看日历 ›</text>
+        <text class="aec-title-hint">坚持日历 ›</text>
       </view>
       <view class="aec-ops">
         <view class="aec-op" @click.stop="$emit('edit', event)"><text class="aec-op__icon">✏️</text></view>

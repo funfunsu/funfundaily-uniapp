@@ -1,5 +1,5 @@
-<template> 
-  <view class="schedule-edit-container">
+<template>
+  <view class="schedule-edit-container" :class="{ 'is-embedded': embedded }">
     <view class="edit-content">
       <!-- 基本信息 -->
       <view class="form-section">
@@ -138,6 +138,17 @@
           </picker>
         </view>
       </view>
+
+      <!-- 月度计划：仅「不重复 / 每年」可关联 -->
+      <view class="form-section" v-if="canIncludeMonthlyPlan">
+        <view class="mp-row">
+          <view class="mp-row__text">
+            <text class="mp-row__title">列入月度计划</text>
+            <text class="mp-row__hint">同步生成一条月度计划，编辑/删除联动</text>
+          </view>
+          <switch :checked="includeMonthlyPlan" color="#007aff" @change="onIncludeMonthlyPlanChange" />
+        </view>
+      </view>
     </view>
   </view>
 </template>
@@ -163,8 +174,22 @@ const props = defineProps({
   startTime:{
     type: String,
     default:'08:00'
+  },
+  // 嵌入底部弹层时为 true：去掉整页高度/自身滚动/灰底，交给弹层 body 滚动
+  embedded: {
+    type: Boolean,
+    default: false
   }
 });
+
+// 「列入月度计划」开关：仅 repeatType ∈ {none, yearly} 时可用
+const includeMonthlyPlan = ref(false);
+const canIncludeMonthlyPlan = computed(() =>
+  ['none', 'yearly'].includes(localSchedule.value?.repeatType)
+);
+const onIncludeMonthlyPlanChange = (e) => {
+  includeMonthlyPlan.value = e.detail.value;
+};
 
 
 let repeatDiffDays = getStoredData(STORAGE_KEYS.SCHEDULE_REPEAT_CACHED_DURATION);
@@ -459,13 +484,13 @@ onMounted(() => {
     handleRepeatDateChanged('repeatStartDay')
     eventDate.value = DateUtils.getDateStr(props.curDate)
   }else{
-    debugger
     eventDate.value = DateUtils.getDateFromDateTimeStr(localSchedule.value.startTime)
     startTime.value = DateUtils.getHourAndMinFromDateTimeStr(localSchedule.value.startTime)
     endTime.value = DateUtils.getHourAndMinFromDateTimeStr(localSchedule.value.endTime)
   }
   doHandleStartTimeChange(props.startTime)
   Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+  includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
   localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 初始化 localRepeatDuration
   emit('schedule-ready', true);
 });
@@ -477,6 +502,7 @@ watch(
       const copyData = deepClone(scheduleData);
       localSchedule.value = copyData;
       Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+      includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
       localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 同步 localRepeatDuration
       emit('schedule-ready', true);
     },
@@ -487,6 +513,8 @@ watch(
 defineExpose({
   getFinalSchedule: () => {
     localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    // 仅在可关联时写入勾选值，否则强制 false，避免后端误建月度计划
+    localSchedule.value.extra.includeMonthlyPlan = canIncludeMonthlyPlan.value && includeMonthlyPlan.value;
     localSchedule.value.startTime = DateUtils.combineDateTime(eventDate.value,startTime.value+':00')
     localSchedule.value.endTime = DateUtils.combineDateTime(eventDate.value,endTime.value+':00')
     return localSchedule.value;
@@ -509,6 +537,22 @@ defineExpose({
   padding: 30rpx;
   box-sizing: border-box;
 }
+
+/* 嵌入底部弹层：高度自适应、不自带滚动、卡片扁平化（弹层 body 已是白底） */
+.is-embedded { height: auto; background-color: transparent; }
+.is-embedded .edit-content { flex: none; overflow: visible; padding: 0; }
+.is-embedded .form-section {
+  padding: 0;
+  margin-bottom: 24rpx;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 月度计划开关行 */
+.mp-row { display: flex; align-items: center; justify-content: space-between; }
+.mp-row__text { display: flex; flex-direction: column; gap: 6rpx; }
+.mp-row__title { font-size: 30rpx; color: #333; font-weight: 600; }
+.mp-row__hint { font-size: 22rpx; color: #999; }
 
 .form-section {
   background-color: white;

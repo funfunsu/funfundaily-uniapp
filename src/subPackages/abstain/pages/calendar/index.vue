@@ -72,7 +72,8 @@ const displayMonth = ref(now.getMonth() + 1)
 
 const posterVisible = ref(false)
 const posterQr = ref('')
-const creatorName = ref('我')
+const creatorName = ref('我')       // 海报「来自 xxx」：事件实际归属人昵称
+const ownerTitleName = ref('我')    // 分享标题：自己=「我」，他人=归属人昵称
 
 const shareToken = ref('')
 
@@ -165,8 +166,12 @@ onLoad(async (query) => {
   }
   groupId.value = query.groupId || ''
   targetUserId.value = query.targetUserId || ''
+  const ownerName = query.ownerName ? decodeURIComponent(query.ownerName) : ''
   const user = getStoredData(STORAGE_KEYS.USER_INFO)
-  creatorName.value = user?.nickname || '我'
+  const isSelf = !targetUserId.value || String(targetUserId.value) === String(user?.id)
+  const resolvedOwner = ownerName || user?.nickname || ''
+  creatorName.value = resolvedOwner || '我'
+  ownerTitleName.value = isSelf ? '我' : (resolvedOwner || 'TA')
   uni.setNavigationBarTitle({ title: event.value.itemTitle || '戒断统计' })
   await fetchRecords()
   // 预创建分享 token，使「链接分享」的 onShareAppMessage 可同步拿到 path
@@ -180,7 +185,7 @@ onShareAppMessage(() => {
     ? `/${SHARE_PAGE}?scene=${token}`
     : `/${SHARE_PAGE}`
   return {
-    title: `我在「${event.value.itemTitle || '戒断日记'}」已坚持 ${streakDays.value} 天`,
+    title: `${ownerTitleName.value}在「${event.value.itemTitle || '戒断日记'}」已坚持 ${streakDays.value} 天`,
     path
   }
 })

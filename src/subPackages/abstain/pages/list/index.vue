@@ -221,6 +221,7 @@ function openCalendar(ev) {
     `id=${ev.id}`,
     `groupId=${currentGroup.value.id}`,
     `targetUserId=${targetUserId()}`,
+    `ownerName=${encodeURIComponent(currentMember.value?.userInfo?.nickname || '')}`,
     `title=${encodeURIComponent(ev.itemTitle || '')}`,
     `startTime=${encodeURIComponent(ev.startTime || '')}`,
     `endTime=${encodeURIComponent(ev.endTime || '')}`,
@@ -250,7 +251,7 @@ onShow(() => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: linear-gradient(180deg, #ecfdf5 0%, #f5f6f8 280rpx); display: flex; flex-direction: column; }
+.page { min-height: 100vh; background: linear-gradient(180deg, #ecfdf5 0%, #f5f6f8 280rpx); display: flex; flex-direction: column; --bar-accent: #10b981; --bar-accent-shadow: rgba(16, 185, 129, 0.3); }
 .content { flex: 1; padding: 24rpx 24rpx 200rpx; box-sizing: border-box; }
 
 /* 顶部 hero */

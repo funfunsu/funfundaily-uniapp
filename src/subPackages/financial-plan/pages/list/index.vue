@@ -1455,6 +1455,8 @@ onShow(() => {
   min-height: 100vh;
   padding-bottom: 220rpx;
   background: linear-gradient(180deg, #f6f8fc 0%, #eef2ff 100%);
+  --bar-accent: #4f46e5;
+  --bar-accent-shadow: rgba(79, 70, 229, 0.3);
 }
 
 /* ===== Page header ===== */

@@ -21,6 +21,19 @@
         @member-change="handleMemberChange"
         @load-all-of-mine = "handleLoadAllOfMine"
         @buttonClick="handleButtonClick"/>
+
+    <!-- 日程新建/编辑：底部弹层 -->
+    <schedule-edit-sheet
+        :visible="sheetVisible"
+        :edit-id="sheetEditId"
+        :date="sheetDate"
+        :hour="sheetHour"
+        :cur-date="currentDate"
+        :group-id="currentGroup?.id || ''"
+        :target-user-id="currentMember?.userId || ''"
+        @close="sheetVisible = false"
+        @saved="onSheetSaved"
+        @deleted="onSheetSaved"/>
   </view>
 </template>
 
@@ -31,6 +44,7 @@ import apiTs from '../../utils/apiTs';
 import DateUtils from '../../utils/util';
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
 import scheduleContent from '../../components/schedule/schedule-content.vue';
+import scheduleEditSheet from '../../components/schedule/schedule-edit-sheet.vue';
 import {onShareAppMessage, onLoad, onShow} from '@dcloudio/uni-app';
 import {getStoredData, removeStoredData, STORAGE_KEYS} from "../../utils/storageManager"; // 引入必要的生命周期钩子
 
@@ -56,6 +70,24 @@ const barTopSideConfig = ref({
 const currentDate = ref(new Date());
 
 const scheduleRef = ref(null); // 用于访问子组件实例
+
+// 日程编辑底部弹层状态
+const sheetVisible = ref(false);
+const sheetEditId = ref(null);
+const sheetDate = ref('');
+const sheetHour = ref('');
+
+function openScheduleSheet({ editId = null, date = '', hour = '' } = {}) {
+  sheetEditId.value = editId;
+  sheetDate.value = date;
+  sheetHour.value = hour;
+  sheetVisible.value = true;
+}
+
+function onSheetSaved() {
+  sheetVisible.value = false;
+  fetchScheduleData();
+}
 
 
 // =============== 计算属性 (如果需要的话) ===============
@@ -91,9 +123,7 @@ onShow(() => {
 
 // =============== 方法 ===============
 const handleGridClick = (date,hour)=>{
-  uni.navigateTo({
-    url: `/pages/schedule/edit?date=${date}&hour=${hour}`
-  });
+  openScheduleSheet({ date, hour });
 }
 function handleEventClick(event) {
   // 「收到的邀请」(invRecv) 只读：打开邀请函详情查看，不进入日程编辑
@@ -103,9 +133,7 @@ function handleEventClick(event) {
     });
     return;
   }
-  uni.navigateTo({
-    url: `/pages/schedule/edit?id=${event.id}`
-  });
+  openScheduleSheet({ editId: event.id });
 }
 
 function initSideConfig() {
@@ -176,9 +204,7 @@ const handleLoadAllOfMine = ()=>{
 
 // 处理添加按钮点击
 function handleAddClick() {
-  uni.navigateTo({
-    url: '/pages/schedule/edit'
-  });
+  openScheduleSheet();
 }
 
 function onSelectionChange(keys) {
