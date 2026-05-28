@@ -78,31 +78,49 @@
                   :value="getMonthDayIndex(localSchedule?.repeatKeys?.[0])" @change="handleMonthDayChange">
             <view class="t-row"><text class="t-row__label">每月日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}日</text><text class="t-row__chev">›</text></view></view>
           </picker>
-          <picker v-else-if="localSchedule?.repeatType === 'yearly'" mode="date" :value="localSchedule?.repeatKeys?.[0]" fields="month-day" @change="handleYearDateChange">
-            <view class="t-row"><text class="t-row__label">每年日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}</text><text class="t-row__chev">›</text></view></view>
-          </picker>
+          <DatePicker
+            v-else-if="localSchedule?.repeatType === 'yearly'"
+            :model-value="localSchedule?.repeatKeys?.[0]"
+            mode="month-day"
+            label="每年日期"
+            placeholder="选择每年的月日"
+            title="选择每年日期"
+            @update:model-value="onYearDatePick"
+          />
         </view>
 
-        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
-                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
-        </picker>
+        <DatePicker
+          :model-value="formatDate(localSchedule?.repeatEndDay)"
+          mode="date"
+          label="截止日期"
+          placeholder="选择截止日期"
+          title="选择截止日期"
+          @update:model-value="onRepeatEndDayPick"
+        />
       </view>
 
       <!-- 待办：仅截止日期（待办默认 1 次，不显示次数）-->
       <view v-else-if="scheduleExtra.taskType === 'Todo'" class="t-section">
-        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
-                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
-        </picker>
+        <DatePicker
+          :model-value="formatDate(localSchedule?.repeatEndDay)"
+          mode="date"
+          label="截止日期"
+          placeholder="选择截止日期"
+          title="选择截止日期"
+          @update:model-value="onRepeatEndDayPick"
+        />
       </view>
 
       <!-- 目标：截止 -->
       <view v-else-if="scheduleExtra.taskType === 'Goal'" class="t-section">
-        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
-                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
-        </picker>
+        <DatePicker
+          :model-value="formatDate(localSchedule?.repeatEndDay)"
+          mode="date"
+          label="截止日期"
+          placeholder="选择截止日期"
+          title="选择截止日期"
+          @update:model-value="onRepeatEndDayPick"
+        />
       </view>
 
         <!-- 关联目标（仅任务类型）-->
@@ -124,6 +142,15 @@
             <view class="t-stepper__btn" @click="stepScore(1)">＋</view>
           </view>
         </view>
+
+        <!-- 月度计划：仅「待办 / 目标 / 每年习惯」(repeatType none|yearly) 可关联 -->
+        <view v-if="canIncludeMonthlyPlan" class="t-row t-row--solo">
+          <view class="t-mp-text">
+            <text class="t-row__label">列入月度计划</text>
+            <text class="t-seg-hint" style="margin-top:4rpx">同步生成一条月度计划，编辑/删除联动</text>
+          </view>
+          <switch :checked="includeMonthlyPlan" color="#2196f3" @change="onIncludeMonthlyPlanChange" />
+        </view>
       </view>
     </view>
   </view>
@@ -135,6 +162,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue';
 import DateUtils from "../../utils/util";
 import { getStoredData, setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
 import {HOBIT_TASK_REPEAT_TYPE_LABELS, HOBIT_TASK_REPEAT_TYPE_VALUES} from "../../utils/constants";
+import DatePicker from "../fun-components/date-picker.vue";
 
 // --- Props 定义 ---
 const props = defineProps({
@@ -167,6 +195,15 @@ const handleSelectGoal = (goal) => {
 
 // 定义自定义事件，可选通知父组件数据就绪
 const emit = defineEmits(['schedule-ready']);
+
+// 「列入月度计划」开关：仅 repeatType ∈ {none, yearly} 时可用
+const includeMonthlyPlan = ref(false);
+const canIncludeMonthlyPlan = computed(() =>
+  ['none', 'yearly'].includes(localSchedule.value?.repeatType)
+);
+const onIncludeMonthlyPlanChange = (e) => {
+  includeMonthlyPlan.value = e.detail.value;
+};
 
 // ✅ 初始化给兜底完整结构，模板渲染时永远有值，杜绝undefined报错
 const localSchedule = ref({
@@ -310,14 +347,10 @@ const handleMonthDayChange = (e) => { // 移除 field 参数，不需要
   }
 };
 
-// ✅ 年份日期选择事件
-const handleYearDateChange = (e) => {
-  const dateStr = e.detail.value;
-  // 从 "YYYY-MM-DD" 提取 "MM-DD"
-  const [_, month, day] = dateStr.split('-');
-  const formattedKey = `${month}-${day}`;
-  if (localSchedule.value.repeatKeys && Array.isArray(localSchedule.value.repeatKeys)) {
-    localSchedule.value.repeatKeys[0] = formattedKey;
+// ✅ 每年日期选择事件（date-picker month-day 模式，val 形如 "MM-DD"）
+const onYearDatePick = (val) => {
+  if (val && localSchedule.value.repeatKeys && Array.isArray(localSchedule.value.repeatKeys)) {
+    localSchedule.value.repeatKeys[0] = val;
   }
 };
 
@@ -392,12 +425,12 @@ const handleItemLabelChange = (e) => {
   localSchedule.value.itemLabel = itemLabelValues.value[index]
 }
 
-// ✅ 【重中之重修复】日期赋值事件 - 加固版，支持所有日期字段赋值，不会丢失最新值
-const handleRepeatDateChange = (e, field) => {
-  if (field && e?.detail?.value) {
-    localSchedule.value[field] = e.detail.value;
+// ✅ 截止日期选择事件（date-picker date 模式，val 形如 "YYYY-MM-DD"）
+const onRepeatEndDayPick = (val) => {
+  if (val) {
+    localSchedule.value.repeatEndDay = val;
   }
-  handleRepeatDateChanged(field)
+  handleRepeatDateChanged('repeatEndDay')
 }
 
 
@@ -433,6 +466,7 @@ onMounted(() => {
     // localSchedule.value.repeatStartDay = DateUtils.getDateStr(props.curDate)
   }
   Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+  includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
   localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 初始化 localRepeatDuration
   emit('schedule-ready', true);
 });
@@ -444,6 +478,7 @@ watch(
       const copyData = deepClone(scheduleData);
       localSchedule.value = copyData;
       Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+      includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
       localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 同步 localRepeatDuration
       emit('schedule-ready', true);
     },
@@ -455,6 +490,8 @@ defineExpose({
   getFinalSchedule: () => {
     if (scheduleExtra.taskType === 'Todo') scheduleExtra.totalCount = 1; // 待办固定 1 次
     localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    // 仅在可关联时写入勾选值，否则强制 false，避免后端误建月度计划
+    localSchedule.value.extra.includeMonthlyPlan = canIncludeMonthlyPlan.value && includeMonthlyPlan.value;
     return localSchedule.value;
   }
 })
@@ -591,6 +628,7 @@ defineExpose({
 }
 .t-row--last { border-bottom: none; }
 .t-row--solo { border-bottom: none; margin-top: 8rpx; }
+.t-mp-text { display: flex; flex-direction: column; min-width: 0; }
 .t-row--col {
   flex-direction: column;
   align-items: stretch;

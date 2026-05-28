@@ -47,7 +47,7 @@
         <view v-else class="date-select-wrap">
           <!-- 顶部年月选择栏：点击选择式（提升可用性） -->
           <view class="ym-select-bar">
-            <view class="ym-unit">
+            <view class="ym-unit" v-if="mode !== 'month-day'">
               <picker
                   mode="selector"
                   :range="yearOptions"
@@ -75,8 +75,8 @@
             </view>
           </view>
 
-          <!-- 日期区域：周行式平铺（优化样式，无边框更简约） -->
-          <view class="date-panel">
+          <!-- 日期区域：周行式平铺（优化样式，无边框更简约）；仅月份模式隐藏日格 -->
+          <view class="date-panel" v-if="mode !== 'month'">
             <!-- 星期头部（优化背景和圆角） -->
             <view class="week-header">
               <text class="week-item" v-for="week in weekList" :key="week">{{ week }}</text>
@@ -133,7 +133,9 @@ const props = defineProps({
   mode: {
     type: String,
     default: 'date',
-    validator: (val) => ['date', 'time', 'datetime'].includes(val)
+    // date=YYYY-MM-DD, datetime=YYYY-MM-DD HH:mm, time=HH:mm,
+    // month=YYYY-MM（仅年月）, month-day=MM-DD（仅月日，用于「每年X月X日」这类年份无关场景）
+    validator: (val) => ['date', 'time', 'datetime', 'month', 'month-day'].includes(val)
   },
   modelValue: {
     type: String,
@@ -218,6 +220,12 @@ const displayValue = computed(() => {
   if (props.mode === 'date') {
     const [year, month, day] = props.modelValue.split('-')
     return `${year}年${month}月${day}日`
+  } else if (props.mode === 'month') {
+    const [year, month] = props.modelValue.split('-')
+    return `${year}年${month}月`
+  } else if (props.mode === 'month-day') {
+    const [month, day] = props.modelValue.split('-')
+    return `${month}月${day}日`
   } else if (props.mode === 'time') {
     return props.modelValue
   } else {
@@ -241,6 +249,13 @@ const parseModelValue = () => {
   if (props.mode === 'date') {
     const [y, m, d] = props.modelValue.split('-').map(Number)
     return { y, m, d, h: 0, mi: 0 }
+  } else if (props.mode === 'month') {
+    const [y, m] = props.modelValue.split('-').map(Number)
+    return { y, m, d: 1, h: 0, mi: 0 }
+  } else if (props.mode === 'month-day') {
+    // 年份无关：用当前年仅供渲染当月天数
+    const [m, d] = props.modelValue.split('-').map(Number)
+    return { y: new Date().getFullYear(), m, d, h: 0, mi: 0 }
   } else if (props.mode === 'time') {
     const [h, mi] = props.modelValue.split(':').map(Number)
     return { y: 0, m: 0, d: 0, h, mi }
@@ -343,6 +358,10 @@ const confirmSelection = () => {
   // 按模式拼接结果
   if (props.mode === 'date') {
     result = `${year}-${m}-${d}`
+  } else if (props.mode === 'month') {
+    result = `${year}-${m}`
+  } else if (props.mode === 'month-day') {
+    result = `${m}-${d}`
   } else if (props.mode === 'time') {
     result = `${h}:${mi}`
   } else {

@@ -136,6 +136,8 @@
 
 <script setup>
 import { ref, onMounted, watch, getCurrentInstance, computed, nextTick } from 'vue'
+import { APP_BRAND } from '../../utils/appBrand'
+import { saveImageToAlbum } from '../../utils/album'
 
 const props = defineProps({
   // 是否全屏覆盖，false 时为半屏弹层
@@ -337,10 +339,17 @@ function renderHdThen(callback, stageText = '正在生成高清图片...') {
     callback && callback()
     return
   }
+  // 保存/分享前先快照当前已生成的带水印预览图。HD 重渲染若失败，drawWatermark 会把
+  // resultImg 回退成无水印原图；这里在回调里检测到回退就恢复快照，确保导出图始终带水印。
+  const prevWatermarked =
+    resultImg.value && resultImg.value !== originalImg.value ? resultImg.value : ''
   isRendering.value = true
   startRenderProgress()
   setRenderStage(stageText, 18)
   drawWatermark(HD_MAX_SIDE, () => {
+    if (prevWatermarked && (!resultImg.value || resultImg.value === originalImg.value)) {
+      resultImg.value = prevWatermarked
+    }
     callback && callback()
   })
 }
@@ -912,8 +921,16 @@ function drawWatermarkWeixin2d(maxSide, done) {
           ({ node: canvas }) => {
             const ctx = canvas.getContext('2d')
             // pixelRatio 改用 getWindowInfo（getSystemInfoSync 已废弃），旧基础库回退
-            const dpr = (typeof wx !== 'undefined' && wx.getWindowInfo ? wx.getWindowInfo().pixelRatio
+            const rawDpr = (typeof wx !== 'undefined' && wx.getWindowInfo ? wx.getWindowInfo().pixelRatio
               : (typeof wx !== 'undefined' && wx.getSystemInfoSync ? wx.getSystemInfoSync().pixelRatio : 1)) || 1
+            // 微信 canvas 有最大尺寸限制（约 4096px）。HD 导出时 width(可达 2800) × dpr(2~3)
+            // 极易超限，超限会导致导出空白/失败并回退成「无水印原图」（保存/分享丢水印的根因）。
+            // 这里按上限收敛实际 dpr，保证 backing store 不越界，HD 图仍是带水印的高清图。
+            const MAX_CANVAS_PX = 4096
+            const longSide = Math.max(width, height)
+            const dpr = longSide * rawDpr > MAX_CANVAS_PX
+              ? Math.max(1, MAX_CANVAS_PX / longSide)
+              : rawDpr
             canvas.width = Math.max(1, Math.floor(width * dpr))
             canvas.height = Math.max(1, Math.floor(height * dpr))
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -931,7 +948,7 @@ function drawWatermarkWeixin2d(maxSide, done) {
                 }
                 ctx.drawImage(baseImg, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
-                const brand = 'fungrowth'
+                const brand = APP_BRAND
                 const timeStr = new Date().toLocaleString()
                 const baseFont = Math.max(22, Math.floor(width / 24))
                 const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
@@ -1160,7 +1177,7 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
       }
       ctx.drawImage(img, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
-      const brand = 'fungrowth'
+      const brand = APP_BRAND
       const timeStr = new Date().toLocaleString()
       const baseFont = Math.max(22, Math.floor(width / 24))
       const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
@@ -1253,7 +1270,7 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
           return
         }
 
-        const brand = 'fungrowth'
+        const brand = APP_BRAND
         const timeStr = new Date().toLocaleString()
         const baseFont = Math.max(22, Math.floor(width / 24))
         const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
@@ -1419,15 +1436,15 @@ function handleSave() {
       return
     }
 
-    uni.saveImageToPhotosAlbum({
-      filePath: resultImg.value,
-      success: () => {
+    saveImageToAlbum(resultImg.value)
+      .then(() => {
         uni.showToast({ title: '已保存到相册', icon: 'success' })
-      },
-      fail: () => {
-        uni.showToast({ title: '保存失败，请检查权限', icon: 'none' })
-      }
-    })
+      })
+      .catch((err) => {
+        console.error('保存到相册失败:', err)
+        const canceled = err && /取消/.test(err.message || '')
+        uni.showToast({ title: canceled ? '已取消保存' : '保存失败，请在设置中开启相册权限', icon: 'none' })
+      })
   }
 
   renderHdThen(doSave, '正在生成高清导出图...')

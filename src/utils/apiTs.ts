@@ -53,7 +53,9 @@ const apiTs = {
         // 已停止关注列表（用于恢复入口）
         closedList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/closed/list', data),
         // 月度计划：群组维度的原始列表（不按天展开），前端按月份归属
-        planList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/plan/list', data)
+        planList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/plan/list', data),
+        // 未停止关注（OPEN）的扁平列表（戒断事件等长期持续事件，不按天展开）
+        activeList: (data: any): Promise<any[]> => api.post<any[]>('/api/schedule/active/list', data)
     },
     // 积分相关接口
     point: {
@@ -169,6 +171,11 @@ const apiTs = {
         // 添加打卡
         listV2: (data: any): Promise<any> => api.post<any>(
             '/api/checkin/listV2',
+            data
+        ),
+        // 戒断事件按天反馈（达成/破戒）：extra.feedback = 'persist' | 'relapse'
+        feedback: (data: any): Promise<any> => api.post<any>(
+            '/api/checkin/feedback',
             data
         ),
     },

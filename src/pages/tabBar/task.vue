@@ -117,6 +117,7 @@ import TaskUtil from "../../utils/taskUtil";
 import WatermarkCamera from "../../components/fun-components/WatermarkCamera.vue";
 import TaskSharePoster from "../../components/task/task-share-poster.vue";
 import { base64ToImageSource } from "../../utils/imageHelper";
+import { APP_BRAND } from "../../utils/appBrand";
 import TaskEditSheet from "../../components/task/task-edit-sheet.vue";
 
 const drawerRef = ref(null);
@@ -386,7 +387,7 @@ onShareAppMessage(() => {
     }, 0)
     return data
   }
-  return { title: 'fun成长 · 一起打卡', path: '/pages/tabBar/task' }
+  return { title: `${APP_BRAND} · 一起打卡`, path: '/pages/tabBar/task' }
 });
 
 function handleShareRequested(payload) {

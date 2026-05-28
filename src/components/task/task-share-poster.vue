@@ -60,6 +60,8 @@
 
 <script setup>
 import { ref, watch, getCurrentInstance, nextTick } from 'vue'
+import { APP_BRAND } from '../../utils/appBrand'
+import { saveImageToAlbum } from '../../utils/album'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -84,7 +86,7 @@ const WIDTH = 600
 const PAD = 40
 const HEADER_H = 200
 const ROW_H = 96
-const FOOTER_H = 320
+const FOOTER_H = 360
 
 const isH5 = () => typeof process !== 'undefined' && process.env && process.env.UNI_PLATFORM === 'h5'
 
@@ -168,7 +170,7 @@ function paint(ctx, api, width, height, qrImg) {
   api.setTextAlign('left')
   api.setTextBaseline('top')
   api.setFont('600 26px sans-serif', 26)
-  ctx.fillText('fun成长 · 任务清单', PAD, 44)
+  ctx.fillText(`${APP_BRAND} · 任务清单`, PAD, 44)
 
   api.setFill('#ffffff')
   api.setFont('800 40px "PingFang SC", sans-serif', 40)
@@ -264,7 +266,7 @@ function paint(ctx, api, width, height, qrImg) {
   ctx.fillText('长按识别二维码 · 收下任务', width / 2, qrY + qrSize + 24)
   api.setFill('#94a3b8')
   api.setFont('400 20px sans-serif', 20)
-  ctx.fillText('用微信打开 fun成长 小程序', width / 2, qrY + qrSize + 60)
+  ctx.fillText(`用微信打开 ${APP_BRAND} 小程序`, width / 2, qrY + qrSize + 60)
 }
 
 function renderPoster() {
@@ -365,11 +367,12 @@ function handleSave() {
   return
   // #endif
   // #ifndef H5
-  uni.saveImageToPhotosAlbum({
-    filePath: resultImg.value,
-    success: () => uni.showToast({ title: '已保存到相册', icon: 'success' }),
-    fail: () => uni.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
-  })
+  saveImageToAlbum(resultImg.value)
+    .then(() => uni.showToast({ title: '已保存到相册', icon: 'success' }))
+    .catch((err) => {
+      const canceled = err && /取消/.test(err.message || '')
+      uni.showToast({ title: canceled ? '已取消保存' : '保存失败，请在设置中开启相册权限', icon: 'none' })
+    })
   // #endif
 }
 
