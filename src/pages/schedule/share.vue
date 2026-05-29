@@ -1,201 +1,168 @@
 <template>
   <view class="page-container">
     <view class="page-content-container">
-      <!-- 引入schedule-content组件 -->
-      <schedule-content ref="schedule"
-                        :dates="dates" :eventList="events"
-                        @eventClick="handleEventClick"
-                        @selection-change="onSelectionChange"/>
+      <!-- 日程预览（只读） -->
+      <schedule-content ref="scheduleRef"
+                        :event-list="events"
+                        @eventClick="handleEventClick"/>
     </view>
 
-    <!-- 底部固定栏 -->
+    <!-- 底部固定栏：只保留群组选择 + 收下按钮 -->
     <view class="bottom-bar" v-if="isLoginSuccessful">
       <schedule-bottom-bar
           :buttons="buttons"
           :is-tab-bar-page="false"
+          :show-group-member="false"
           @member-change="handleMemberChange"
           @buttonClick="handleButtonClick"/>
     </view>
+
+    <!-- 成员选择弹窗：选择 / 新建成员来收下（与任务分享一致） -->
+    <MemberSelectPopup
+        :visible="popupVisible"
+        :group-id="currentGroup?.id"
+        @close="popupVisible = false"
+        @select="onSelectMember"
+        @create="onCreateMember"/>
   </view>
 </template>
 <script setup>
-// 引入必要的依赖和组件
-import {computed, ref} from 'vue';
-import {onLoad} from '@dcloudio/uni-app'; // 用于页面生命周期
+import {ref, nextTick} from 'vue';
+import {onLoad} from '@dcloudio/uni-app';
 import ScheduleBottomBar from '../../components/schedule-bottom-bar.vue';
 import scheduleContent from "../../components/schedule/schedule-content.vue";
+import MemberSelectPopup from '../../components/member-select-popup.vue';
 import apiTs from '../../utils/apiTs';
 import {autoLogin} from '../../utils/auth';
-import {getShareToken, removeShareToken, setShareToken} from '../../utils/token';
-
-// --- 组件声明 ---
-// 注意：defineOptions 需要插件支持或特定 Vue 版本，在纯 JS 中可能不直接可用
-// 如果 defineOptions 不工作，可以在 script 标签外或通过其他方式设置 name
-// defineOptions({
-//   name: 'ShareDemo' // 组件名称
-// });
+import {getShareToken, setShareToken} from '../../utils/token';
+import {setStoredData, STORAGE_KEYS} from "../../utils/storageManager";
+import {ensureCurrentGroup} from "../../utils/currentGroupResolver";
 
 // --- 响应式数据 ---
-const events = ref({}); // 存储日期 -> 事件列表 的映射
-const dates = computed(() => Object.keys(events.value).sort()); // 从 events 的 key 中提取并排序
-const selectedCount = ref(0);
-const totalEvents = computed(() => {
-  // 计算总事件数，假设 events 是一个对象，值是数组
-  return Object.values(events.value).reduce((acc, dayEvents) => acc + (dayEvents ? dayEvents.length : 0), 0);
-});
-const buttons = [
-  { code: 'copy', text: '收下' },
-  { code: 'copyToNewMember', text: '新成员收下' }
-];
+const events = ref([]); // 后端 schedule_share 返回按天分组的 [{date, schedules}] 数组
 const isLoginSuccessful = ref(false);
-const currentMember = ref(null);
 const currentGroup = ref(null);
+const currentMember = ref(null);
+const popupVisible = ref(false);
+const scheduleRef = ref(null);
+
+const buttons = [
+  { code: 'receive', text: '收下' }
+];
 
 // --- 方法定义 ---
 
-// 处理成员切换
+// 底部栏群组切换
 const handleMemberChange = (e) => {
-  currentMember.value = e.currentMember;
   currentGroup.value = e.currentGroup;
-  console.log('Current Group:', currentGroup.value, 'Current Member:', currentMember.value);
+  currentMember.value = e.currentMember;
 };
 
-// 处理事件点击
-const handleEventClick = (event) => {
-  // 可根据需要处理点击事件
-  console.log("📅 点击了事件:", event);
-};
+const handleEventClick = () => { /* 预览态，点击事件不做处理 */ };
 
-// 处理选中事件变化
-const onSelectionChange = (selectedEvents) => {
-  selectedCount.value = selectedEvents.length;
-  console.log("✅ 选中事件数量变化:", selectedCount.value);
-};
-
-const receiveToUser = async (targetUserId,groupId,token) => {
-  try {
-    await uni.showLoading({title: "处理中..."});
-    const req = {
-      targetUserId: targetUserId, // 假设 currentMember.value 有 userId
-      groupId: groupId,          // 假设 currentGroup.value 有 id
-      shareToken: token
-    };
-    await apiTs.schedule.copy(req);
-    await uni.showToast({title: "收下成功", icon: "success"});
-  } catch (error) {
-    console.error("❌ 收下失败:", error);
-    await uni.showToast({title: error.message || "操作失败", icon: "none"});
-  } finally {
-    uni.hideLoading();
-  }
-
-}
-
-// 处理底部按钮点击
+// 点击「收下」：先确保有可用群组，再弹出成员选择弹窗
 const handleButtonClick = async (buttonCode) => {
+  if (buttonCode !== 'receive') return;
   const token = getShareToken();
   if (!token) {
-    await uni.showToast({title: "缺少分享令牌", icon: "none"});
+    uni.showToast({ title: '缺少分享令牌', icon: 'none' });
     return;
   }
-  if (buttonCode === 'copy') {
-    uni.showModal({
-      title: '确认收下',
-      content: `确定要将日程收下给 ${currentGroup.value.groupName || '未知群组'} 的 ${currentMember.value.userInfo.nickname || '未知成员'} 吗？`,
-      confirmColor: "#007AFF", // 可选，自定义确认按钮颜色
-      success: async function (modalRes) {
-        if (modalRes.confirm) {
-          console.log('用户点击确定');
-          // 用户点击了“确定”按钮，继续执行后续操作
-
-          await receiveToUser(currentMember.value.userId, currentGroup.value.id, token);
-        } else if (modalRes.cancel) {
-          console.log('用户点击取消');
-        }
-      },
-      fail: function (failRes) {
-        console.error("Modal 失败:", failRes);
-        uni.showToast({ title: "无法显示确认框", icon: "none" });
-      }
-    });
-  } else if (buttonCode === 'copyToNewMember') {
-    // 添加新成员并复制
-    uni.showModal({
-      title: '添加新成员',
-      placeholderText: '请输入昵称',
-      editable: true,
-      success: async (res1) => {
-        if (res1.confirm && res1.content && res1.content.trim()) {
-          const nickname = res1.content.trim();
-          const userResp = await apiTs.group.user.add({ groupId: currentGroup.value.id, nickname: nickname });
-          await receiveToUser(userResp.userId, currentGroup.value.id, token);
-        } else if(res1.cancel) {
-          // 用户取消输入
-        }
-      },
-      fail: (failRes) => {
-        console.error("Modal 失败:", failRes);
-        uni.showToast({ title: "操作中断", icon: "none" });
-      }
-    });
+  if (!currentGroup.value) {
+    const group = await ensureCurrentGroup();
+    if (!group) {
+      uni.showToast({ title: '你还没有群组，请先在 App 创建群组', icon: 'none' });
+      return;
+    }
+    currentGroup.value = group;
   }
+  popupVisible.value = true;
+};
+
+// 选择已有成员收下
+const onSelectMember = async (member) => {
+  popupVisible.value = false;
+  await receiveToUser(member.userId, currentGroup.value.id);
+};
+
+// 新建成员并收下（多用于给小朋友收）
+const onCreateMember = async (nickname) => {
+  try {
+    uni.showLoading({ title: '创建成员中...', mask: true });
+    const userResp = await apiTs.group.user.add({ groupId: currentGroup.value.id, nickname });
+    popupVisible.value = false;
+    uni.hideLoading();
+    await receiveToUser(userResp.userId, currentGroup.value.id);
+  } catch (e) {
+    uni.hideLoading();
+    console.error('新建成员失败:', e);
+    uni.showToast({ title: e?.message || '新建成员失败', icon: 'none' });
+  }
+};
+
+// 把分享的日程收下给目标成员（按 token 服务端复制）
+const receiveToUser = async (targetUserId, groupId) => {
+  const token = getShareToken();
+  if (!token) {
+    uni.showToast({ title: '缺少分享令牌', icon: 'none' });
+    return;
+  }
+  try {
+    uni.showLoading({ title: '收下中...', mask: true });
+    await apiTs.schedule.copy({ targetUserId, groupId, shareToken: token });
+    uni.hideLoading();
+    uni.showToast({ title: '已收下', icon: 'success' });
+    setTimeout(() => switchToScheduleTab(), 800);
+  } catch (error) {
+    uni.hideLoading();
+    console.error('收下失败:', error);
+    uni.showToast({ title: error?.message || '收下失败，请重试', icon: 'none' });
+  }
+};
+
+const switchToScheduleTab = () => {
+  const uri = '/pages/tabBar/schedule';
+  setStoredData(STORAGE_KEYS.REFRESH_TAB, uri);
+  uni.switchTab({ url: uri });
 };
 
 // 获取分享内容
 const fetchSharedContent = async (token) => {
-  await uni.showLoading({title: "加载中..."});
+  uni.showLoading({ title: '加载中...' });
   try {
-    // 1. 调用后端接口获取分享内容
-    events.value = await apiTs.share.getContent(token)
-
+    const res = await apiTs.share.getContent(token);
+    events.value = Array.isArray(res) ? res : [];
+    // 内容就位后把视口定位到上午 8 点
+    nextTick(() => scheduleRef.value?.focusToMorning?.());
   } catch (err) {
-    console.error("❌ 获取分享内容失败:", err);
-    await uni.showToast({
-      title: err.message || "加载失败，请稍后重试",
-      icon: "none"
-    });
+    console.error('获取分享内容失败:', err);
+    uni.showToast({ title: err?.message || '加载失败，请稍后重试', icon: 'none' });
   } finally {
     uni.hideLoading();
   }
 };
 
 // --- 生命周期钩子 ---
-
 onLoad(async (query) => {
-  console.log("🚀 页面 onLoad 参数:", query);
   const token = query && query.token;
-  if (token) {
-    setShareToken(token);
-    try {
-      // 等待 autoLogin 完成
-      const loginToken = await autoLogin(token);
-      console.log("✅ 自动登录成功, 获取到 token:", loginToken);
-      isLoginSuccessful.value = true;
-    } catch (loginError) {
-      // 处理自动登录失败
-      console.error("❌ 自动登录失败:", loginError);
-      await uni.showToast({
-        title: loginError.message || "自动登录失败，请尝试手动登录", // 更具体的提示
-        icon: "none",
-        duration: 3000 // 稍长一些的显示时间
-      });
-      // 即使登录失败，也可以考虑是否加载公开部分或给出提示
-    }
-
-    if (isLoginSuccessful.value) {
-      // 如果必须登录：
-      console.log("➡️ 准备获取分享内容...");
-      await fetchSharedContent(token);
-    } else {
-      console.log("🛑 由于未登录，暂不加载需要登录的分享内容。");
-      // 可能需要显示登录提示或其他UI状态
-    }
-  } else {
-    console.warn("⚠️ 缺少分享令牌");
-    await uni.showToast({title: "缺少分享令牌", icon: "none"});
+  if (!token) {
+    uni.showToast({ title: '缺少分享令牌', icon: 'none' });
+    return;
+  }
+  setShareToken(token);
+  try {
+    await autoLogin(token);
+    isLoginSuccessful.value = true;
+  } catch (loginError) {
+    console.error('自动登录失败:', loginError);
+    uni.showToast({ title: loginError?.message || '自动登录失败，请尝试手动登录', icon: 'none', duration: 3000 });
+  }
+  if (isLoginSuccessful.value) {
+    // 预解析当前群组，收下时弹窗直接可用
+    ensureCurrentGroup().then(g => { if (g && !currentGroup.value) currentGroup.value = g });
+    await fetchSharedContent(token);
   }
 });
-
 </script>
 
 <style scoped>
@@ -215,7 +182,7 @@ onLoad(async (query) => {
 }
 
 
-/* 底部固定栏：高度60px，绿色背景 */
+/* 底部固定栏：高度60px */
 .bottom-bar {
   height: 60px;
   color: white;

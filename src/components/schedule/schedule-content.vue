@@ -359,6 +359,7 @@ defineExpose({
   getTotalEventCount,
   selectAll,
   toggleSelectAll,
+  focusToMorning,
   // clearSelection,
   // getSelectedCount,
   // getTotalEventCount

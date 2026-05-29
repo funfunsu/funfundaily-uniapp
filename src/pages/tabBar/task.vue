@@ -69,10 +69,11 @@
       @close="handleWatermarkClose"
     />
 
-    <!-- 任务分享海报 -->
-    <TaskSharePoster
+    <!-- 任务分享海报（公共组件） -->
+    <share-poster
       :visible="posterVisible"
-      :tasks="posterTasks"
+      renderer="taskList"
+      :payload="posterTasks"
       :qr-source="posterQr"
       :creator-name="posterCreator"
       @close="handlePosterClose"
@@ -123,7 +124,7 @@ import DrawerBtnItem from "../../components/fun-components/drawer-btn/drawer-btn
 import TaskGoalGroupList from "../../components/task/task-goal-group-list.vue";
 import TaskUtil from "../../utils/taskUtil";
 import WatermarkCamera from "../../components/fun-components/WatermarkCamera.vue";
-import TaskSharePoster from "../../components/task/task-share-poster.vue";
+import sharePoster from "../../components/share/share-poster.vue";
 import { base64ToImageSource } from "../../utils/imageHelper";
 import { APP_BRAND } from "../../utils/appBrand";
 import TaskEditSheet from "../../components/task/task-edit-sheet.vue";

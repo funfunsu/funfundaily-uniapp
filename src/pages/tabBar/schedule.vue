@@ -36,12 +36,14 @@
         @saved="onSheetSaved"
         @deleted="onSheetSaved"/>
 
-    <!-- 日程分享海报：长图 + 二维码 -->
-    <schedule-share-poster
+    <!-- 日程分享海报：课程表长图 + 二维码（公共组件） -->
+    <share-poster
         :visible="posterVisible"
-        :schedules="posterSchedules"
+        renderer="scheduleTimetable"
+        :payload="posterSchedules"
         :qr-source="posterQr"
         :creator-name="posterCreator"
+        :show-link="true"
         @close="posterVisible = false"/>
   </view>
 </template>
@@ -54,7 +56,7 @@ import DateUtils from '../../utils/util';
 import scheduleBottomBar from '../../components/schedule-bottom-bar.vue';
 import scheduleContent from '../../components/schedule/schedule-content.vue';
 import scheduleEditSheet from '../../components/schedule/schedule-edit-sheet.vue';
-import scheduleSharePoster from '../../components/schedule/schedule-share-poster.vue';
+import sharePoster from '../../components/share/share-poster.vue';
 import {onShareAppMessage, onLoad, onShow} from '@dcloudio/uni-app';
 import {getStoredData, removeStoredData, STORAGE_KEYS} from "../../utils/storageManager"; // 引入必要的生命周期钩子
 import {base64ToImageSource} from "../../utils/imageHelper";
