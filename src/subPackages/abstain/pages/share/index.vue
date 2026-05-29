@@ -31,13 +31,25 @@
 
       <!-- 互动：新用户可立刻开始同款戒断，并了解更多亲子工具 -->
       <view class="cta">
-        <button class="cta-primary" :disabled="creating" @click="createSameEvent">
+        <button class="cta-primary" :disabled="creating" @click="openCreate">
           <text class="cta-primary-text">{{ creating ? '创建中…' : `🚀 我也要坚持「${event.itemTitle || '戒断'}」` }}</text>
         </button>
         <view class="cta-hook" @click="goExploreTools">
           <text class="cta-hook-text">还有更多亲子小工具，去看看 ›</text>
         </view>
       </view>
+
+      <!-- 成员选择：为谁开始这个戒断（可选已有成员或新建，如给小朋友） -->
+      <member-select-popup
+        :visible="popupVisible"
+        :group-id="currentGroup?.id"
+        title="为谁开始戒断？"
+        subtitle="选择一个成员，或新建一个（如给小朋友）"
+        action-verb="开始"
+        @close="popupVisible = false"
+        @select="onSelectMember"
+        @create="onCreateMember"
+      />
     </template>
   </view>
 </template>
@@ -47,16 +59,19 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import apiTs from '../../../../utils/apiTs'
 import FeedbackCalendar from '../../../../components/fun-components/feedback-calendar.vue'
+import MemberSelectPopup from '../../../../components/member-select-popup.vue'
 import { buildFeedbackMap, calcStreakDays, toDateKey } from '../../../../utils/abstainUtil'
 import { setShareToken } from '../../../../utils/token'
 import { autoLogin } from '../../../../utils/auth'
-import { ensureCurrentContext } from '../../../../utils/currentGroupResolver'
+import { ensureCurrentGroup } from '../../../../utils/currentGroupResolver'
 
 const event = ref({ itemTitle: '', itemDesc: '', startTime: '', endTime: '', ownerName: '' })
 const records = ref([])
 const creatorName = ref('')
 const loadError = ref(false)
 const creating = ref(false)
+const currentGroup = ref(null)
+const popupVisible = ref(false)
 
 const statusMap = computed(() => buildFeedbackMap(records.value))
 const streakDays = computed(() => calcStreakDays(event.value.startTime, records.value))
@@ -124,19 +139,55 @@ function resolveSameEndTime() {
   return `${toDateKey(d)}T23:59:59`
 }
 
-// 立刻为当前用户创建一份「同款」戒断事件（新用户由 group/list 自动建默认群组）
-async function createSameEvent() {
+// 点「我也要坚持」：先确保有群组（新用户由 group/list 自动建默认群组），再弹成员选择
+async function openCreate() {
   if (creating.value) return
-  creating.value = true
-  uni.showLoading({ title: '创建中...', mask: true })
-  try {
-    const ctx = await ensureCurrentContext()
-    if (!ctx) {
+  if (!currentGroup.value) {
+    uni.showLoading({ title: '加载中...', mask: true })
+    try {
+      const group = await ensureCurrentGroup()
+      currentGroup.value = group
+    } catch (e) {
+      console.warn('解析群组失败:', e)
+    } finally {
       uni.hideLoading()
+    }
+    if (!currentGroup.value) {
       uni.showToast({ title: '登录信息加载中，请稍后重试', icon: 'none' })
       return
     }
-    const targetUserId = ctx.member.userId ?? ctx.member.id
+  }
+  popupVisible.value = true
+}
+
+// 选择已有成员，为其创建同款戒断
+async function onSelectMember(member) {
+  popupVisible.value = false
+  await createEventForMember(member.userId)
+}
+
+// 新建成员（如给小朋友），再为其创建同款戒断
+async function onCreateMember(nickname) {
+  if (!currentGroup.value) return
+  uni.showLoading({ title: '创建成员中...', mask: true })
+  try {
+    const userResp = await apiTs.group.user.add({ groupId: currentGroup.value.id, nickname })
+    popupVisible.value = false
+    uni.hideLoading()
+    await createEventForMember(userResp.userId)
+  } catch (e) {
+    uni.hideLoading()
+    console.error('新建成员失败:', e)
+    uni.showToast({ title: e?.message || '新建成员失败', icon: 'none' })
+  }
+}
+
+// 为指定成员创建一份「同款」戒断事件
+async function createEventForMember(targetUserId) {
+  if (creating.value || !currentGroup.value) return
+  creating.value = true
+  uni.showLoading({ title: '创建中...', mask: true })
+  try {
     const item = {
       id: null,
       itemTitle: event.value.itemTitle || '我的戒断',
@@ -147,9 +198,9 @@ async function createSameEvent() {
       endTime: resolveSameEndTime(),
       parentId: 0
     }
-    await apiTs.schedule.save({ targetUserId, groupId: ctx.group.id, items: [item] })
+    await apiTs.schedule.save({ targetUserId, groupId: currentGroup.value.id, items: [item] })
     uni.hideLoading()
-    uni.showToast({ title: '已为你创建，开始坚持吧 💪', icon: 'none' })
+    uni.showToast({ title: '已创建，开始坚持吧 💪', icon: 'none' })
     setTimeout(() => {
       uni.navigateTo({ url: '/subPackages/abstain/pages/list/index' })
     }, 800)
@@ -181,6 +232,8 @@ onLoad(async (query) => {
     console.error('自动登录失败:', e)
     uni.showToast({ title: e?.message || '自动登录失败', icon: 'none' })
   }
+  // 预解析当前群组，点「我也要坚持」时成员弹窗可直接可用
+  ensureCurrentGroup().then(g => { if (g && !currentGroup.value) currentGroup.value = g }).catch(() => {})
   await fetchShared(token)
 })
 </script>
