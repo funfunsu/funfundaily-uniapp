@@ -93,6 +93,8 @@ const posterVisible = ref(false);
 const posterSchedules = ref([]);
 const posterQr = ref('');
 const posterCreator = ref('我');
+// 缓存最近一次生成的分享 token，转发链接时复用，保证「图片」与「链接」指向同一内容
+const lastShare = ref({ content: '', token: '' });
 
 function openScheduleSheet({ editId = null, date = '', hour = '' } = {}) {
   sheetEditId.value = editId;
@@ -172,8 +174,8 @@ async function handleButtonClick(buttonCode) {
     case 'toggleSelectAll':
       toggleSelectAll();
       break;
-    case 'doSharePoster':
-      doSharePoster();
+    case 'doShare':
+      doShare();
       break;
     case 'cancelShare':
       exitShareMode();
@@ -236,8 +238,7 @@ function enterShareMode() {
     { code: 'cancelShare', text: '取消' },
     { code: 'selectAll', text: '全选' },
     { code: 'toggleSelectAll', text: '反选' },
-    { code: 'doSharePoster', text: '图片' },
-    { code: 'doShareLink', type: 'share', text: '链接' }
+    { code: 'doShare', text: '去分享' }
   ];
   shareMode.value = true;
   nextTick(() => {
@@ -309,20 +310,22 @@ function collectSelectedSchedules() {
   return uniqueById(selected);
 }
 
-// 「图片」分享：生成长图 + 小程序码（参考任务分享）
-async function doSharePoster() {
+// 「去分享」：生成课程表长图 + 小程序码，弹出海报弹层（内含「图片分享」与「转发链接」两种方式）
+async function doShare() {
   const selected = collectSelectedSchedules();
   if (selected.length === 0) {
     uni.showToast({ title: '请先选择要分享的日程', icon: 'none' });
     return;
   }
-  uni.showLoading({ title: '生成分享图...', mask: true });
+  uni.showLoading({ title: '生成课程表...', mask: true });
   try {
+    const content = JSON.stringify(selected);
     const resData = await apiTs.share.create({
-      content: JSON.stringify(selected),
+      content,
       sceneCode: 'schedule_share'
     });
     if (!resData?.token) throw new Error('生成分享链接失败');
+    lastShare.value = { content, token: resData.token };
 
     const qr = await apiTs.share.qrcode({ token: resData.token, page: 'pages/schedule/share' });
     const qrSrc = await base64ToImageSource(qr.qrBase64, qr.contentType);
@@ -362,6 +365,15 @@ onShareAppMessage((res) => {
   const uniqueSelectedJsonString = JSON.stringify(uniqueSelected);
   const shareTitle = `分享 ${uniqueSelected.length} 个日程`;
 
+  // 若「去分享」已为同一份内容生成过 token，直接复用，避免重复建 token 且与课程表图片一致
+  if (lastShare.value.token && lastShare.value.content === uniqueSelectedJsonString) {
+    return {
+      title: shareTitle,
+      path: `/pages/schedule/share?token=${lastShare.value.token}`,
+      imageUrl: ''
+    };
+  }
+
   // 返回 Promise，动态生成分享配置
   return new Promise(async (resolve) => {
     try {
@@ -371,6 +383,7 @@ onShareAppMessage((res) => {
       });
 
       if (resData?.token) {
+        lastShare.value = { content: uniqueSelectedJsonString, token: resData.token };
         resolve({
           title: shareTitle,
           path: `/pages/schedule/share?token=${resData.token}`,

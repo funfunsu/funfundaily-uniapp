@@ -114,7 +114,7 @@
 </template>
 
 <script setup>
-import {ref, watch, onMounted, reactive, computed} from 'vue';
+import {ref, watch, onMounted, reactive, computed, nextTick} from 'vue';
 import DateUtils from '../../utils/util';
 
 // Props 定义
@@ -147,8 +147,18 @@ const props = defineProps({
 // State
 const selectedEvents = ref(new Set());
 const dates = ref([]);
-// 进入默认定位到 8:00（行高 60px，时间轴从 0:00 起，content-wrapper 顶部 padding 40px 让首格落在表头下）
-const defaultScrollTop = ref(8 * 60);
+// 进入默认定位到 8:00（行高 60px，时间轴从 0:00 起）。scroll-view 的 scroll-top 仅在「值变化」时
+// 才滚动，初值若直接给 480，mp-weixin 首次渲染不会滚动 → 看起来停在 0:00。故初值给 0，渲染后再设为 480 触发滚动。
+const MORNING_SCROLL_TOP = 8 * 60;
+const defaultScrollTop = ref(0);
+
+// 渲染后把视口定位到早上 8 点
+const focusToMorning = () => {
+  defaultScrollTop.value = 0;
+  nextTick(() => {
+    setTimeout(() => { defaultScrollTop.value = MORNING_SCROLL_TOP; }, 60);
+  });
+};
 const personColorMap = reactive({})
 const availableColors = ['blue', '1', '2', '3', '4', '5', '6']; // 定义可用的颜色类名
 
@@ -331,11 +341,13 @@ watch(() => props.shareMode, (newVal) => {
 watch(() => props.eventList, (newList) => {
   console.log("📅 eventList changed, updating dates...");
   updateDatesFromEventList(newList);
+  if (!isScheduleEmpty.value) focusToMorning();
 }, { immediate: false });
 
 // Lifecycle Hooks
 onMounted(() => {
   updateDatesFromEventList(props.eventList);
+  focusToMorning();
 });
 
 

@@ -2,7 +2,7 @@
   <view v-if="visible" class="poster-overlay" @tap.self="handleClose">
     <view class="poster-shell" @tap.stop>
       <view class="poster-topbar">
-        <text class="poster-title">分享日程</text>
+        <text class="poster-title">分享课程表</text>
         <view class="poster-close" @click="handleClose"><text class="poster-close__icon">×</text></view>
       </view>
 
@@ -17,17 +17,23 @@
         </view>
       </scroll-view>
 
-      <text class="poster-hint">好友收到图片后，长按识别二维码即可收下日程</text>
+      <text class="poster-hint">好友长按识别二维码，或点开小程序链接即可收下课程表</text>
 
-      <!-- 操作按钮 -->
+      <!-- 操作区：重新设计的分享按钮布局 -->
       <view class="poster-actions">
-        <button class="poster-btn poster-btn--ghost" :disabled="!resultImg" @click="handleSave">
-          <text class="poster-btn__text">保存到相册</text>
-        </button>
         <!-- #ifdef MP-WEIXIN -->
         <button class="poster-btn poster-btn--primary" :disabled="!resultImg" @tap="handleShareImageMenu">
-          <text class="poster-btn__text">分享给朋友</text>
+          <text class="poster-btn__icon">🖼️</text>
+          <text class="poster-btn__text">把课程表图片发给朋友</text>
         </button>
+        <view class="poster-actions__row">
+          <button class="poster-btn poster-btn--ghost" :disabled="!resultImg" @click="handleSave">
+            <text class="poster-btn__text">保存到相册</text>
+          </button>
+          <button class="poster-btn poster-btn--link" open-type="share" @tap="handleLinkShare">
+            <text class="poster-btn__text">转发小程序链接</text>
+          </button>
+        </view>
         <!-- #endif -->
         <!-- #ifndef MP-WEIXIN -->
         <button class="poster-btn poster-btn--primary" :disabled="!resultImg" @click="handleSave">
@@ -74,57 +80,82 @@ const props = defineProps({
   creatorName: { type: String, default: '我' }
 })
 
-const emit = defineEmits(['close', 'shared'])
+const emit = defineEmits(['close', 'shared', 'link'])
 
 const instance = getCurrentInstance()
 const resultImg = ref('')
-const renderStage = ref('正在生成分享图...')
+const renderStage = ref('正在生成课程表...')
 const canvasWidth = ref(600)
 const canvasHeight = ref(900)
 
-// 布局常量（逻辑像素）
-const WIDTH = 600
-const PAD = 40
-const HEADER_H = 200
-const ROW_H = 110
-const FOOTER_H = 360
+// ===== 课程表布局常量（逻辑像素） =====
+const TIME_COL_W = 70    // 左侧时间轴列宽
+const HOUR_H = 84        // 每小时行高
+const HEADER_BAND_H = 160 // 顶部标题带
+const DAY_HEADER_H = 72  // 星期/日期表头行
+const FOOTER_H = 300     // 底部二维码卡
+const MIN_BLOCK_H = 46   // 事件块最小高度
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const PALETTE = ['#2196F3', '#00B8D4', '#3D5AFE', '#1565C0', '#5C6BC0', '#26A69A', '#7E57C2', '#0D47A1']
 
 const isH5 = () => typeof process !== 'undefined' && process.env && process.env.UNI_PLATFORM === 'h5'
 
-// 把单条日程整理成展示字段
-function formatSchedule(s) {
-  const dateStr = s?.date || DateUtils.getDateFromDateTimeStr(s?.startTime || '', '')
-  let weekText = ''
-  let dayText = dateStr
-  if (dateStr) {
-    const parts = dateStr.split('-').map(Number)
-    if (parts.length === 3 && !parts.some(isNaN)) {
-      const d = new Date(parts[0], parts[1] - 1, parts[2])
-      weekText = WEEK_LABELS[d.getDay()]
-      dayText = `${parts[1]}月${parts[2]}日`
-    }
-  }
-  const start = DateUtils.getHourAndMinFromDateTimeStr(s?.startTime || '', '')
-  const end = DateUtils.getHourAndMinFromDateTimeStr(s?.endTime || '', '')
-  const timeText = start ? (end ? `${start} - ${end}` : start) : '全天'
-  return {
-    title: s?.itemTitle || '未命名日程',
-    location: s?.location || '',
-    dateText: dayText && weekText ? `${dayText} ${weekText}` : (dayText || ''),
-    timeText
-  }
+function toMinutes(hhmm) {
+  if (!hhmm) return null
+  const [h, m] = String(hhmm).split(':').map(Number)
+  if (isNaN(h)) return null
+  return h * 60 + (isNaN(m) ? 0 : m)
 }
 
-const rows = () => props.schedules.map(formatSchedule)
+// 计算课程表布局：列（按日期）、时间窗（起止小时）、尺寸
+function buildLayout() {
+  const list = props.schedules || []
+
+  const dateSet = [...new Set(list.map(s => s?.date || DateUtils.getDateFromDateTimeStr(s?.startTime || '', '')))]
+    .filter(Boolean).sort()
+  const columns = dateSet.map(d => {
+    const parts = String(d).split('-').map(Number)
+    let week = '', label = d
+    if (parts.length === 3 && !parts.some(isNaN)) {
+      const dt = new Date(parts[0], parts[1] - 1, parts[2])
+      week = WEEK_LABELS[dt.getDay()]
+      label = `${parts[1]}/${parts[2]}`
+    }
+    return { date: d, week, label }
+  })
+
+  let minStart = Infinity, maxEnd = -Infinity
+  list.forEach(s => {
+    const sm = toMinutes(DateUtils.getHourAndMinFromDateTimeStr(s?.startTime || '', ''))
+    const em = toMinutes(DateUtils.getHourAndMinFromDateTimeStr(s?.endTime || '', ''))
+    if (sm != null) { minStart = Math.min(minStart, sm); maxEnd = Math.max(maxEnd, sm + 60) }
+    if (em != null) maxEnd = Math.max(maxEnd, em)
+  })
+
+  let startHour, endHour
+  if (minStart === Infinity) { startHour = 8; endHour = 18 }
+  else {
+    startHour = Math.max(0, Math.floor(minStart / 60))
+    endHour = Math.min(24, Math.ceil(maxEnd / 60))
+    if (endHour <= startHour) endHour = Math.min(24, startHour + 1)
+    if (endHour - startHour < 4) endHour = Math.min(24, startHour + 4)
+  }
+
+  const cols = Math.max(1, columns.length)
+  const dayColW = Math.max(96, Math.min(220, Math.round(640 / cols)))
+  const width = TIME_COL_W + cols * dayColW
+  const gridH = (endHour - startHour) * HOUR_H
+  const height = HEADER_BAND_H + DAY_HEADER_H + gridH + FOOTER_H
+  return { columns, startHour, endHour, dayColW, width, height, gridH }
+}
 
 watch(
   () => [props.visible, props.schedules, props.qrSource],
   () => {
     if (props.visible && props.schedules.length > 0) {
       resultImg.value = ''
-      renderStage.value = '正在生成分享图...'
+      renderStage.value = '正在生成课程表...'
       nextTick(() => setTimeout(() => renderPoster(), 60))
     }
   },
@@ -174,95 +205,152 @@ function truncate(api, text, maxWidth) {
   return result + '…'
 }
 
-function computeHeight() {
-  return HEADER_H + props.schedules.length * ROW_H + FOOTER_H
-}
-
-// 真正的绘制逻辑（ctx 为 2d/H5/legacy 任一；qrImg 为 Image 对象或路径字符串）
-function paint(ctx, api, width, height, qrImg) {
-  const list = rows()
+// 绘制课程表网格（ctx 为 2d/H5/legacy 任一；qrImg 为 Image 对象或路径字符串）
+function paint(ctx, api, layout, qrImg) {
+  const { columns, startHour, endHour, dayColW, width, height, gridH } = layout
+  const cols = columns.length
+  const list = props.schedules || []
 
   // 背景
   api.setFill('#f5f7fa')
   ctx.fillRect(0, 0, width, height)
 
-  // ===== 顶部头图 =====
+  // ===== 顶部标题带 =====
   if (ctx.createLinearGradient) {
-    const grad = ctx.createLinearGradient(0, 0, width, HEADER_H)
+    const grad = ctx.createLinearGradient(0, 0, width, HEADER_BAND_H)
     grad.addColorStop(0, '#4f8cff')
     grad.addColorStop(1, '#2196f3')
     api.setFill(grad)
   } else {
     api.setFill('#2196f3')
   }
-  ctx.fillRect(0, 0, width, HEADER_H)
+  ctx.fillRect(0, 0, width, HEADER_BAND_H)
 
   api.setFill('rgba(255,255,255,0.92)')
   api.setTextAlign('left')
   api.setTextBaseline('top')
   api.setFont('600 26px sans-serif', 26)
-  ctx.fillText(`${APP_BRAND} · 日程安排`, PAD, 44)
+  ctx.fillText(`${APP_BRAND} · 课程表`, 28, 34)
 
   api.setFill('#ffffff')
   api.setFont('800 40px "PingFang SC", sans-serif', 40)
-  ctx.fillText(truncate(api, `来自 ${props.creatorName} 的分享`, width - PAD * 2), PAD, 86)
+  ctx.fillText(truncate(api, `来自 ${props.creatorName} 的分享`, width - 56), 28, 74)
 
   api.setFill('rgba(255,255,255,0.85)')
   api.setFont('400 24px sans-serif', 24)
-  ctx.fillText(`共 ${list.length} 个日程，一起安排起来吧`, PAD, 142)
+  ctx.fillText(`共 ${list.length} 个日程，一起安排起来吧`, 28, 126)
 
-  // ===== 日程行 =====
-  let y = HEADER_H + 16
-  list.forEach((row) => {
-    const cardX = PAD
-    const cardY = y
-    const cardW = width - PAD * 2
-    const cardH = ROW_H - 16
-    // 卡片底
-    drawRoundRectPath(ctx, cardX, cardY, cardW, cardH, 16)
-    api.setFill('#ffffff')
-    ctx.fill()
+  // ===== 星期/日期表头行 =====
+  const dhY = HEADER_BAND_H
+  // 左上角格
+  api.setFill('#e8f1ff')
+  ctx.fillRect(0, dhY, TIME_COL_W, DAY_HEADER_H)
+  api.setFill('#90a4c4')
+  api.setTextAlign('center')
+  api.setTextBaseline('middle')
+  api.setFont('600 20px sans-serif', 20)
+  ctx.fillText('时间', TIME_COL_W / 2, dhY + DAY_HEADER_H / 2)
 
-    // 左侧时间竖条
-    drawRoundRectPath(ctx, cardX, cardY, 8, cardH, 4)
-    api.setFill('#2196f3')
-    ctx.fill()
-
-    const textX = cardX + 28
-
-    // 日期 + 周几（小标签）
+  columns.forEach((c, i) => {
+    const x = TIME_COL_W + i * dayColW
+    api.setFill(i % 2 === 0 ? '#f3f8ff' : '#e8f1ff')
+    ctx.fillRect(x, dhY, dayColW, DAY_HEADER_H)
+    api.setFill('#1f3a5f')
+    api.setTextAlign('center')
     api.setTextBaseline('top')
+    api.setFont('700 26px sans-serif', 26)
+    ctx.fillText(c.week || '', x + dayColW / 2, dhY + 12)
+    api.setFill('#7a90b0')
+    api.setFont('400 20px sans-serif', 20)
+    ctx.fillText(c.label || '', x + dayColW / 2, dhY + 44)
+  })
+
+  // ===== 网格主体 =====
+  const gy0 = HEADER_BAND_H + DAY_HEADER_H
+  api.setFill('#ffffff')
+  ctx.fillRect(0, gy0, width, gridH)
+
+  // 横向小时线 + 时间标签
+  api.setStroke('#eef2f7')
+  api.setLineWidth(1)
+  for (let h = startHour; h <= endHour; h++) {
+    const y = gy0 + (h - startHour) * HOUR_H
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke()
+    if (h < endHour) {
+      api.setFill('#9aa7b8')
+      api.setTextAlign('center')
+      api.setTextBaseline('top')
+      api.setFont('400 20px sans-serif', 20)
+      ctx.fillText(`${h}:00`, TIME_COL_W / 2, y + 6)
+    }
+  }
+  // 纵向分隔线
+  ctx.beginPath(); ctx.moveTo(0, gy0); ctx.lineTo(0, gy0 + gridH); ctx.stroke()
+  for (let i = 0; i <= cols; i++) {
+    const x = TIME_COL_W + i * dayColW
+    ctx.beginPath(); ctx.moveTo(x, gy0); ctx.lineTo(x, gy0 + gridH); ctx.stroke()
+  }
+
+  // ===== 事件块 =====
+  const dateIndex = {}
+  columns.forEach((c, i) => { dateIndex[c.date] = i })
+  list.forEach((s, idx) => {
+    const key = s?.date != null ? s.date : DateUtils.getDateFromDateTimeStr(s?.startTime || '', '')
+    const di = dateIndex[key]
+    if (di == null) return
+
+    let sm = toMinutes(DateUtils.getHourAndMinFromDateTimeStr(s?.startTime || '', ''))
+    let em = toMinutes(DateUtils.getHourAndMinFromDateTimeStr(s?.endTime || '', ''))
+    if (sm == null) sm = startHour * 60
+    if (em == null || em <= sm) em = sm + 60
+
+    const top = gy0 + (sm - startHour * 60) / 60 * HOUR_H
+    const blockH = Math.max(MIN_BLOCK_H, (em - sm) / 60 * HOUR_H)
+    const x = TIME_COL_W + di * dayColW + 5
+    const w = dayColW - 10
+
+    drawRoundRectPath(ctx, x, top + 3, w, blockH - 6, 12)
+    api.setFill(PALETTE[idx % PALETTE.length])
+    ctx.fill()
+
+    api.setFill('#ffffff')
     api.setTextAlign('left')
-    api.setFill('#2196f3')
-    api.setFont('600 22px sans-serif', 22)
-    ctx.fillText(truncate(api, row.dateText || '未设置日期', cardW - 56), textX, cardY + 16)
+    api.setTextBaseline('top')
+    const tx = x + 12
+    let ty = top + 12
+    api.setFont('700 22px sans-serif', 22)
+    ctx.fillText(truncate(api, s?.itemTitle || '日程', w - 20), tx, ty)
 
-    // 标题
-    api.setFill('#1f2937')
-    api.setFont('700 28px sans-serif', 28)
-    ctx.fillText(truncate(api, row.title, cardW - 56), textX, cardY + 44)
-
-    // 时间 + 地点
-    api.setFill('#94a3b8')
-    api.setFont('400 22px sans-serif', 22)
-    const meta = row.location ? `${row.timeText} · ${row.location}` : row.timeText
-    ctx.fillText(truncate(api, meta, cardW - 56), textX, cardY + 80)
-
-    y += ROW_H
+    if (blockH >= 72) {
+      const start = DateUtils.getHourAndMinFromDateTimeStr(s?.startTime || '', '')
+      const end = DateUtils.getHourAndMinFromDateTimeStr(s?.endTime || '', '')
+      const timeText = start ? (end ? `${start}-${end}` : start) : ''
+      if (timeText) {
+        ty += 30
+        api.setFill('rgba(255,255,255,0.92)')
+        api.setFont('400 19px sans-serif', 19)
+        ctx.fillText(truncate(api, timeText, w - 20), tx, ty)
+      }
+      if (blockH >= 108 && s?.location) {
+        ty += 24
+        api.setFill('rgba(255,255,255,0.85)')
+        ctx.fillText(truncate(api, `📍 ${s.location}`, w - 20), tx, ty)
+      }
+    }
   })
 
   // ===== 底部二维码卡片 =====
-  const footerY = HEADER_H + list.length * ROW_H + 8
-  const fCardX = PAD
-  const fCardW = width - PAD * 2
-  const fCardH = FOOTER_H - 40
-  drawRoundRectPath(ctx, fCardX, footerY, fCardW, fCardH, 20)
+  const footerY = gy0 + gridH + 24
+  const fX = 24
+  const fW = width - 48
+  const fH = FOOTER_H - 48
+  drawRoundRectPath(ctx, fX, footerY, fW, fH, 20)
   api.setFill('#ffffff')
   ctx.fill()
 
-  const qrSize = 180
-  const qrX = fCardX + (fCardW - qrSize) / 2
-  const qrY = footerY + 30
+  const qrSize = 170
+  const qrX = fX + (fW - qrSize) / 2
+  const qrY = footerY + 28
   if (qrImg) {
     try { ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize) } catch (e) { /* ignore */ }
   } else {
@@ -274,15 +362,15 @@ function paint(ctx, api, width, height, qrImg) {
   api.setTextAlign('center')
   api.setTextBaseline('top')
   api.setFont('600 26px sans-serif', 26)
-  ctx.fillText('长按识别二维码 · 收下日程', width / 2, qrY + qrSize + 24)
+  ctx.fillText('长按识别二维码 · 收下课程表', width / 2, qrY + qrSize + 22)
   api.setFill('#94a3b8')
   api.setFont('400 20px sans-serif', 20)
-  ctx.fillText(`用微信打开 ${APP_BRAND} 小程序`, width / 2, qrY + qrSize + 60)
+  ctx.fillText(`用微信打开 ${APP_BRAND} 小程序`, width / 2, qrY + qrSize + 56)
 }
 
 function renderPoster() {
-  const width = WIDTH
-  const height = computeHeight()
+  const layout = buildLayout()
+  const { width, height } = layout
   canvasWidth.value = width
   canvasHeight.value = height
 
@@ -295,7 +383,7 @@ function renderPoster() {
     const ctx = canvas.getContext('2d')
     const api = makeCanvasApi(ctx)
     const finish = (qrImg) => {
-      paint(ctx, api, width, height, qrImg)
+      paint(ctx, api, layout, qrImg)
       try { resultImg.value = canvas.toDataURL('image/png') } catch (e) { renderStage.value = '生成失败' }
     }
     if (props.qrSource) {
@@ -325,7 +413,7 @@ function renderPoster() {
       ctx.scale(dpr, dpr)
       const api = makeCanvasApi(ctx)
       const finish = (qrImg) => {
-        paint(ctx, api, width, height, qrImg)
+        paint(ctx, api, layout, qrImg)
         wx.canvasToTempFilePath({
           canvas,
           x: 0, y: 0, width, height,
@@ -351,7 +439,7 @@ function renderPoster() {
   // #ifndef MP-WEIXIN
   const ctx = uni.createCanvasContext('scheduleSharePosterCanvas', instance && instance.proxy)
   const api = makeCanvasApi(ctx)
-  paint(ctx, api, width, height, props.qrSource || null)
+  paint(ctx, api, layout, props.qrSource || null)
   ctx.draw(false, () => {
     setTimeout(() => {
       uni.canvasToTempFilePath({
@@ -400,6 +488,11 @@ function handleShareImageMenu() {
     uni.showToast({ title: '当前微信版本不支持，请先保存图片', icon: 'none' })
   }
   // #endif
+}
+
+// 转发小程序链接：按钮 open-type="share" 会触发页面的 onShareAppMessage，这里仅做提示/埋点
+function handleLinkShare() {
+  emit('link')
 }
 
 function handleClose() {
@@ -451,15 +544,23 @@ function handleClose() {
 @keyframes posterSpin { to { transform: rotate(360deg); } }
 .poster-loading__text { font-size: 26rpx; color: #94a3b8; }
 .poster-hint { display: block; text-align: center; font-size: 24rpx; color: #94a3b8; padding: 8rpx 32rpx 0; box-sizing: border-box; width: 100%; }
-.poster-actions { display: flex; gap: 20rpx; padding: 24rpx 32rpx 28rpx; box-sizing: border-box; width: 100%; }
+
+.poster-actions {
+  display: flex; flex-direction: column; gap: 16rpx;
+  padding: 20rpx 32rpx 28rpx; box-sizing: border-box; width: 100%;
+}
+.poster-actions__row { display: flex; gap: 20rpx; }
 .poster-btn {
   flex: 1; height: 88rpx; border-radius: 44rpx; border: none; margin: 0;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; gap: 8rpx;
 }
 .poster-btn::after { border: none; }
 .poster-btn[disabled] { opacity: 0.45; }
+.poster-btn__icon { font-size: 30rpx; }
 .poster-btn--ghost { background: #f1f5f9; }
 .poster-btn--ghost .poster-btn__text { color: #475569; font-size: 28rpx; font-weight: 600; }
+.poster-btn--link { background: #e8f5e9; }
+.poster-btn--link .poster-btn__text { color: #2e7d32; font-size: 28rpx; font-weight: 600; }
 .poster-btn--primary { background: #2196f3; }
 .poster-btn--primary .poster-btn__text { color: #ffffff; font-size: 28rpx; font-weight: 600; }
 </style>
