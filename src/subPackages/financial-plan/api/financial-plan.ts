@@ -2,10 +2,14 @@ import type {
   AssetMarket,
   AssetProfitSummary,
   BatchDirection,
+  BatchStats,
   BatchType,
+  ExerciseAction,
   FinancialPlan,
   FinancialPlanAsset,
   FinancialPlanListItem,
+  InstrumentType,
+  OptionType,
   PlanStatus,
   PlanType,
   ProfitSummary,
@@ -164,12 +168,15 @@ export const api5UpdateFinancialPlanAssetParamsMethod = httpMethod.put
 
 export interface Api6CreateRealizationBatchRequest {
   assetId: string
-  batchType: BatchType
+  /** 批次只挂正股；该字段保留兼容，后端恒按 EQUITY 处理。 */
+  batchType?: BatchType
+  /** @deprecated 期权下沉到操作层，批次不再带方向。 */
   direction?: BatchDirection
   batchName?: string
   quantity: number
   planBuyPrice: number
   planSellPrice: number
+  /** @deprecated 期权到期下沉到操作层。 */
   expirationDate?: string
   note?: string
 }
@@ -187,10 +194,20 @@ export const api6CreateRealizationBatchUrl =
 export const api6CreateRealizationBatchMethod = httpMethod.post
 
 export interface Api7RecordRealizationBuyRequest {
+  /** STOCK（默认）/ OPTION。 */
+  instrument?: InstrumentType
   tradeDate: string
+  /** OPTION 时可为 0。 */
   actualBuyPrice: number
+  /** STOCK >0，OPTION ≠0（可为负）。 */
   quantity: number
   fee?: number
+  /** 仅 OPTION 必填。 */
+  optionType?: OptionType
+  /** 仅 OPTION 必填：目标价格。 */
+  strikePrice?: number
+  /** 仅 OPTION 必填：到期时间。 */
+  expirationDate?: string
   note?: string
 }
 
@@ -205,10 +222,20 @@ export const api7RecordRealizationBuyUrl =
 export const api7RecordRealizationBuyMethod = httpMethod.post
 
 export interface Api8RecordRealizationSellRequest {
+  /** STOCK（默认）/ OPTION。 */
+  instrument?: InstrumentType
   tradeDate: string
+  /** OPTION 时可为 0。 */
   actualSellPrice: number
+  /** STOCK >0，OPTION ≠0（可为负）。 */
   quantity: number
   fee?: number
+  /** 仅 OPTION 必填。 */
+  optionType?: OptionType
+  /** 仅 OPTION 必填：目标价格。 */
+  strikePrice?: number
+  /** 仅 OPTION 必填：到期时间。 */
+  expirationDate?: string
   note?: string
 }
 
@@ -229,6 +256,8 @@ export interface Api9GetFinancialPlanDetailResponse {
   assets: FinancialPlanAsset[]
   realizationBatches: RealizationBatch[]
   summary: ProfitSummary
+  /** 各批次卡片汇总，顺序与 realizationBatches 一致。 */
+  batchStats?: BatchStats[]
 }
 
 export const api9GetFinancialPlanDetailUrl = '/api/financial-plans/{planId}'
@@ -337,19 +366,28 @@ export interface FinancialPlanApiContract {
     batchId: string,
     request: Api13UpdateRealizationBatchRequest,
   ): Promise<ApiResponseEnvelope<RealizationBatch>>
+
+  /** API-14: Exercise / assign an option key within a batch. */
+  exerciseOption(
+    planId: string,
+    batchId: string,
+    request: Api14ExerciseOptionRequest,
+  ): Promise<ApiResponseEnvelope<RealizationBatch>>
 }
 
 export const api12ListBatchOperationsUrl =
   '/api/financial-plans/{planId}/realizations/{batchId}/operations'
 export const api12ListBatchOperationsMethod = httpMethod.get
 
-/** API-13: 编辑兑现批次。 */
+/** API-13: 编辑兑现批次（正股计划）。 */
 export interface Api13UpdateRealizationBatchRequest {
   batchName?: string
+  /** @deprecated 期权下沉到操作层。 */
   direction?: BatchDirection
   quantity?: number
   planBuyPrice?: number
   planSellPrice?: number
+  /** @deprecated 期权到期下沉到操作层。 */
   expirationDate?: string
   note?: string
   version: number
@@ -358,3 +396,15 @@ export interface Api13UpdateRealizationBatchRequest {
 export const api13UpdateRealizationBatchUrl =
   '/api/financial-plans/{planId}/realizations/{batchId}'
 export const api13UpdateRealizationBatchMethod = httpMethod.put
+
+/** API-14: 行权 / 被行权（针对批次内某个期权 key）。 */
+export interface Api14ExerciseOptionRequest {
+  optionType: OptionType
+  strikePrice: number
+  expirationDate: string
+  action: ExerciseAction
+}
+
+export const api14ExerciseOptionUrl =
+  '/api/financial-plans/{planId}/realizations/{batchId}/exercise'
+export const api14ExerciseOptionMethod = httpMethod.post

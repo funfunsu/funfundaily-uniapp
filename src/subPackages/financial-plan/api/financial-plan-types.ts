@@ -89,6 +89,30 @@ export const operationType = {
 
 export type OperationType = (typeof operationType)[keyof typeof operationType]
 
+/** 操作标的类型：正股 / 期权。 */
+export const instrumentType = {
+  stock: 'STOCK',
+  option: 'OPTION',
+} as const
+
+export type InstrumentType = (typeof instrumentType)[keyof typeof instrumentType]
+
+/** 期权类型：看涨 / 看跌。 */
+export const optionType = {
+  call: 'CALL',
+  put: 'PUT',
+} as const
+
+export type OptionType = (typeof optionType)[keyof typeof optionType]
+
+/** 行权动作：行权 / 被行权。 */
+export const exerciseAction = {
+  exercise: 'EXERCISE',
+  assign: 'ASSIGN',
+} as const
+
+export type ExerciseAction = (typeof exerciseAction)[keyof typeof exerciseAction]
+
 export interface FinancialPlan {
   planId: string
   groupId: string
@@ -151,17 +175,48 @@ export interface RealizationBatch {
   version: number
 }
 
-/** 批次下的单次操作明细（多次买/卖即多条）。 */
+/** 批次下的单次操作明细（多次买/卖即多条；正股或期权）。 */
 export interface RealizationOperation {
   operationId: string
   batchId: string
+  instrument: InstrumentType
   operationType: OperationType
+  /** 仅 OPTION 有效。 */
+  optionType?: OptionType
+  /** 仅 OPTION 有效：目标价格（行权价）。 */
+  strikePrice?: number
+  /** 仅 OPTION 有效：到期时间。 */
+  expirationDate?: string
   tradeDate: string
   price: number
   quantity: number
   fee: number
   note?: string
   createdAt: string
+}
+
+/** 批次内单个期权 key 的持仓与盈亏汇总。 */
+export interface OptionKeyStats {
+  optionType: OptionType
+  strikePrice: number
+  expirationDate: string
+  netQuantity: number
+  costAmount: number
+  avgCost?: number
+  realizedProfit: number
+}
+
+/** 批次卡片汇总（正股 + 各期权 key）。 */
+export interface BatchStats {
+  batchId: string
+  targetProfit: number
+  stockRealizedProfit: number
+  optionRealizedProfit: number
+  totalRealizedProfit: number
+  stockQuantity: number
+  stockCostPrice?: number
+  stockCostAmount: number
+  optionKeys: OptionKeyStats[]
 }
 
 export interface ProfitSummary {

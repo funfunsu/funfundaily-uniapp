@@ -29,6 +29,8 @@ import {
   api12ListBatchOperationsUrl,
   api13UpdateRealizationBatchMethod,
   api13UpdateRealizationBatchUrl,
+  api14ExerciseOptionMethod,
+  api14ExerciseOptionUrl,
   financialPlanErrorCode,
   type Api1FinancialPlanQueryRequest,
   type Api1FinancialPlanQueryResponse,
@@ -55,7 +57,10 @@ import {
   type FinancialPlanErrorCode,
 } from './financial-plan'
 import type { RealizationOperation, RealizationBatch } from './financial-plan-types'
-import type { Api13UpdateRealizationBatchRequest } from './financial-plan'
+import type {
+  Api13UpdateRealizationBatchRequest,
+  Api14ExerciseOptionRequest,
+} from './financial-plan'
 
 const financialPlanErrorCodeSet = new Set<string>(Object.values(financialPlanErrorCode))
 
@@ -406,6 +411,18 @@ export function createFinancialPlanApiClient(
       request,
     )
 
+  /** API-14：行权 / 被行权。 */
+  const exerciseOption = (
+    planId: string,
+    batchId: string,
+    request: Api14ExerciseOptionRequest,
+  ): Promise<ApiEnvelopeWithTrace<RealizationBatch>> =>
+    requestWithRetry<RealizationBatch>(
+      api14ExerciseOptionMethod,
+      buildUrl(api14ExerciseOptionUrl, { planId, batchId }),
+      request,
+    )
+
   return {
     queryPlans,
     createPlan,
@@ -420,6 +437,7 @@ export function createFinancialPlanApiClient(
     archivePlan,
     listBatchOperations,
     updateRealizationBatch,
+    exerciseOption,
   }
 }
 
