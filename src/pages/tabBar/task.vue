@@ -76,6 +76,7 @@
       :payload="posterTasks"
       :qr-source="posterQr"
       :creator-name="posterCreator"
+      :show-link="true"
       @close="handlePosterClose"
       @shared="handlePosterClose"
     />
@@ -165,6 +166,8 @@ const posterVisible = ref(false);
 const posterTasks = ref([]);
 const posterQr = ref('');
 const posterCreator = ref('我');
+// 缓存「去分享」生成的 token，供「转链接」(onShareAppMessage) 复用，保证链接与图片指向同一份内容
+const lastShare = ref({ content: '', token: '' });
 
 // 任务编辑底部弹层状态
 const editSheetVisible = ref(false);
@@ -402,8 +405,9 @@ onShow(() => {
   if (refreshUri === currentTab) { fetchAllData(); removeStoredData(STORAGE_KEYS.REFRESH_TAB) }
 });
 
-// 微信原生转发：仅用于水印照片场景；任务分享已改为「生成长图 + 二维码」（见 doShare）。
-onShareAppMessage(() => {
+// 微信原生转发：覆盖三种场景——①水印照片；②海报弹层「转链接」分享任务清单；③默认转发。
+onShareAppMessage((res) => {
+  // ① 水印照片分享（优先级最高）
   if (watermarkShareImageUrl.value) {
     const data = {
       title: watermarkShareTitle.value,
@@ -416,6 +420,43 @@ onShareAppMessage(() => {
     }, 0)
     return data
   }
+
+  // ② 任务清单「转链接」：海报弹层内 open-type="share" 按钮触发
+  const selectedTasks = taskList.value.filter(task => selectedTaskIds.value.has(task.id));
+  if (res?.from === 'button' && selectedTasks.length > 0) {
+    const content = JSON.stringify(selectedTasks);
+    const shareTitle = `分享 ${selectedTasks.length} 个任务，一起打卡吧`;
+    // 与「去分享」同一份内容则复用已生成的 token，保证链接与图片一致并省一次建 token
+    if (lastShare.value.token && lastShare.value.content === content) {
+      return {
+        title: shareTitle,
+        path: `/pages/task/share?token=${lastShare.value.token}`,
+        imageUrl: ''
+      };
+    }
+    return new Promise(async (resolve) => {
+      try {
+        const resData = await apiTs.share.create({ content, sceneCode: 'task_share' });
+        if (resData?.token) {
+          lastShare.value = { content, token: resData.token };
+          resolve({
+            title: shareTitle,
+            path: `/pages/task/share?token=${resData.token}`,
+            imageUrl: ''
+          });
+        } else {
+          uni.showToast({ title: '生成分享链接失败', icon: 'none' });
+          resolve({});
+        }
+      } catch (err) {
+        console.error('生成分享 token 失败:', err);
+        uni.showToast({ title: '网络错误，请重试', icon: 'none' });
+        resolve({});
+      }
+    });
+  }
+
+  // ③ 默认转发
   return { title: `${APP_BRAND} · 一起打卡`, path: '/pages/tabBar/task' }
 });
 
@@ -433,11 +474,13 @@ async function doShare() {
   }
   uni.showLoading({ title: '生成分享图...', mask: true });
   try {
+    const content = JSON.stringify(selectedTasks);
     const resData = await apiTs.share.create({
-      content: JSON.stringify(selectedTasks),
+      content,
       sceneCode: 'task_share'
     });
     if (!resData?.token) throw new Error('生成分享链接失败');
+    lastShare.value = { content, token: resData.token };
 
     const qr = await apiTs.share.qrcode({ token: resData.token, page: 'pages/task/share' });
     const qrSrc = await base64ToImageSource(qr.qrBase64, qr.contentType);
