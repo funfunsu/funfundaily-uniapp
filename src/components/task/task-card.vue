@@ -66,7 +66,14 @@
     </view>
     <!-- 任务描述和完成时间/打卡次数在同一行 -->
     <view class="task-desc-and-time" >
-      <text class="task-desc">{{ task.itemDesc || ' ' }}</text>
+      <view class="task-desc-wrap">
+        <text class="task-desc">{{ displayDesc }}</text>
+        <text
+            v-if="isDescLong"
+            class="desc-toggle"
+            @click.stop="descExpanded = !descExpanded"
+        >{{ descExpanded ? '收起' : '查看更多' }}</text>
+      </view>
       <template v-if="mode !== 'share'">
         <text v-if="task.completedTime" class="completed-time">
           {{ DateUtils.formatDateTimeToShow(new Date(task.completedTime)) }}
@@ -92,7 +99,7 @@
 </template>
 
 <script setup>
-import {defineProps, defineEmits, computed} from 'vue'
+import {defineProps, defineEmits, computed, ref} from 'vue'
 import DateUtils from "../../utils/util";
 import {TASK_REPEAT_TYPE_LABEL_MAP} from "../../utils/constants";
 import ProgressLineItem from "../fun-components/progress-line-item.vue";
@@ -119,6 +126,16 @@ const props = defineProps({
 })
 
 const taskRepeatTypeLabelMap= TASK_REPEAT_TYPE_LABEL_MAP;
+
+// 任务描述过长时截断，点击「查看更多」展开
+const DESC_LIMIT = 40;
+const descExpanded = ref(false);
+const isDescLong = computed(() => (props.task.itemDesc || '').length > DESC_LIMIT);
+const displayDesc = computed(() => {
+  const desc = props.task.itemDesc || ' ';
+  if (!isDescLong.value || descExpanded.value) return desc;
+  return desc.slice(0, DESC_LIMIT) + '…';
+});
 
 const todayIsDueDate = (duDate) => {
   return DateUtils.getDateStr(props.curDate) === duDate;
@@ -243,12 +260,19 @@ const toggleSelection = () => {
   gap: 16rpx;
   flex-wrap: wrap;
 }
-.task-desc {
-  flex-grow: 1;
-  flex-shrink: 1;
+.task-desc-wrap {
+  flex: 1 1 auto;
   min-width: 0;
   word-break: break-word;
+}
+.task-desc {
   font-size: 24rpx;
+}
+.desc-toggle {
+  font-size: 24rpx;
+  color: #007aff;
+  margin-left: 8rpx;
+  white-space: nowrap;
 }
 .task-item--completed .task-desc {
   color: #aaa;

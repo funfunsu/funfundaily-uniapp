@@ -47,16 +47,16 @@ const taskList = {
     api.setFill('rgba(255,255,255,0.92)')
     api.setTextAlign('left')
     api.setTextBaseline('top')
-    api.setFont('600 26px sans-serif', 26)
-    ctx.fillText(`${APP_BRAND} · 任务清单`, TASK_PAD, 44)
+    api.setFont('600 22px sans-serif', 22)
+    ctx.fillText(`${APP_BRAND} · 任务清单`, TASK_PAD, 46)
 
     api.setFill('#ffffff')
-    api.setFont('800 40px "PingFang SC", sans-serif', 40)
-    ctx.fillText(truncate(api, `来自 ${creatorName} 的分享`, width - TASK_PAD * 2), TASK_PAD, 86)
+    api.setFont('800 32px "PingFang SC", sans-serif', 32)
+    ctx.fillText(truncate(api, `来自 ${creatorName} 的分享`, width - TASK_PAD * 2), TASK_PAD, 88)
 
     api.setFill('rgba(255,255,255,0.85)')
-    api.setFont('400 24px sans-serif', 24)
-    ctx.fillText(`共 ${tasks.length} 个任务，一起打卡吧`, TASK_PAD, 142)
+    api.setFont('400 22px sans-serif', 22)
+    ctx.fillText(`共 ${tasks.length} 个任务，一起打卡吧`, TASK_PAD, 140)
 
     // 任务行
     let y = TASK_HEADER_H + 16
@@ -79,13 +79,13 @@ const taskList = {
       ctx.fill()
       api.setFill('#2196f3')
       api.setTextAlign('center')
-      api.setFont('700 22px sans-serif', 22)
+      api.setFont('700 20px sans-serif', 20)
       ctx.fillText(String(idx + 1), dotCx, dotCy + 1)
 
       const textX = dotCx + dotR + 18
       const score = Number(task?.extra?.score || 0)
       const tagText = score > 0 ? `+${score}分` : (task?.extra?.taskType === 'Habit' ? '习惯' : '任务')
-      api.setFont('600 22px sans-serif', 22)
+      api.setFont('600 20px sans-serif', 20)
       const tagW = api.measureWidth(tagText) + 28
       const tagH = 40
       const tagX = cardX + cardW - tagW - 16
@@ -100,13 +100,13 @@ const taskList = {
       const textMaxW = tagX - textX - 16
       api.setTextAlign('left')
       api.setFill('#1f2937')
-      api.setFont('600 26px sans-serif', 26)
+      api.setFont('600 24px sans-serif', 24)
       const desc = task?.itemDesc ? String(task.itemDesc) : ''
       if (desc) {
-        ctx.fillText(truncate(api, task?.itemTitle || '未命名任务', textMaxW), textX, dotCy - 14)
+        ctx.fillText(truncate(api, task?.itemTitle || '未命名任务', textMaxW), textX, dotCy - 13)
         api.setFill('#94a3b8')
-        api.setFont('400 20px sans-serif', 20)
-        ctx.fillText(truncate(api, desc, textMaxW), textX, dotCy + 16)
+        api.setFont('400 18px sans-serif', 18)
+        ctx.fillText(truncate(api, desc, textMaxW), textX, dotCy + 15)
       } else {
         ctx.fillText(truncate(api, task?.itemTitle || '未命名任务', textMaxW), textX, dotCy + 1)
       }
@@ -136,11 +136,11 @@ const taskList = {
     api.setFill('#1f2937')
     api.setTextAlign('center')
     api.setTextBaseline('top')
-    api.setFont('600 26px sans-serif', 26)
+    api.setFont('600 22px sans-serif', 22)
     ctx.fillText('长按识别二维码 · 收下任务', width / 2, qrY + qrSize + 24)
     api.setFill('#94a3b8')
-    api.setFont('400 20px sans-serif', 20)
-    ctx.fillText(`用微信打开 ${APP_BRAND} 小程序`, width / 2, qrY + qrSize + 60)
+    api.setFont('400 18px sans-serif', 18)
+    ctx.fillText(`用微信打开 ${APP_BRAND} 小程序`, width / 2, qrY + qrSize + 58)
   }
 }
 
