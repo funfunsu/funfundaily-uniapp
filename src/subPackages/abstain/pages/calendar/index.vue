@@ -74,6 +74,7 @@ const posterVisible = ref(false)
 const posterQr = ref('')
 const creatorName = ref('我')       // 海报「来自 xxx」：事件实际归属人昵称
 const ownerTitleName = ref('我')    // 分享标题：自己=「我」，他人=归属人昵称
+const ownerDisplayName = ref('')    // 写进分享内容的归属人昵称（无「我」兜底，缺失留空由收下页回落）
 
 const shareToken = ref('')
 
@@ -118,7 +119,9 @@ async function ensureShareToken() {
       itemTitle: event.value.itemTitle,
       itemDesc: event.value.itemDesc,
       startTime: event.value.startTime,
-      endTime: event.value.endTime
+      endTime: event.value.endTime,
+      // 戒断事项的实际归属人昵称（非分享人），供分享页区分「谁在戒断」
+      ownerName: ownerDisplayName.value
     },
     records: records.value
   })
@@ -171,6 +174,7 @@ onLoad(async (query) => {
   const isSelf = !targetUserId.value || String(targetUserId.value) === String(user?.id)
   const resolvedOwner = ownerName || user?.nickname || ''
   creatorName.value = resolvedOwner || '我'
+  ownerDisplayName.value = resolvedOwner
   ownerTitleName.value = isSelf ? '我' : (resolvedOwner || 'TA')
   uni.setNavigationBarTitle({ title: event.value.itemTitle || '戒断统计' })
   await fetchRecords()
