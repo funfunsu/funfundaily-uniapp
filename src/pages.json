@@ -94,6 +94,13 @@
         "navigationBarTitleText": "打卡日历",
         "enablePullDownRefresh": false
       }
+    },
+    {
+      "path": "pages/point/history",
+      "style": {
+        "navigationBarTitleText": "积分流水",
+        "enablePullDownRefresh": false
+      }
     }
   ],
   "subPackages": [

@@ -30,7 +30,7 @@
         <view class="t-seg">
           <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Habit' }" @click="onTaskTypeChanged('Habit')">习惯</view>
           <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Todo' }" @click="onTaskTypeChanged('Todo')">待办</view>
-          <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Goal' }" @click="onTaskTypeChanged('Goal')">目标</view>
+          <view v-if="showGoalType" class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Goal' }" @click="onTaskTypeChanged('Goal')">目标</view>
         </view>
         <text class="t-seg-hint">{{ typeHint }}</text>
 
@@ -128,8 +128,10 @@
           <text class="t-group-label">关联目标</text>
           <view class="t-chips">
             <view class="t-chip" :class="{ 't-chip--active': !localSchedule.parentId }" @click="handleSelectGoal({ id: 0, title: '无目标' })">无目标</view>
-            <view class="t-chip" v-for="(goal, idx) in goalList" :key="idx"
+            <view class="t-chip" v-for="(goal, idx) in localGoalList" :key="idx"
                   :class="{ 't-chip--active': localSchedule.parentId === goal.id }" @click="handleSelectGoal(goal)">{{ goal.itemTitle || '未命名目标' }}</view>
+            <!-- 新建目标入口：目标不再有单独的创建按钮，在此内联创建 -->
+            <view class="t-chip t-chip--add" :class="{ 'is-disabled': creatingGoal }" @click="onCreateGoal">＋ 新建目标</view>
           </view>
         </view>
 
@@ -160,9 +162,10 @@
 // 引入必要的 Vue 功能
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import DateUtils from "../../utils/util";
-import { getStoredData, setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
+import { getStoredData, getStoredKey, setStoredData, removeStoredDataByKeys, STORAGE_KEYS } from "../../utils/storageManager";
 import {HOBIT_TASK_REPEAT_TYPE_LABELS, HOBIT_TASK_REPEAT_TYPE_VALUES} from "../../utils/constants";
 import DatePicker from "../fun-components/date-picker.vue";
+import apiTs from "../../utils/apiTs";
 
 // --- Props 定义 ---
 const props = defineProps({
@@ -178,6 +181,15 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  // 「新建目标」内联创建需要的上下文
+  groupId: {
+    type: [String, Number],
+    default: ''
+  },
+  targetUserId: {
+    type: [String, Number],
+    default: ''
+  },
   // 嵌入底部弹层时为 true：去掉整页高度/自身滚动/卡片阴影，交给弹层 body 滚动
   embedded: {
     type: Boolean,
@@ -185,11 +197,92 @@ const props = defineProps({
   }
 });
 
+// 本地目标列表：以 props.goalList 为初值，内联「新建目标」后即时追加
+const localGoalList = ref([]);
+watch(
+  () => props.goalList,
+  (list) => { localGoalList.value = Array.isArray(list) ? [...list] : []; },
+  { immediate: true, deep: true }
+);
+
+// 仅在「编辑已存在的目标」时，类型分段才展示「目标」项；新建任务只给习惯/待办
+const showGoalType = computed(() =>
+  !!localSchedule.value?.id && localSchedule.value?.itemType === 'goal'
+);
+
 // ✅ 选中目标 赋值parentId
 const handleSelectGoal = (goal) => {
   localSchedule.value.parentId = goal.id; // 核心赋值：选中目标的id = parentId
   // 无目标时 parentId = null，和上面的无目标选项联动
 };
+
+// 「新建目标」内联创建：弹出输入框 → 保存目标 → 重新拉取并自动选中
+const creatingGoal = ref(false);
+const onCreateGoal = () => {
+  if (creatingGoal.value) return;
+  if (!props.groupId || !props.targetUserId) {
+    uni.showToast({ title: '请先选择群组成员', icon: 'none' });
+    return;
+  }
+  uni.showModal({
+    title: '新建目标',
+    editable: true,
+    placeholderText: '输入目标名称',
+    success: async (res) => {
+      if (!res.confirm) return;
+      const title = (res.content || '').trim();
+      if (!title) {
+        uni.showToast({ title: '请输入目标名称', icon: 'none' });
+        return;
+      }
+      await saveNewGoal(title);
+    }
+  });
+};
+
+async function saveNewGoal(title) {
+  creatingGoal.value = true;
+  const day = props.curDate || new Date();
+  const endDate = DateUtils.getDayOff(new Date(day), 365);
+  const goalItem = {
+    itemType: 'goal',
+    itemTitle: title,
+    repeatType: 'none',
+    repeatKeys: [],
+    startTime: DateUtils.getDayStartTimeStr(day),
+    endTime: DateUtils.getDayEndTimeStr(day),
+    repeatStartDay: DateUtils.getDateStr(day),
+    repeatEndDay: DateUtils.getDateStr(endDate),
+    extra: { taskType: 'Goal', score: 0, totalCount: 1 }
+  };
+  try {
+    await apiTs.schedule.save({ targetUserId: props.targetUserId, groupId: props.groupId, items: [goalItem] });
+    // 失效目标缓存，确保列表页/再次打开能看到新目标
+    removeStoredDataByKeys(STORAGE_KEYS.USER_ALL_GOAL, props.targetUserId);
+    // 重新拉取目标，拿到带 id 的新目标并自动选中
+    const req = {
+      fromDate: DateUtils.getDateStr(day),
+      toDate: DateUtils.getNextDayStr(day),
+      targetUserId: props.targetUserId,
+      groupId: props.groupId,
+      scheduleItemType: 'goal'
+    };
+    const dateList = await apiTs.schedule.list(req);
+    const goals = dateList.find(d => d.date === DateUtils.getDateStr(day))?.schedules || [];
+    setStoredData(getStoredKey(STORAGE_KEYS.USER_ALL_GOAL, props.targetUserId), goals);
+    localGoalList.value = goals;
+    const created = goals
+      .filter(g => g.itemTitle === title)
+      .sort((a, b) => Number(b.id) - Number(a.id))[0];
+    if (created) localSchedule.value.parentId = created.id;
+    uni.showToast({ title: '目标已创建', icon: 'success' });
+  } catch (e) {
+    console.error('新建目标失败:', e);
+    uni.showToast({ title: e?.message || '新建目标失败', icon: 'none' });
+  } finally {
+    creatingGoal.value = false;
+  }
+}
 
 // watch(() => localSchedule.value.parentId, () => {}, { immediate: true });
 
@@ -461,7 +554,20 @@ onMounted(() => {
   const copyData = deepClone(scheduleData);
   localSchedule.value = copyData;
   if (!localSchedule.value.id){
-    localSchedule.value.repeatType = 'daily';
+    // 依据初始类型设默认重复规则：习惯=每天重复；待办/目标=不重复
+    const initType = copyData.extra?.taskType || 'Habit';
+    if (initType === 'Todo') {
+      localSchedule.value.repeatType = 'none';
+      localSchedule.value.repeatKeys = [];
+      localSchedule.value.itemType = 'task';
+    } else if (initType === 'Goal') {
+      localSchedule.value.repeatType = 'none';
+      localSchedule.value.repeatKeys = [];
+      localSchedule.value.itemType = 'goal';
+    } else {
+      localSchedule.value.repeatType = 'daily';
+      localSchedule.value.repeatKeys = ['whole'];
+    }
     handleRepeatDateChanged('repeatStartDay')
     // localSchedule.value.repeatStartDay = DateUtils.getDateStr(props.curDate)
   }
@@ -682,6 +788,12 @@ defineExpose({
   font-size: 26rpx;
 }
 .t-chip--active { background: #e6f0ff; color: #2196f3; font-weight: 600; }
+.t-chip--add {
+  background: transparent;
+  color: #2196f3;
+  border: 2rpx dashed #93c5fd;
+}
+.t-chip--add.is-disabled { opacity: 0.5; }
 
 .form-section {
   background-color: white;

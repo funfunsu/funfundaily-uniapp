@@ -20,10 +20,18 @@
         @member-change="handleMemberChange"
     />
 
+    <!-- 新建任务类型选择（习惯 / 待办前移） -->
+    <TaskCreateChooser
+      :visible="chooserVisible"
+      @close="chooserVisible = false"
+      @select="onChooseTaskType"
+    />
+
     <!-- 任务编辑底部弹层 -->
     <TaskEditSheet
       :visible="editSheetVisible"
       :edit-id="editSheetId"
+      :initial-task-type="pendingTaskType"
       :goal-list="editGoalList"
       :cur-date="currentDate"
       :group-id="currentGroup?.id"
@@ -46,6 +54,7 @@ import TaskCard from "../../components/task/task-card.vue";
 import TaskListContainer from "../../components/task/task-list-container.vue";
 import TaskUtil from "../../utils/taskUtil";
 import TaskEditSheet from "../../components/task/task-edit-sheet.vue";
+import TaskCreateChooser from "../../components/task/task-create-chooser.vue";
 import { getStoredData, getStoredKey, STORAGE_KEYS } from "../../utils/storageManager";
 
 const listShow = ref(true)
@@ -61,6 +70,9 @@ const selectedTaskIds = ref(new Set());
 const editSheetVisible = ref(false);
 const editSheetId = ref(null);
 const editGoalList = ref([]);
+// 新建任务类型选择（前移：先选习惯/待办，再进表单）
+const chooserVisible = ref(false);
+const pendingTaskType = ref('Habit');
 
 const taskList = ref([]) // Task[] 类型会自动推断
 // ✅ 模拟任务数据：格式固定【date:YYYY-MM-DD, count:数字】
@@ -172,6 +184,11 @@ function loadEditGoalList() {
 }
 function onAddTaskClick() {
   loadEditGoalList();
+  chooserVisible.value = true;
+}
+function onChooseTaskType(taskType) {
+  chooserVisible.value = false;
+  pendingTaskType.value = taskType;
   editSheetId.value = null;
   editSheetVisible.value = true;
 }
