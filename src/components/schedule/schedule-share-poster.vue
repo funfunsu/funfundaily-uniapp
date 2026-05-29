@@ -108,22 +108,31 @@ function toMinutes(hhmm) {
   return h * 60 + (isNaN(m) ? 0 : m)
 }
 
-// 计算课程表布局：列（按日期）、时间窗（起止小时）、尺寸
+// 计算课程表布局：列（整周周一~周日 7 天，空日为空列）、时间窗（起止小时）、尺寸
 function buildLayout() {
   const list = props.schedules || []
 
-  const dateSet = [...new Set(list.map(s => s?.date || DateUtils.getDateFromDateTimeStr(s?.startTime || '', '')))]
-    .filter(Boolean).sort()
-  const columns = dateSet.map(d => {
-    const parts = String(d).split('-').map(Number)
-    let week = '', label = d
-    if (parts.length === 3 && !parts.some(isNaN)) {
-      const dt = new Date(parts[0], parts[1] - 1, parts[2])
-      week = WEEK_LABELS[dt.getDay()]
-      label = `${parts[1]}/${parts[2]}`
-    }
-    return { date: d, week, label }
-  })
+  // 以最早一条日程所在的「周一」为基准，固定生成周一~周日 7 列（与日程页一致）；
+  // 没有日程的那一天列保持为空。
+  const dateStrs = list
+    .map(s => s?.date || DateUtils.getDateFromDateTimeStr(s?.startTime || '', ''))
+    .filter(Boolean)
+    .sort()
+  let base = new Date()
+  const firstParts = String(dateStrs[0] || '').split('-').map(Number)
+  if (firstParts.length === 3 && !firstParts.some(isNaN)) {
+    base = new Date(firstParts[0], firstParts[1] - 1, firstParts[2])
+  }
+  const monday = DateUtils.getMonday(base)
+  const columns = []
+  for (let i = 0; i < 7; i++) {
+    const d = DateUtils.getDayOff(monday, i)
+    columns.push({
+      date: DateUtils.getDateStr(d),
+      week: WEEK_LABELS[d.getDay()],
+      label: `${d.getMonth() + 1}/${d.getDate()}`
+    })
+  }
 
   let minStart = Infinity, maxEnd = -Infinity
   list.forEach(s => {
