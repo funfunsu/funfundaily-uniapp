@@ -30,7 +30,15 @@
             <view class="member-actions">
               <!-- 非群主才显示操作按钮 -->
               <template v-if="isAdminRole(myRole)">
-<!--                <button class="action-btn invite-btn" v-if="member.bindType === 'None'" open-type="share">邀请绑定</button>-->
+                <button
+                    v-if="member.bindType === 'None' && member.userId !== loginUser.id"
+                    class="action-btn invite-btn bind-share-btn"
+                    open-type="share"
+                    @click="prepareBindShare(member)">邀请绑定</button>
+                <text
+                    v-if="member.bindType === 'None' && member.userId !== loginUser.id"
+                    class="action-btn edit-nick-btn"
+                    @click="editMemberNickname(member)">改昵称</text>
                 <template  v-if="member.role !== 'Creator'">
                   <text class="action-btn remove-btn" v-if="member.userId === loginUser.id" @click="removeMember(member.userId)">退出</text>
                   <text class="action-btn remove-btn" v-else @click="removeMember(member.userId)">移除</text>
@@ -45,7 +53,7 @@
       <!-- 新增：两个并排按钮 -->
       <view class="action-buttons">
         <button class="btn add-btn" @click="addMember">添加成员</button>
-        <button class="btn invite-link-btn"  open-type="share">邀请加入</button>
+        <button class="btn invite-link-btn" open-type="share" @click="prepareInviteShare">邀请加入</button>
       </view>
     </view>
   </view>
@@ -72,6 +80,9 @@ const isSharingInvite = ref(false);
 const shareGroupId = ref('');
 const shareGroupName = ref('');
 const currentGroup = ref({});
+// 分享模式：'invite' = 邀请加入（创建新成员）；'bind' = 邀请绑定（把对方 openid 绑到占位成员）
+const shareMode = ref('invite');
+const bindTarget = ref(null);
 
 const loginUser = ref({});
 const myRole = ref('');
@@ -108,23 +119,36 @@ onShareAppMessage((res) => {
     return ;
   }
 
-  const shareData = {
-    groupId:currentGroup.value.id,
-    groupName:currentGroup.value.groupName,
-    role:'Member',
-    label:'parents'
+  const isBind = shareMode.value === 'bind' && bindTarget.value;
+  const groupName = currentGroup.value.groupName;
+  const shareTitle = `邀请您加入${groupName}`;
+
+  let shareContent;
+  let sceneCode;
+  if (isBind) {
+    sceneCode = 'member_bind';
+    shareContent = JSON.stringify({
+      groupId: currentGroup.value.id,
+      groupName,
+      targetUserId: String(bindTarget.value.userId),
+      targetNickname: bindTarget.value.nickname || ''
+    });
+  } else {
+    sceneCode = 'member_share';
+    shareContent = JSON.stringify({
+      groupId: currentGroup.value.id,
+      groupName,
+      role: 'Member',
+      label: 'parents'
+    });
   }
-
-  const shareContent = JSON.stringify(shareData);
-  const shareTitle = `邀请您加入${currentGroup.value.groupName}`;
-
 
   // 返回 Promise，动态生成分享配置
   return new Promise(async (resolve) => {
     try {
       const resData = await api.share.create({
         content: shareContent,
-        sceneCode: 'member_share'
+        sceneCode
       });
 
       if (resData?.token) {
@@ -141,6 +165,10 @@ onShareAppMessage((res) => {
       console.error('生成分享 token 失败:', err);
       await uni.showToast({title: '网络错误，请重试', icon: 'none'});
       resolve({});
+    } finally {
+      // 一次分享结束后复位，避免下次默认携带上次的 bind 目标
+      shareMode.value = 'invite';
+      bindTarget.value = null;
     }
   });
 });
@@ -208,34 +236,47 @@ const goBack = () => {
   uni.navigateBack();
 };
 
-// ========== 新增：准备邀请分享 ==========
+// ========== 准备邀请分享（普通：创建新成员） ==========
 const prepareInviteShare = () => {
+  shareMode.value = 'invite';
+  bindTarget.value = null;
+};
+
+// ========== 准备邀请绑定分享（把对方 openid 绑到该占位成员） ==========
+const prepareBindShare = (member) => {
+  shareMode.value = 'bind';
+  bindTarget.value = {
+    userId: member.userId,
+    nickname: member.userInfo?.nickname || ''
+  };
+};
+
+// ========== 群主/管理员修改未绑定成员昵称 ==========
+const editMemberNickname = (member) => {
+  const current = member.userInfo?.nickname || '';
   uni.showModal({
-    title: '邀请加入',
-    content: '将生成群邀请卡片，您可以发送给好友。',
-    showCancel: false, // 只显示确定按钮，因为点击按钮本身就是要分享
-    confirmText: '知道了', // 或者 '去分享'
-    success: (res) => {
-      if (res.confirm) {
-        // --- 关键步骤：设置分享标志和数据 ---
-        isSharingInvite.value = true;
-        shareGroupId.value = currentGroupId.value;
-        shareGroupName.value = groupName.value;
-
-        // --- 可选：提示用户去点击分享 ---
-        // 由于使用了 open-type="share"，点击按钮就会直接触发分享菜单
-        // 但如果想更明确，可以加个提示 (虽然通常不需要)
-        // uni.showToast({ title: '请点击弹出的菜单进行分享', icon: 'none', duration: 2000 });
-
-        // --- 可选：主动调用 wx.showShareMenu (增强兼容性或定制菜单) ---
-        // #ifdef MP-WEIXIN
-        if (typeof wx !== 'undefined' && wx.showShareMenu) {
-          wx.showShareMenu({
-            withShareTicket: false, // 是否获取转发详情 (群信息等)，一般设为 false
-            menus: ['shareAppMessage', 'shareTimeline'] // 显示的菜单项
-          });
-        }
-        // #endif
+    title: '修改昵称',
+    placeholderText: current || '请输入新昵称',
+    editable: true,
+    success: async (res) => {
+      if (!res.confirm) return;
+      const nickname = (res.content || '').trim();
+      if (!nickname) {
+        await uni.showToast({title: '昵称不能为空', icon: 'none'});
+        return;
+      }
+      if (nickname === current) return;
+      try {
+        await api.user.updateMemberNickname({
+          groupId: String(currentGroup.value.id),
+          targetUserId: String(member.userId),
+          nickname
+        });
+        await loadMembers(currentGroup.value.id);
+        await uni.showToast({title: '修改成功', icon: 'success'});
+      } catch (e) {
+        console.error('修改昵称失败:', e);
+        await uni.showToast({title: '修改失败', icon: 'none'});
       }
     }
   });
@@ -431,6 +472,22 @@ const setRole = (memberId,role) => {
 .invite-btn {
   color: #007aff;
   background-color: #e6f0ff;
+}
+
+/* 邀请绑定按钮：原生 button 但保留药丸样式 */
+.bind-share-btn {
+  border: none;
+  line-height: 1.4;
+  min-height: auto;
+  margin: 0;
+}
+.bind-share-btn::after {
+  border: none;
+}
+
+.edit-nick-btn {
+  color: #34c759;
+  background-color: #e8f8ed;
 }
 
 .remove-btn {

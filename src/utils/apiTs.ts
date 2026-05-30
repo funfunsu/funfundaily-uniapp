@@ -29,6 +29,12 @@ const apiTs = {
         update:(data:object): Promise<any> => api.post<any>(
             '/api/user/update',
             data
+        ),
+        // 群主/管理员修改未绑定微信成员（bindType=None）的昵称
+        // data: { groupId, targetUserId, nickname }
+        updateMemberNickname: (data: any): Promise<any> => api.post<any>(
+            '/api/user/update-member-nickname',
+            data
         )
     },
     discovery: {
