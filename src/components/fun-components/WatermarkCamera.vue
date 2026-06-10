@@ -656,7 +656,7 @@ function drawEditorialTemplate(ctx, params) {
   ctx.fillText(titleText, padX, padTop)
 
   // ===== 琥珀短线 + 天数胶囊 =====
-  const accentY = padTop + titleSize + Math.max(16, Math.floor(titleSize * 0.22))
+  const accentY = padTop + titleSize + Math.max(30, Math.floor(titleSize * 0.5))
   const accentH = Math.max(4, Math.floor(titleSize * 0.07))
   const accentW = Math.max(60, Math.floor(titleSize * 1.1))
   api.setFill(accentColor)
@@ -740,37 +740,15 @@ function drawEditorialTemplate(ctx, params) {
 }
 
 /**
- * 极简模板：底部半透明黑色长条 + 标题 + 日期，右上角小天数胶囊，右下角圆角小程序码。
+ * 极简模板：底部半透明黑色长条，左侧琥珀竖线 + 距离时间眉标 + 标题 + 日期，右下角圆角小程序码。
  */
 function drawMinimalTemplate(ctx, params) {
   const { width, height, titleLine, dayLine, brand, timeStr, smallFont, baseFont, miniCodeImage } = params
   const api = makeCanvasApi(ctx)
   const useLegacy = api.legacy
 
-  // 顶部右上：天数胶囊
-  if (dayLine) {
-    const chipFontSize = Math.max(20, Math.floor(baseFont * 0.7))
-    api.setFont(`600 ${chipFontSize}px sans-serif`, chipFontSize)
-    const chipText = String(dayLine).replace(/\s+/g, '')
-    const padX = Math.max(14, Math.floor(chipFontSize * 0.8))
-    const padY = Math.max(8, Math.floor(chipFontSize * 0.34))
-    const textW = api.measureWidth(chipText)
-    const chipW = textW + padX * 2
-    const chipH = chipFontSize + padY * 2
-    const margin = Math.max(20, Math.floor(width / 36))
-    const chipX = width - margin - chipW
-    const chipY = margin
-    drawRoundRectPath(ctx, chipX, chipY, chipW, chipH, chipH / 2)
-    api.setFill('rgba(255, 255, 255, 0.92)')
-    ctx.fill()
-    api.setFill('#0f172a')
-    api.setTextAlign('left')
-    api.setTextBaseline('middle')
-    ctx.fillText(chipText, chipX + padX, chipY + chipH / 2)
-  }
-
-  // 底部长条
-  const barH = Math.max(140, Math.floor(height * 0.16))
+  // 底部长条（略高，容纳标题上方的距离时间眉标）
+  const barH = Math.max(160, Math.floor(height * 0.19))
   const barY = height - barH
   if (ctx.createLinearGradient) {
     const grad = ctx.createLinearGradient(0, barY, 0, height)
@@ -783,22 +761,46 @@ function drawMinimalTemplate(ctx, params) {
   }
   ctx.fillRect(0, barY, width, barH)
 
-  // 标题
-  const titleSize = Math.max(34, Math.floor(width / 18))
+  // 距离时间(眉标) → 标题 → 副信息：紧凑左对齐堆叠，左侧加一道琥珀竖线增加质感
   const margin = Math.max(28, Math.floor(width / 32))
-  const titleY = barY + Math.floor(barH * 0.35)
+  const titleSize = Math.max(34, Math.floor(width / 18))
+  const dayText = dayLine ? String(dayLine).replace(/\s+/g, '') : ''
+  const eyebrowSize = dayText ? Math.max(20, Math.floor(titleSize * 0.52)) : 0
+  const subSize = Math.max(20, Math.floor(titleSize * 0.5))
+  const gapEyebrow = dayText ? Math.max(6, Math.floor(titleSize * 0.12)) : 0
+  const gapSub = Math.max(10, Math.floor(titleSize * 0.2))
+  const blockH = (dayText ? eyebrowSize + gapEyebrow : 0) + titleSize + gapSub + subSize
+  const blockTop = barY + Math.floor((barH - blockH) / 2)
+
+  // 左侧琥珀竖线，给极简补一点视觉重心
+  const accentW = Math.max(4, Math.floor(titleSize * 0.1))
+  const accentGap = Math.max(14, Math.floor(titleSize * 0.3))
+  const textX = margin + accentW + accentGap
+  api.setFill('#fbbf24')
+  ctx.fillRect(margin, blockTop, accentW, blockH)
+
+  let cursorY = blockTop
+  api.setTextAlign('left')
+  api.setTextBaseline('top')
+
+  // 距离时间眉标：琥珀色，紧贴标题上方，保留逐月浏览的连贯节奏
+  if (dayText) {
+    api.setFont(`700 ${eyebrowSize}px sans-serif`, eyebrowSize)
+    api.setFill('#fcd34d')
+    ctx.fillText(dayText, textX, cursorY)
+    cursorY += eyebrowSize + gapEyebrow
+  }
+
+  // 标题
   api.setFont(`700 ${titleSize}px sans-serif`, titleSize)
   api.setFill('rgba(255,255,255,0.98)')
-  api.setTextAlign('left')
-  api.setTextBaseline('middle')
-  ctx.fillText(String(titleLine || '记录此刻'), margin, titleY)
+  ctx.fillText(String(titleLine || '记录此刻'), textX, cursorY)
+  cursorY += titleSize + gapSub
 
   // 副信息：时间 + 品牌
-  const subSize = Math.max(20, Math.floor(titleSize * 0.5))
-  const subY = barY + Math.floor(barH * 0.72)
   api.setFont(`500 ${subSize}px sans-serif`, subSize)
   api.setFill('rgba(218, 226, 240, 0.82)')
-  ctx.fillText(`${timeStr}  ·  ${brand}`, margin, subY)
+  ctx.fillText(`${timeStr}  ·  ${brand}`, textX, cursorY)
 
   // 右下角小程序码占位
   const codeSize = Math.max(110, Math.floor(Math.min(width, height) * 0.13))
@@ -872,28 +874,34 @@ function drawPolaroidTemplate(ctx, params) {
     titleSize -= 2
     api.setFont(`800 ${titleSize}px "PingFang SC", "Hiragino Sans", sans-serif`, titleSize)
   }
+  // 标题 + 副信息整体在白边内垂直居中，让标题与右侧天数落在同一水平中线
+  const subSize = Math.max(18, Math.floor(titleSize * 0.45))
+  const subGap = Math.max(10, Math.floor(titleSize * 0.2))
+  const textBlockH = titleSize + subGap + subSize
+  const blockTop = bandTop + Math.max(14, Math.floor((bandHeight - textBlockH) / 2))
+  const titleY = blockTop
+  const titleCenterY = titleY + titleSize / 2
+
   api.setFill('#1f2937')
   api.setTextAlign('left')
   api.setTextBaseline('top')
-  const titleY = bandTop + Math.max(18, Math.floor(bandHeight * 0.18))
   ctx.fillText(titleText, textLeftX, titleY)
 
   // 副信息：时间 · 品牌
-  const subSize = Math.max(18, Math.floor(titleSize * 0.45))
   api.setFont(`500 ${subSize}px sans-serif`, subSize)
   api.setFill('#94a3b8')
   api.setTextAlign('left')
   api.setTextBaseline('top')
-  const subY = titleY + titleSize + Math.max(10, Math.floor(titleSize * 0.18))
+  const subY = titleY + titleSize + subGap
   ctx.fillText(`${timeStr}  ·  ${brand}`, textLeftX, subY)
 
-  // 天数：右侧大字，垂直居中对齐 QR / 整个白边
+  // 天数：右侧大字，与标题同一水平中线对齐
   if (dayLine) {
     api.setFont(`700 ${daySize}px sans-serif`, daySize)
     api.setFill('#c98a1a')
     api.setTextAlign('right')
     api.setTextBaseline('middle')
-    ctx.fillText(dayText, width - padX, bandTop + bandHeight / 2)
+    ctx.fillText(dayText, width - padX, titleCenterY)
   }
 
   if (miniCodeImage) {
@@ -949,7 +957,7 @@ function drawWatermarkWeixin2d(maxSide, done) {
                 ctx.drawImage(baseImg, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
                 const brand = APP_BRAND
-                const timeStr = new Date().toLocaleString()
+                const timeStr = new Date().toLocaleDateString()
                 const baseFont = Math.max(22, Math.floor(width / 24))
                 const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
                 const { titleLine, dayLine } = getPosterHeadlineLines()
@@ -1178,7 +1186,7 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
       ctx.drawImage(img, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
       const brand = APP_BRAND
-      const timeStr = new Date().toLocaleString()
+      const timeStr = new Date().toLocaleDateString()
       const baseFont = Math.max(22, Math.floor(width / 24))
       const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
       const { titleLine, dayLine } = getPosterHeadlineLines()
@@ -1271,7 +1279,7 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
         }
 
         const brand = APP_BRAND
-        const timeStr = new Date().toLocaleString()
+        const timeStr = new Date().toLocaleDateString()
         const baseFont = Math.max(22, Math.floor(width / 24))
         const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
         const { titleLine, dayLine } = getPosterHeadlineLines()
