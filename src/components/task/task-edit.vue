@@ -137,11 +137,33 @@
 
         <!-- 积分奖励（仅任务类型）-->
         <view v-if="localSchedule?.itemType === 'task'" class="t-row t-row--solo">
-          <text class="t-row__label">完成可得积分</text>
+          <text class="t-row__label">{{ scoreLabel }}</text>
           <view class="t-stepper">
             <view class="t-stepper__btn" @click="stepScore(-1)">−</view>
             <text class="t-stepper__val">{{ scheduleExtra.score }}</text>
             <view class="t-stepper__btn" @click="stepScore(1)">＋</view>
+          </view>
+        </view>
+
+        <!-- 积分获取方式（仅「习惯 + 多次」任务）：全部完成 / 每次打卡 -->
+        <view v-if="showScoreMode" class="t-row">
+          <text class="t-row__label">积分获取</text>
+          <view class="t-seg t-seg--inline">
+            <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.scoreMode !== 'each' }" @click="scheduleExtra.scoreMode = 'full'">全部完成</view>
+            <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.scoreMode === 'each' }" @click="scheduleExtra.scoreMode = 'each'">每次打卡</view>
+          </view>
+        </view>
+
+        <!-- 每日打卡上限（仅「习惯 + 跨天周期」）：每天最多可打卡次数，默认 1 -->
+        <view v-if="showDailyLimit" class="t-row t-row--solo">
+          <view class="t-mp-text">
+            <text class="t-row__label">每日打卡上限</text>
+            <text class="t-seg-hint" style="margin-top:4rpx">每天最多可打卡的次数，跨天累计完成「次数」目标</text>
+          </view>
+          <view class="t-stepper">
+            <view class="t-stepper__btn" @click="stepDailyLimit(-1)">−</view>
+            <text class="t-stepper__val">{{ scheduleExtra.dailyLimit }}</text>
+            <view class="t-stepper__btn" @click="stepDailyLimit(1)">＋</view>
           </view>
         </view>
 
@@ -313,13 +335,25 @@ const localSchedule = ref({
   startTime: '',
   endTime: '',
   userId: '',
-  extra: { score: 0, taskType: 'Habit', totalCount: 1 },
+  extra: { score: 0, taskType: 'Habit', totalCount: 1, scoreMode: 'full', dailyLimit: 1 },
   updateScope: null,
   showExtra: null
 });
 
 // ✅ 核心：独立响应式extra对象，解决v-model绑定嵌套属性undefined报错
-const scheduleExtra = reactive({ score: 0, taskType: 'Habit', totalCount: 1 });
+// scoreMode: full=全部完成得分(默认) / each=每次打卡得分；dailyLimit: 每日打卡上限
+const scheduleExtra = reactive({ score: 0, taskType: 'Habit', totalCount: 1, scoreMode: 'full', dailyLimit: 1 });
+
+// 积分文案：每次打卡模式提示单次得分
+const scoreLabel = computed(() => (showScoreMode.value && scheduleExtra.scoreMode === 'each') ? '每次打卡得积分' : '完成可得积分');
+// 「积分获取方式」：仅多次（次数>1）的习惯任务有意义
+const showScoreMode = computed(() =>
+  localSchedule.value?.itemType === 'task' && scheduleExtra.taskType === 'Habit' && Number(scheduleExtra.totalCount) > 1
+);
+// 「每日打卡上限」：仅跨天周期(周/月/年)的习惯任务展示；每天重复时每日上限即「次数」
+const showDailyLimit = computed(() =>
+  localSchedule.value?.itemType === 'task' && scheduleExtra.taskType === 'Habit' && localSchedule.value?.repeatType !== 'daily'
+);
 
 // 描述：默认折叠，已有内容或点击「添加描述」后展开
 const descExpanded = ref(false)
@@ -342,6 +376,10 @@ function stepCount(d) {
 }
 function stepScore(d) {
   scheduleExtra.score = Math.max(0, Number(scheduleExtra.score || 0) + d)
+}
+// 每日打卡上限 ≥ 1
+function stepDailyLimit(d) {
+  scheduleExtra.dailyLimit = Math.max(1, Number(scheduleExtra.dailyLimit || 1) + d)
 }
 
 // ✅ 重复时长切换事件 - 修改为操作 localRepeatDuration ref
@@ -549,7 +587,7 @@ const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
 
 // ✅ 初始化赋值 + 监听props变化自动同步
 onMounted(() => {
-  const scheduleData = props.schedule?.extra ? props.schedule : { ...props.schedule, extra: { score:0, taskType:'Habit', totalCount:1 } };
+  const scheduleData = props.schedule?.extra ? props.schedule : { ...props.schedule, extra: { score:0, taskType:'Habit', totalCount:1, scoreMode:'full', dailyLimit:1 } };
   console.log(scheduleData)
   const copyData = deepClone(scheduleData);
   localSchedule.value = copyData;
@@ -580,7 +618,7 @@ onMounted(() => {
 watch(
     () => props.schedule,
     (newSchedule) => {
-      const scheduleData = newSchedule?.extra ? newSchedule : { ...newSchedule, extra: { score:0, taskType:'Habit', totalCount:1 } };
+      const scheduleData = newSchedule?.extra ? newSchedule : { ...newSchedule, extra: { score:0, taskType:'Habit', totalCount:1, scoreMode:'full', dailyLimit:1 } };
       const copyData = deepClone(scheduleData);
       localSchedule.value = copyData;
       Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
@@ -595,9 +633,24 @@ watch(
 defineExpose({
   getFinalSchedule: () => {
     if (scheduleExtra.taskType === 'Todo') scheduleExtra.totalCount = 1; // 待办固定 1 次
-    localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    const finalExtra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    // 积分模式：仅多次任务有意义，单次任务统一为 full（全部完成=单次完成）
+    if (!(Number(scheduleExtra.totalCount) > 1)) finalExtra.scoreMode = 'full';
+    // 每日打卡上限归一：
+    //  · 习惯+每天重复：当天目标次数即每日上限（次数=1 时即「每天仅 1 次」）
+    //  · 习惯+周/月/年：使用用户设置的每日上限（默认 1，跨天累计）
+    //  · 待办/目标：单次完成，每日最多 1 次
+    const repeat = localSchedule.value.repeatType;
+    if (scheduleExtra.taskType !== 'Habit') {
+      finalExtra.dailyLimit = 1;
+    } else if (repeat === 'daily') {
+      finalExtra.dailyLimit = Math.max(1, Number(scheduleExtra.totalCount) || 1);
+    } else {
+      finalExtra.dailyLimit = Math.max(1, Number(scheduleExtra.dailyLimit) || 1);
+    }
     // 仅在可关联时写入勾选值，否则强制 false，避免后端误建月度计划
-    localSchedule.value.extra.includeMonthlyPlan = canIncludeMonthlyPlan.value && includeMonthlyPlan.value;
+    finalExtra.includeMonthlyPlan = canIncludeMonthlyPlan.value && includeMonthlyPlan.value;
+    localSchedule.value.extra = finalExtra;
     return localSchedule.value;
   }
 })
