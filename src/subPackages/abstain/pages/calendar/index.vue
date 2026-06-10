@@ -22,7 +22,9 @@
         :init-year="displayYear"
         :init-month="displayMonth"
         @monthChange="onMonthChange"
+        @dateSelected="onDateSelected"
       />
+      <text class="cal-tip">点击任意过往日期，可补打卡 / 修改当天反馈</text>
     </view>
 
     <!-- 分享 -->
@@ -33,6 +35,26 @@
       <button class="share-btn share-btn--primary" @click="openImageShare">
         <text class="share-btn__text">🖼 图片分享</text>
       </button>
+    </view>
+
+    <!-- 补打卡：选定某天后弹出达成 / 破戒 -->
+    <view v-if="makeupVisible" class="makeup-mask" @click="closeMakeup">
+      <view class="makeup-sheet" @click.stop>
+        <view class="makeup-head">
+          <text class="makeup-date">{{ makeupDateLabel }}</text>
+          <text class="makeup-status" :class="makeupStatusClass">{{ makeupStatusText }}</text>
+        </view>
+        <text class="makeup-hint">为这一天补充反馈</text>
+        <view class="makeup-btns">
+          <button class="makeup-btn makeup-btn--persist" :disabled="submitting" @click="submitMakeup('persist')">
+            <text class="makeup-btn__text">坚持达成</text>
+          </button>
+          <button class="makeup-btn makeup-btn--relapse" :disabled="submitting" @click="submitMakeup('relapse')">
+            <text class="makeup-btn__text">不慎破戒</text>
+          </button>
+        </view>
+        <button class="makeup-cancel" @click="closeMakeup"><text class="makeup-cancel__text">取消</text></button>
+      </view>
     </view>
 
     <abstain-calendar-poster
@@ -91,6 +113,75 @@ const daysSinceStart = computed(() => {
 function onMonthChange(e) {
   displayYear.value = e.year
   displayMonth.value = e.month
+}
+
+// ---- 补打卡：选定过往未反馈/已反馈的某天，补充或修改反馈 ----
+const makeupVisible = ref(false)
+const makeupKey = ref('')        // 选中日期 yyyy-MM-dd
+const submitting = ref(false)
+
+const makeupDateLabel = computed(() => {
+  if (!makeupKey.value) return ''
+  const [y, m, d] = makeupKey.value.split('-')
+  return `${y}年${Number(m)}月${Number(d)}日`
+})
+const makeupStatus = computed(() => statusMap.value[makeupKey.value] || '')
+const makeupStatusText = computed(() => {
+  if (makeupStatus.value === FEEDBACK_PERSIST) return '已记录：坚持'
+  if (makeupStatus.value === FEEDBACK_RELAPSE) return '已记录：破戒'
+  return '未反馈'
+})
+const makeupStatusClass = computed(() => ({
+  'makeup-status--persist': makeupStatus.value === FEEDBACK_PERSIST,
+  'makeup-status--relapse': makeupStatus.value === FEEDBACK_RELAPSE
+}))
+
+function onDateSelected(item) {
+  const key = item?.date
+  if (!key) return
+  const todayKey = toDateKey(new Date())
+  if (key > todayKey) {
+    uni.showToast({ title: '未来日期不能补打卡', icon: 'none' })
+    return
+  }
+  const startKey = toDateKey(event.value.startTime)
+  if (startKey && key < startKey) {
+    uni.showToast({ title: '戒断开始前不能补打卡', icon: 'none' })
+    return
+  }
+  makeupKey.value = key
+  makeupVisible.value = true
+}
+
+function closeMakeup() {
+  if (submitting.value) return
+  makeupVisible.value = false
+  makeupKey.value = ''
+}
+
+async function submitMakeup(feedback) {
+  if (!event.value.id || !makeupKey.value || submitting.value) return
+  submitting.value = true
+  try {
+    await apiTs.checkin.feedback({
+      groupId: groupId.value,
+      targetUserId: targetUserId.value,
+      taskId: event.value.id,
+      taskTime: `${makeupKey.value}T00:00:00`,
+      extra: { feedback }
+    })
+    // 反馈变更后失效旧分享 token，下次分享重新生成最新数据
+    shareToken.value = ''
+    await fetchRecords()
+    makeupVisible.value = false
+    makeupKey.value = ''
+    uni.showToast({ title: feedback === FEEDBACK_PERSIST ? '已记录坚持 💪' : '已记录破戒', icon: 'none' })
+  } catch (e) {
+    console.error('补打卡失败:', e)
+    uni.showToast({ title: e?.message || '补打卡失败', icon: 'none' })
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function fetchRecords() {
@@ -210,6 +301,27 @@ onShareAppMessage(() => {
 .stat-num--relapse { color: #fee2e2; }
 .stat-label { font-size: 22rpx; opacity: 0.85; margin-top: 4rpx; }
 .cal-wrap { margin-top: 24rpx; }
+.cal-tip { display: block; text-align: center; font-size: 22rpx; color: #94a3b8; margin-top: 16rpx; }
+
+/* 补打卡弹窗 */
+.makeup-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: flex; align-items: flex-end; }
+.makeup-sheet { width: 100%; background: #fff; border-radius: 28rpx 28rpx 0 0; padding: 36rpx 32rpx calc(36rpx + env(safe-area-inset-bottom)); box-sizing: border-box; }
+.makeup-head { display: flex; align-items: center; justify-content: space-between; }
+.makeup-date { font-size: 34rpx; font-weight: 800; color: #1f2937; }
+.makeup-status { font-size: 24rpx; color: #94a3b8; }
+.makeup-status--persist { color: #10b981; }
+.makeup-status--relapse { color: #ef4444; }
+.makeup-hint { display: block; font-size: 24rpx; color: #94a3b8; margin: 12rpx 0 28rpx; }
+.makeup-btns { display: flex; gap: 20rpx; }
+.makeup-btn { flex: 1; height: 96rpx; border-radius: 20rpx; border: none; display: flex; align-items: center; justify-content: center; }
+.makeup-btn::after { border: none; }
+.makeup-btn--persist { background: #10b981; }
+.makeup-btn--relapse { background: #ef4444; }
+.makeup-btn__text { color: #fff; font-size: 30rpx; font-weight: 700; }
+.makeup-btn[disabled] { opacity: 0.6; }
+.makeup-cancel { width: 100%; height: 88rpx; margin-top: 20rpx; background: #f5f6f8; border-radius: 20rpx; border: none; display: flex; align-items: center; justify-content: center; }
+.makeup-cancel::after { border: none; }
+.makeup-cancel__text { color: #64748b; font-size: 28rpx; }
 .share-bar { display: flex; gap: 20rpx; margin-top: 28rpx; }
 .share-btn { flex: 1; height: 88rpx; border-radius: 44rpx; border: none; display: flex; align-items: center; justify-content: center; }
 .share-btn::after { border: none; }
