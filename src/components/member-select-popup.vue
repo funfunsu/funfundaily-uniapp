@@ -2,8 +2,8 @@
   <view v-if="visible" class="msp-overlay" @tap.self="handleClose">
     <view class="msp-shell" @tap.stop>
       <view class="msp-header">
-        <text class="msp-title">收下给谁？</text>
-        <text class="msp-subtitle">选择一个成员，或新建一个（如给小朋友）</text>
+        <text class="msp-title">{{ title }}</text>
+        <text class="msp-subtitle">{{ subtitle }}</text>
       </view>
 
       <scroll-view scroll-y class="msp-list">
@@ -19,9 +19,9 @@
             <text class="msp-item__name">{{ memberName(m) }}</text>
             <text class="msp-item__role">{{ roleText(m) }}</text>
           </view>
-          <text class="msp-item__arrow">收下 ›</text>
+          <text class="msp-item__arrow">{{ actionVerb }} ›</text>
         </view>
-        <view v-if="!loading && members.length === 0" class="msp-empty"><text>该群组暂无成员</text></view>
+        <view v-if="!loading && members.length === 0" class="msp-empty"><text>该小队暂无成员</text></view>
       </scroll-view>
 
       <!-- 新建成员 -->
@@ -34,7 +34,7 @@
           :maxlength="20"
         />
         <button class="msp-create__btn" :disabled="!newName.trim() || creating" @click="handleCreate">
-          <text class="msp-create__btn-text">{{ creating ? '创建中' : '新建并收下' }}</text>
+          <text class="msp-create__btn-text">{{ creating ? '创建中' : `新建并${actionVerb}` }}</text>
         </button>
       </view>
 
@@ -49,7 +49,10 @@ import apiTs from '../utils/apiTs'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  groupId: { type: [String, Number], default: '' }
+  groupId: { type: [String, Number], default: '' },
+  title: { type: String, default: '收下给谁？' },
+  subtitle: { type: String, default: '选择一个成员，或新建一个（如给小朋友）' },
+  actionVerb: { type: String, default: '收下' }
 })
 
 const emit = defineEmits(['close', 'select', 'create'])

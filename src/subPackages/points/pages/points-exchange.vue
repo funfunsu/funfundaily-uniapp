@@ -55,7 +55,7 @@
         <button class="empty__action" @click="goManage">去配置奖励</button>
       </template>
       <template v-else>
-        <text class="empty__text">请先在底部选择群组</text>
+        <text class="empty__text">请先在底部选择小队</text>
       </template>
     </view>
   </view>
@@ -180,7 +180,7 @@ const goManage = () => {
 
 const goRecords = () => {
   if (!currentGroup.value.id) {
-    uni.showToast({title: '请先选择群组', icon: 'none'});
+    uni.showToast({title: '请先选择小队', icon: 'none'});
     return;
   }
   const userId = currentMember.value && currentMember.value.userId

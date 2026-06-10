@@ -3,16 +3,17 @@
     <!-- 卡片式内容区域 -->
     <view class="card" v-if="!hasJoinedGroup">
       <!-- 欢迎信息 -->
-      <view  class="welcome-text">{{ shareFrom.creatorNickname }} 邀请你加入 {{ shareGroup.groupName }}</view>
+      <view  class="welcome-text">{{ shareFrom.creatorNickname }} 邀请你成为「{{ shareGroup.groupName }}」小队的队友</view>
+      <view v-if="isBindShare" class="bind-hint">点击「接受」即可将本微信绑定到该账号，登录后自动以该账号身份进入</view>
       <!-- 昵称设置表单 -->
       <view class="form-section">
-        <button class="submit-button" @click="join">好的，我加入</button>
+        <button class="submit-button" @click="join">{{ isBindShare ? '好的，我接受' : '好的，我加入' }}</button>
       </view>
     </view>
     <!-- 卡片式内容区域 -->
     <view class="card" v-if="hasJoinedGroup">
       <!-- 欢迎信息 -->
-      <view  class="welcome-text">你已加入过 {{ shareGroup.groupName }}</view>
+      <view  class="welcome-text">你已是「{{ shareGroup.groupName }}」小队的队友</view>
       <!-- 昵称设置表单 -->
       <view class="form-section">
         <button class="submit-button" @click="goHome">好的，现在去主页看看</button>
@@ -23,22 +24,24 @@
 
 <script setup lang="ts">
 // --- 导入部分 ---
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 // 导入 onLoad 生命周期钩子
 import { onLoad } from '@dcloudio/uni-app'; // 确保路径正确，根据你的项目配置
 import { autoLogin } from '../../utils/auth';
 import apiTs from '../../utils/apiTs';
-import {setShareToken} from "../../utils/token";
+import {setShareToken, removeToken} from "../../utils/token";
 
 // 存储用户信息
 const userInfo = ref<{ nickname?: string }>({});
 // 存储重定向路径
 const redirectPath = ref<string | null>(null);
 
-const shareToken =  ref({});
+const shareToken =  ref('');
 const shareFrom =  ref({});
-const shareGroup =  ref({});
+const shareGroup =  ref<any>({});
 const hasJoinedGroup =  ref(false);
+const sceneCode = ref<string>('');
+const isBindShare = computed(() => sceneCode.value === 'member_bind');
 
 // --- 生命周期 ---
 /**
@@ -54,9 +57,13 @@ onLoad(async (query) => {
       creatorNickname: shareInfo.creatorNickname
     }
     shareGroup.value = shareInfo.data
+    sceneCode.value = shareInfo.sceneCode || '';
 
-    const  groupList = await apiTs.group.list();
-    hasJoinedGroup.value = groupList.some(group => group.id === shareGroup.value.groupId);
+    // member_bind 场景下，"已加入" 的判断改为 "占位账号已绑定微信"。
+    // 但当前用户也无法直接探知占位账号状态，这里保留 group 维度的判断，
+    // 不强求精细：若当前 wx 用户恰好已在该群（极少见），按已加入提示即可。
+    const groupList = await apiTs.group.list();
+    hasJoinedGroup.value = Array.isArray(groupList) && groupList.some(group => String(group.id) === String(shareGroup.value?.groupId));
 
   } else {
     await uni.showToast({title: "缺少分享令牌", icon: "none"});
@@ -76,17 +83,29 @@ onMounted(async () => {
 
 
 /**
- * 更新用户昵称
+ * 接受分享：member_share 进群；member_bind 把当前 wx openid 转移到占位账号。
+ * member_bind 接受成功后，需要清掉当前 token 重新 wx_login —— 这样后端按 openid
+ * 解析到的就是新绑定的占位账号，恢复其群组身份。
  */
 const join = async () => {
   try {
     const acceptResp = await apiTs.share.accept(shareToken.value);
     console.log(acceptResp)
   }catch (e){
-    if (e.response.code === '4030001'){
+    if (e?.response?.code === '4030001'){
       await uni.redirectTo({url: '/pages/index/index?redirect=/pages/tabBar/profile'});
+      return;
     }
     console.log(e)
+    await uni.showToast({title: '接受失败，请稍后重试', icon: 'none'});
+    return;
+  }
+
+  if (isBindShare.value) {
+    // 绑定完成：当前 session 仍指向已被腾空 openid 的旧 wx 用户。
+    // 清 token 后跳 index，index 会重新走 autoLogin（wx.login → 后端按新 openid 解析到占位账号）。
+    removeToken();
+    await uni.showToast({title: '绑定成功', icon: 'success'});
   }
 
   await uni.redirectTo({url: '/pages/index/index?redirect=/pages/tabBar/profile'});
@@ -129,7 +148,15 @@ const goHome= async () => {
 .welcome-text {
   color: #007aff;
   text-align: center;
-  margin-bottom: 25px;
+  margin-bottom: 12px;
+}
+
+.bind-hint {
+  font-size: 13px;
+  color: #86909c;
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.4;
 }
 
 .form-section {

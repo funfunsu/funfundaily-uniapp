@@ -136,6 +136,8 @@
 
 <script setup>
 import { ref, onMounted, watch, getCurrentInstance, computed, nextTick } from 'vue'
+import { APP_BRAND } from '../../utils/appBrand'
+import { saveImageToAlbum } from '../../utils/album'
 
 const props = defineProps({
   // 是否全屏覆盖，false 时为半屏弹层
@@ -337,10 +339,17 @@ function renderHdThen(callback, stageText = '正在生成高清图片...') {
     callback && callback()
     return
   }
+  // 保存/分享前先快照当前已生成的带水印预览图。HD 重渲染若失败，drawWatermark 会把
+  // resultImg 回退成无水印原图；这里在回调里检测到回退就恢复快照，确保导出图始终带水印。
+  const prevWatermarked =
+    resultImg.value && resultImg.value !== originalImg.value ? resultImg.value : ''
   isRendering.value = true
   startRenderProgress()
   setRenderStage(stageText, 18)
   drawWatermark(HD_MAX_SIDE, () => {
+    if (prevWatermarked && (!resultImg.value || resultImg.value === originalImg.value)) {
+      resultImg.value = prevWatermarked
+    }
     callback && callback()
   })
 }
@@ -647,7 +656,7 @@ function drawEditorialTemplate(ctx, params) {
   ctx.fillText(titleText, padX, padTop)
 
   // ===== 琥珀短线 + 天数胶囊 =====
-  const accentY = padTop + titleSize + Math.max(16, Math.floor(titleSize * 0.22))
+  const accentY = padTop + titleSize + Math.max(30, Math.floor(titleSize * 0.5))
   const accentH = Math.max(4, Math.floor(titleSize * 0.07))
   const accentW = Math.max(60, Math.floor(titleSize * 1.1))
   api.setFill(accentColor)
@@ -731,37 +740,15 @@ function drawEditorialTemplate(ctx, params) {
 }
 
 /**
- * 极简模板：底部半透明黑色长条 + 标题 + 日期，右上角小天数胶囊，右下角圆角小程序码。
+ * 极简模板：底部半透明黑色长条，左侧琥珀竖线 + 距离时间眉标 + 标题 + 日期，右下角圆角小程序码。
  */
 function drawMinimalTemplate(ctx, params) {
   const { width, height, titleLine, dayLine, brand, timeStr, smallFont, baseFont, miniCodeImage } = params
   const api = makeCanvasApi(ctx)
   const useLegacy = api.legacy
 
-  // 顶部右上：天数胶囊
-  if (dayLine) {
-    const chipFontSize = Math.max(20, Math.floor(baseFont * 0.7))
-    api.setFont(`600 ${chipFontSize}px sans-serif`, chipFontSize)
-    const chipText = String(dayLine).replace(/\s+/g, '')
-    const padX = Math.max(14, Math.floor(chipFontSize * 0.8))
-    const padY = Math.max(8, Math.floor(chipFontSize * 0.34))
-    const textW = api.measureWidth(chipText)
-    const chipW = textW + padX * 2
-    const chipH = chipFontSize + padY * 2
-    const margin = Math.max(20, Math.floor(width / 36))
-    const chipX = width - margin - chipW
-    const chipY = margin
-    drawRoundRectPath(ctx, chipX, chipY, chipW, chipH, chipH / 2)
-    api.setFill('rgba(255, 255, 255, 0.92)')
-    ctx.fill()
-    api.setFill('#0f172a')
-    api.setTextAlign('left')
-    api.setTextBaseline('middle')
-    ctx.fillText(chipText, chipX + padX, chipY + chipH / 2)
-  }
-
-  // 底部长条
-  const barH = Math.max(140, Math.floor(height * 0.16))
+  // 底部长条（略高，容纳标题上方的距离时间眉标）
+  const barH = Math.max(160, Math.floor(height * 0.19))
   const barY = height - barH
   if (ctx.createLinearGradient) {
     const grad = ctx.createLinearGradient(0, barY, 0, height)
@@ -774,22 +761,46 @@ function drawMinimalTemplate(ctx, params) {
   }
   ctx.fillRect(0, barY, width, barH)
 
-  // 标题
-  const titleSize = Math.max(34, Math.floor(width / 18))
+  // 距离时间(眉标) → 标题 → 副信息：紧凑左对齐堆叠，左侧加一道琥珀竖线增加质感
   const margin = Math.max(28, Math.floor(width / 32))
-  const titleY = barY + Math.floor(barH * 0.35)
+  const titleSize = Math.max(34, Math.floor(width / 18))
+  const dayText = dayLine ? String(dayLine).replace(/\s+/g, '') : ''
+  const eyebrowSize = dayText ? Math.max(20, Math.floor(titleSize * 0.52)) : 0
+  const subSize = Math.max(20, Math.floor(titleSize * 0.5))
+  const gapEyebrow = dayText ? Math.max(6, Math.floor(titleSize * 0.12)) : 0
+  const gapSub = Math.max(10, Math.floor(titleSize * 0.2))
+  const blockH = (dayText ? eyebrowSize + gapEyebrow : 0) + titleSize + gapSub + subSize
+  const blockTop = barY + Math.floor((barH - blockH) / 2)
+
+  // 左侧琥珀竖线，给极简补一点视觉重心
+  const accentW = Math.max(4, Math.floor(titleSize * 0.1))
+  const accentGap = Math.max(14, Math.floor(titleSize * 0.3))
+  const textX = margin + accentW + accentGap
+  api.setFill('#fbbf24')
+  ctx.fillRect(margin, blockTop, accentW, blockH)
+
+  let cursorY = blockTop
+  api.setTextAlign('left')
+  api.setTextBaseline('top')
+
+  // 距离时间眉标：琥珀色，紧贴标题上方，保留逐月浏览的连贯节奏
+  if (dayText) {
+    api.setFont(`700 ${eyebrowSize}px sans-serif`, eyebrowSize)
+    api.setFill('#fcd34d')
+    ctx.fillText(dayText, textX, cursorY)
+    cursorY += eyebrowSize + gapEyebrow
+  }
+
+  // 标题
   api.setFont(`700 ${titleSize}px sans-serif`, titleSize)
   api.setFill('rgba(255,255,255,0.98)')
-  api.setTextAlign('left')
-  api.setTextBaseline('middle')
-  ctx.fillText(String(titleLine || '记录此刻'), margin, titleY)
+  ctx.fillText(String(titleLine || '记录此刻'), textX, cursorY)
+  cursorY += titleSize + gapSub
 
   // 副信息：时间 + 品牌
-  const subSize = Math.max(20, Math.floor(titleSize * 0.5))
-  const subY = barY + Math.floor(barH * 0.72)
   api.setFont(`500 ${subSize}px sans-serif`, subSize)
   api.setFill('rgba(218, 226, 240, 0.82)')
-  ctx.fillText(`${timeStr}  ·  ${brand}`, margin, subY)
+  ctx.fillText(`${timeStr}  ·  ${brand}`, textX, cursorY)
 
   // 右下角小程序码占位
   const codeSize = Math.max(110, Math.floor(Math.min(width, height) * 0.13))
@@ -863,28 +874,34 @@ function drawPolaroidTemplate(ctx, params) {
     titleSize -= 2
     api.setFont(`800 ${titleSize}px "PingFang SC", "Hiragino Sans", sans-serif`, titleSize)
   }
+  // 标题 + 副信息整体在白边内垂直居中，让标题与右侧天数落在同一水平中线
+  const subSize = Math.max(18, Math.floor(titleSize * 0.45))
+  const subGap = Math.max(10, Math.floor(titleSize * 0.2))
+  const textBlockH = titleSize + subGap + subSize
+  const blockTop = bandTop + Math.max(14, Math.floor((bandHeight - textBlockH) / 2))
+  const titleY = blockTop
+  const titleCenterY = titleY + titleSize / 2
+
   api.setFill('#1f2937')
   api.setTextAlign('left')
   api.setTextBaseline('top')
-  const titleY = bandTop + Math.max(18, Math.floor(bandHeight * 0.18))
   ctx.fillText(titleText, textLeftX, titleY)
 
   // 副信息：时间 · 品牌
-  const subSize = Math.max(18, Math.floor(titleSize * 0.45))
   api.setFont(`500 ${subSize}px sans-serif`, subSize)
   api.setFill('#94a3b8')
   api.setTextAlign('left')
   api.setTextBaseline('top')
-  const subY = titleY + titleSize + Math.max(10, Math.floor(titleSize * 0.18))
+  const subY = titleY + titleSize + subGap
   ctx.fillText(`${timeStr}  ·  ${brand}`, textLeftX, subY)
 
-  // 天数：右侧大字，垂直居中对齐 QR / 整个白边
+  // 天数：右侧大字，与标题同一水平中线对齐
   if (dayLine) {
     api.setFont(`700 ${daySize}px sans-serif`, daySize)
     api.setFill('#c98a1a')
     api.setTextAlign('right')
     api.setTextBaseline('middle')
-    ctx.fillText(dayText, width - padX, bandTop + bandHeight / 2)
+    ctx.fillText(dayText, width - padX, titleCenterY)
   }
 
   if (miniCodeImage) {
@@ -912,8 +929,16 @@ function drawWatermarkWeixin2d(maxSide, done) {
           ({ node: canvas }) => {
             const ctx = canvas.getContext('2d')
             // pixelRatio 改用 getWindowInfo（getSystemInfoSync 已废弃），旧基础库回退
-            const dpr = (typeof wx !== 'undefined' && wx.getWindowInfo ? wx.getWindowInfo().pixelRatio
+            const rawDpr = (typeof wx !== 'undefined' && wx.getWindowInfo ? wx.getWindowInfo().pixelRatio
               : (typeof wx !== 'undefined' && wx.getSystemInfoSync ? wx.getSystemInfoSync().pixelRatio : 1)) || 1
+            // 微信 canvas 有最大尺寸限制（约 4096px）。HD 导出时 width(可达 2800) × dpr(2~3)
+            // 极易超限，超限会导致导出空白/失败并回退成「无水印原图」（保存/分享丢水印的根因）。
+            // 这里按上限收敛实际 dpr，保证 backing store 不越界，HD 图仍是带水印的高清图。
+            const MAX_CANVAS_PX = 4096
+            const longSide = Math.max(width, height)
+            const dpr = longSide * rawDpr > MAX_CANVAS_PX
+              ? Math.max(1, MAX_CANVAS_PX / longSide)
+              : rawDpr
             canvas.width = Math.max(1, Math.floor(width * dpr))
             canvas.height = Math.max(1, Math.floor(height * dpr))
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -931,8 +956,8 @@ function drawWatermarkWeixin2d(maxSide, done) {
                 }
                 ctx.drawImage(baseImg, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
-                const brand = 'fungrowth'
-                const timeStr = new Date().toLocaleString()
+                const brand = APP_BRAND
+                const timeStr = new Date().toLocaleDateString()
                 const baseFont = Math.max(22, Math.floor(width / 24))
                 const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
                 const { titleLine, dayLine } = getPosterHeadlineLines()
@@ -1160,8 +1185,8 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
       }
       ctx.drawImage(img, photoRect.x, photoRect.y, photoRect.w, photoRect.h)
 
-      const brand = 'fungrowth'
-      const timeStr = new Date().toLocaleString()
+      const brand = APP_BRAND
+      const timeStr = new Date().toLocaleDateString()
       const baseFont = Math.max(22, Math.floor(width / 24))
       const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
       const { titleLine, dayLine } = getPosterHeadlineLines()
@@ -1253,8 +1278,8 @@ function drawWatermark(maxSide = PREVIEW_MAX_SIDE, done) {
           return
         }
 
-        const brand = 'fungrowth'
-        const timeStr = new Date().toLocaleString()
+        const brand = APP_BRAND
+        const timeStr = new Date().toLocaleDateString()
         const baseFont = Math.max(22, Math.floor(width / 24))
         const smallFont = Math.max(18, Math.floor(baseFont * 0.82))
         const { titleLine, dayLine } = getPosterHeadlineLines()
@@ -1419,15 +1444,15 @@ function handleSave() {
       return
     }
 
-    uni.saveImageToPhotosAlbum({
-      filePath: resultImg.value,
-      success: () => {
+    saveImageToAlbum(resultImg.value)
+      .then(() => {
         uni.showToast({ title: '已保存到相册', icon: 'success' })
-      },
-      fail: () => {
-        uni.showToast({ title: '保存失败，请检查权限', icon: 'none' })
-      }
-    })
+      })
+      .catch((err) => {
+        console.error('保存到相册失败:', err)
+        const canceled = err && /取消/.test(err.message || '')
+        uni.showToast({ title: canceled ? '已取消保存' : '保存失败，请在设置中开启相册权限', icon: 'none' })
+      })
   }
 
   renderHdThen(doSave, '正在生成高清导出图...')

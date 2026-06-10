@@ -79,6 +79,7 @@ import { ref, computed, onMounted,onUnmounted } from 'vue';
 import HanziStroke from '../../components/HanziStroke.vue'; // 确保路径正确
 import { onLoad,onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app';
 import { pinyin } from 'pinyin-pro';
+import { APP_BRAND } from '../../../../utils/appBrand';
 
 const inputValue = ref('');
 const historyChars = ref([]); // 存储历史输入的单个汉字
@@ -168,7 +169,7 @@ onLoad((options) => {
  * 生成分享配置（核心）
  */
 function getShareConfig() {
-  const shareTitle =  '汉字笔顺学习 | fungrowth日程';
+  const shareTitle =  `汉字笔顺学习 | ${APP_BRAND}`;
   // 分享路径：携带当前汉字参数
   const encodedHistory = encodeURIComponent(JSON.stringify(historyChars.value));
 

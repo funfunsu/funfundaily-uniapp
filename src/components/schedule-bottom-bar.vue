@@ -19,7 +19,7 @@
       <!-- 左侧：群组信息 + 成员选择器 -->
       <view class="left-section" >
         <!-- 群组信息 -->
-        <view class="group-info">
+        <view class="group-info" v-if="showGroup">
           <view class="member-switcher">
             <picker
                 @change="handleGroupChange"
@@ -88,6 +88,7 @@ const props = defineProps({
   autoLoadMembers: { type: Boolean, default: true },
   buttons:{type: Array, default: () => []},
   topSideConfig:{type: Object, default: null },
+  showGroup: { type: Boolean, default: true },
   showGroupMember: { type: Boolean, default: true },
   isTabBarPage: { type: Boolean, default: true },
   allSelectAllMember: { type: Boolean, default: false }
@@ -387,6 +388,10 @@ watch(_groupList, (newList) => {
 </script>
 
 <style scoped>
+/* 主题色可被页面覆盖（在底栏的父节点上定义即可，默认沿用品牌蓝）：
+ *   --bar-accent         按钮背景 / 顶部条文字色
+ *   --bar-accent-shadow  按钮投影色
+ * 例：戒断页 .page { --bar-accent:#10b981; --bar-accent-shadow:rgba(16,185,129,.3); } */
 .bottom-bar-wrapper {
   position: fixed;
   left: 0;
@@ -418,7 +423,7 @@ watch(_groupList, (newList) => {
   padding-left: 16px;    /* 控制内容与边界距离 */
   padding-right: 16px;
   gap: 10px;
-  color: #007aff;
+  color: var(--bar-accent, #007aff);
 }
 
 .bottom-bar-content {
@@ -505,7 +510,7 @@ watch(_groupList, (newList) => {
 }
 
 .bottom-add-btn {
-  background-color: #007aff;
+  background-color: var(--bar-accent, #007aff);
   color: #fff;
   border-radius: 20px;
   font-size: 13px;
@@ -516,7 +521,7 @@ watch(_groupList, (newList) => {
   align-items: center;
   justify-content: center;
   border: none;
-  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
+  box-shadow: 0 2px 6px var(--bar-accent-shadow, rgba(0, 122, 255, 0.3));
   flex-shrink: 0;
 }
 
@@ -526,7 +531,7 @@ watch(_groupList, (newList) => {
 
 .bottom-add-btn:active {
   transform: scale(0.97);
-  box-shadow: 0 1px 3px rgba(0, 122, 255, 0.3);
+  box-shadow: 0 1px 3px var(--bar-accent-shadow, rgba(0, 122, 255, 0.3));
 }
 
 .add-icon {

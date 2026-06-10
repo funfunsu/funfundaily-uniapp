@@ -118,7 +118,9 @@ void slots
   right: 0;
   bottom: 0;
   background: rgba(15, 23, 42, 0.55);
-  z-index: 200;
+  /* H5 下 uni tabBar 是 z-index 998/999 的页内固定元素，需高于它，否则 tab 页弹层底部
+     的「保存」按钮会被 tabBar 盖住；同时低于 date-picker 弹层(9999)以保证其仍在最上层。 */
+  z-index: 9990;
   display: flex;
   align-items: flex-end;
   justify-content: center;

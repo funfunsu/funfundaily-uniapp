@@ -30,7 +30,7 @@
         <view class="t-seg">
           <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Habit' }" @click="onTaskTypeChanged('Habit')">习惯</view>
           <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Todo' }" @click="onTaskTypeChanged('Todo')">待办</view>
-          <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Goal' }" @click="onTaskTypeChanged('Goal')">目标</view>
+          <view v-if="showGoalType" class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.taskType === 'Goal' }" @click="onTaskTypeChanged('Goal')">目标</view>
         </view>
         <text class="t-seg-hint">{{ typeHint }}</text>
 
@@ -78,31 +78,49 @@
                   :value="getMonthDayIndex(localSchedule?.repeatKeys?.[0])" @change="handleMonthDayChange">
             <view class="t-row"><text class="t-row__label">每月日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}日</text><text class="t-row__chev">›</text></view></view>
           </picker>
-          <picker v-else-if="localSchedule?.repeatType === 'yearly'" mode="date" :value="localSchedule?.repeatKeys?.[0]" fields="month-day" @change="handleYearDateChange">
-            <view class="t-row"><text class="t-row__label">每年日期</text><view class="t-row__value"><text>{{ localSchedule?.repeatKeys?.[0] }}</text><text class="t-row__chev">›</text></view></view>
-          </picker>
+          <DatePicker
+            v-else-if="localSchedule?.repeatType === 'yearly'"
+            :model-value="localSchedule?.repeatKeys?.[0]"
+            mode="month-day"
+            label="每年日期"
+            placeholder="选择每年的月日"
+            title="选择每年日期"
+            @update:model-value="onYearDatePick"
+          />
         </view>
 
-        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
-                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
-        </picker>
+        <DatePicker
+          :model-value="formatDate(localSchedule?.repeatEndDay)"
+          mode="date"
+          label="截止日期"
+          placeholder="选择截止日期"
+          title="选择截止日期"
+          @update:model-value="onRepeatEndDayPick"
+        />
       </view>
 
       <!-- 待办：仅截止日期（待办默认 1 次，不显示次数）-->
       <view v-else-if="scheduleExtra.taskType === 'Todo'" class="t-section">
-        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
-                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
-        </picker>
+        <DatePicker
+          :model-value="formatDate(localSchedule?.repeatEndDay)"
+          mode="date"
+          label="截止日期"
+          placeholder="选择截止日期"
+          title="选择截止日期"
+          @update:model-value="onRepeatEndDayPick"
+        />
       </view>
 
       <!-- 目标：截止 -->
       <view v-else-if="scheduleExtra.taskType === 'Goal'" class="t-section">
-        <picker mode="date" :value="formatDate(localSchedule?.repeatEndDay)" start="2023-01-01" end="2030-12-31"
-                @change="(e) => handleRepeatDateChange(e, 'repeatEndDay')">
-          <view class="t-row t-row--last"><text class="t-row__label">截止日期</text><view class="t-row__value"><text>{{ formatDate(localSchedule?.repeatEndDay) }}</text><text class="t-row__chev">›</text></view></view>
-        </picker>
+        <DatePicker
+          :model-value="formatDate(localSchedule?.repeatEndDay)"
+          mode="date"
+          label="截止日期"
+          placeholder="选择截止日期"
+          title="选择截止日期"
+          @update:model-value="onRepeatEndDayPick"
+        />
       </view>
 
         <!-- 关联目标（仅任务类型）-->
@@ -110,19 +128,65 @@
           <text class="t-group-label">关联目标</text>
           <view class="t-chips">
             <view class="t-chip" :class="{ 't-chip--active': !localSchedule.parentId }" @click="handleSelectGoal({ id: 0, title: '无目标' })">无目标</view>
-            <view class="t-chip" v-for="(goal, idx) in goalList" :key="idx"
+            <view class="t-chip" v-for="(goal, idx) in localGoalList" :key="idx"
                   :class="{ 't-chip--active': localSchedule.parentId === goal.id }" @click="handleSelectGoal(goal)">{{ goal.itemTitle || '未命名目标' }}</view>
+            <!-- 新建目标入口：目标不再有单独的创建按钮，在此内联创建 -->
+            <view class="t-chip t-chip--add" :class="{ 'is-disabled': creatingGoal }" @click="onCreateGoal">＋ 新建目标</view>
           </view>
         </view>
 
         <!-- 积分奖励（仅任务类型）-->
         <view v-if="localSchedule?.itemType === 'task'" class="t-row t-row--solo">
-          <text class="t-row__label">完成可得积分</text>
+          <text class="t-row__label">{{ scoreLabel }}</text>
           <view class="t-stepper">
             <view class="t-stepper__btn" @click="stepScore(-1)">−</view>
             <text class="t-stepper__val">{{ scheduleExtra.score }}</text>
             <view class="t-stepper__btn" @click="stepScore(1)">＋</view>
           </view>
+        </view>
+
+        <!-- 积分获取方式（仅「习惯 + 多次」任务）：全部完成 / 每次打卡 -->
+        <view v-if="showScoreMode" class="t-row">
+          <text class="t-row__label">积分获取</text>
+          <view class="t-seg t-seg--inline">
+            <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.scoreMode !== 'each' }" @click="scheduleExtra.scoreMode = 'full'">全部完成</view>
+            <view class="t-seg__item" :class="{ 't-seg__item--active': scheduleExtra.scoreMode === 'each' }" @click="scheduleExtra.scoreMode = 'each'">每次打卡</view>
+          </view>
+        </view>
+
+        <!-- 周期全部完成额外奖励（仅「习惯 + 多次」任务）：达成周期目标额外加分 -->
+        <view v-if="showScoreMode" class="t-row t-row--solo">
+          <view class="t-mp-text">
+            <text class="t-row__label">周期全部完成奖励</text>
+            <text class="t-seg-hint" style="margin-top:4rpx">周期内打满「次数」额外奖励的积分</text>
+          </view>
+          <view class="t-stepper">
+            <view class="t-stepper__btn" @click="stepBonusScore(-1)">−</view>
+            <text class="t-stepper__val">{{ scheduleExtra.bonusScore }}</text>
+            <view class="t-stepper__btn" @click="stepBonusScore(1)">＋</view>
+          </view>
+        </view>
+
+        <!-- 每日打卡上限（仅「习惯 + 跨天周期」）：每天最多可打卡次数，默认 1 -->
+        <view v-if="showDailyLimit" class="t-row t-row--solo">
+          <view class="t-mp-text">
+            <text class="t-row__label">每日打卡上限</text>
+            <text class="t-seg-hint" style="margin-top:4rpx">每天最多可打卡的次数，跨天累计完成「次数」目标</text>
+          </view>
+          <view class="t-stepper">
+            <view class="t-stepper__btn" @click="stepDailyLimit(-1)">−</view>
+            <text class="t-stepper__val">{{ scheduleExtra.dailyLimit }}</text>
+            <view class="t-stepper__btn" @click="stepDailyLimit(1)">＋</view>
+          </view>
+        </view>
+
+        <!-- 月度计划：仅「待办 / 目标 / 每年习惯」(repeatType none|yearly) 可关联 -->
+        <view v-if="canIncludeMonthlyPlan" class="t-row t-row--solo">
+          <view class="t-mp-text">
+            <text class="t-row__label">列入月度计划</text>
+            <text class="t-seg-hint" style="margin-top:4rpx">同步生成一条月度计划，编辑/删除联动</text>
+          </view>
+          <switch :checked="includeMonthlyPlan" color="#2196f3" @change="onIncludeMonthlyPlanChange" />
         </view>
       </view>
     </view>
@@ -133,8 +197,10 @@
 // 引入必要的 Vue 功能
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import DateUtils from "../../utils/util";
-import { getStoredData, setStoredData, STORAGE_KEYS } from "../../utils/storageManager";
+import { getStoredData, getStoredKey, setStoredData, removeStoredDataByKeys, STORAGE_KEYS } from "../../utils/storageManager";
 import {HOBIT_TASK_REPEAT_TYPE_LABELS, HOBIT_TASK_REPEAT_TYPE_VALUES} from "../../utils/constants";
+import DatePicker from "../fun-components/date-picker.vue";
+import apiTs from "../../utils/apiTs";
 
 // --- Props 定义 ---
 const props = defineProps({
@@ -150,6 +216,15 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  // 「新建目标」内联创建需要的上下文
+  groupId: {
+    type: [String, Number],
+    default: ''
+  },
+  targetUserId: {
+    type: [String, Number],
+    default: ''
+  },
   // 嵌入底部弹层时为 true：去掉整页高度/自身滚动/卡片阴影，交给弹层 body 滚动
   embedded: {
     type: Boolean,
@@ -157,16 +232,106 @@ const props = defineProps({
   }
 });
 
+// 本地目标列表：以 props.goalList 为初值，内联「新建目标」后即时追加
+const localGoalList = ref([]);
+watch(
+  () => props.goalList,
+  (list) => { localGoalList.value = Array.isArray(list) ? [...list] : []; },
+  { immediate: true, deep: true }
+);
+
+// 仅在「编辑已存在的目标」时，类型分段才展示「目标」项；新建任务只给习惯/待办
+const showGoalType = computed(() =>
+  !!localSchedule.value?.id && localSchedule.value?.itemType === 'goal'
+);
+
 // ✅ 选中目标 赋值parentId
 const handleSelectGoal = (goal) => {
   localSchedule.value.parentId = goal.id; // 核心赋值：选中目标的id = parentId
   // 无目标时 parentId = null，和上面的无目标选项联动
 };
 
+// 「新建目标」内联创建：弹出输入框 → 保存目标 → 重新拉取并自动选中
+const creatingGoal = ref(false);
+const onCreateGoal = () => {
+  if (creatingGoal.value) return;
+  if (!props.groupId || !props.targetUserId) {
+    uni.showToast({ title: '请先选择小队成员', icon: 'none' });
+    return;
+  }
+  uni.showModal({
+    title: '新建目标',
+    editable: true,
+    placeholderText: '输入目标名称',
+    success: async (res) => {
+      if (!res.confirm) return;
+      const title = (res.content || '').trim();
+      if (!title) {
+        uni.showToast({ title: '请输入目标名称', icon: 'none' });
+        return;
+      }
+      await saveNewGoal(title);
+    }
+  });
+};
+
+async function saveNewGoal(title) {
+  creatingGoal.value = true;
+  const day = props.curDate || new Date();
+  const endDate = DateUtils.getDayOff(new Date(day), 365);
+  const goalItem = {
+    itemType: 'goal',
+    itemTitle: title,
+    repeatType: 'none',
+    repeatKeys: [],
+    startTime: DateUtils.getDayStartTimeStr(day),
+    endTime: DateUtils.getDayEndTimeStr(day),
+    repeatStartDay: DateUtils.getDateStr(day),
+    repeatEndDay: DateUtils.getDateStr(endDate),
+    extra: { taskType: 'Goal', score: 0, totalCount: 1 }
+  };
+  try {
+    await apiTs.schedule.save({ targetUserId: props.targetUserId, groupId: props.groupId, items: [goalItem] });
+    // 失效目标缓存，确保列表页/再次打开能看到新目标
+    removeStoredDataByKeys(STORAGE_KEYS.USER_ALL_GOAL, props.targetUserId);
+    // 重新拉取目标，拿到带 id 的新目标并自动选中
+    const req = {
+      fromDate: DateUtils.getDateStr(day),
+      toDate: DateUtils.getNextDayStr(day),
+      targetUserId: props.targetUserId,
+      groupId: props.groupId,
+      scheduleItemType: 'goal'
+    };
+    const dateList = await apiTs.schedule.list(req);
+    const goals = dateList.find(d => d.date === DateUtils.getDateStr(day))?.schedules || [];
+    setStoredData(getStoredKey(STORAGE_KEYS.USER_ALL_GOAL, props.targetUserId), goals);
+    localGoalList.value = goals;
+    const created = goals
+      .filter(g => g.itemTitle === title)
+      .sort((a, b) => Number(b.id) - Number(a.id))[0];
+    if (created) localSchedule.value.parentId = created.id;
+    uni.showToast({ title: '目标已创建', icon: 'success' });
+  } catch (e) {
+    console.error('新建目标失败:', e);
+    uni.showToast({ title: e?.message || '新建目标失败', icon: 'none' });
+  } finally {
+    creatingGoal.value = false;
+  }
+}
+
 // watch(() => localSchedule.value.parentId, () => {}, { immediate: true });
 
 // 定义自定义事件，可选通知父组件数据就绪
 const emit = defineEmits(['schedule-ready']);
+
+// 「列入月度计划」开关：仅 repeatType ∈ {none, yearly} 时可用
+const includeMonthlyPlan = ref(false);
+const canIncludeMonthlyPlan = computed(() =>
+  ['none', 'yearly'].includes(localSchedule.value?.repeatType)
+);
+const onIncludeMonthlyPlanChange = (e) => {
+  includeMonthlyPlan.value = e.detail.value;
+};
 
 // ✅ 初始化给兜底完整结构，模板渲染时永远有值，杜绝undefined报错
 const localSchedule = ref({
@@ -183,13 +348,25 @@ const localSchedule = ref({
   startTime: '',
   endTime: '',
   userId: '',
-  extra: { score: 0, taskType: 'Habit', totalCount: 1 },
+  extra: { score: 0, taskType: 'Habit', totalCount: 1, scoreMode: 'full', dailyLimit: 1, bonusScore: 0 },
   updateScope: null,
   showExtra: null
 });
 
 // ✅ 核心：独立响应式extra对象，解决v-model绑定嵌套属性undefined报错
-const scheduleExtra = reactive({ score: 0, taskType: 'Habit', totalCount: 1 });
+// scoreMode: full=全部完成得分(默认) / each=每次打卡得分；dailyLimit: 每日打卡上限；bonusScore: 周期全部完成额外奖励
+const scheduleExtra = reactive({ score: 0, taskType: 'Habit', totalCount: 1, scoreMode: 'full', dailyLimit: 1, bonusScore: 0 });
+
+// 积分文案：每次打卡模式提示单次得分
+const scoreLabel = computed(() => (showScoreMode.value && scheduleExtra.scoreMode === 'each') ? '每次打卡得积分' : '完成可得积分');
+// 「积分获取方式」：仅多次（次数>1）的习惯任务有意义
+const showScoreMode = computed(() =>
+  localSchedule.value?.itemType === 'task' && scheduleExtra.taskType === 'Habit' && Number(scheduleExtra.totalCount) > 1
+);
+// 「每日打卡上限」：仅跨天周期(周/月/年)的习惯任务展示；每天重复时每日上限即「次数」
+const showDailyLimit = computed(() =>
+  localSchedule.value?.itemType === 'task' && scheduleExtra.taskType === 'Habit' && localSchedule.value?.repeatType !== 'daily'
+);
 
 // 描述：默认折叠，已有内容或点击「添加描述」后展开
 const descExpanded = ref(false)
@@ -212,6 +389,14 @@ function stepCount(d) {
 }
 function stepScore(d) {
   scheduleExtra.score = Math.max(0, Number(scheduleExtra.score || 0) + d)
+}
+// 每日打卡上限 ≥ 1
+function stepDailyLimit(d) {
+  scheduleExtra.dailyLimit = Math.max(1, Number(scheduleExtra.dailyLimit || 1) + d)
+}
+// 周期全部完成额外奖励 ≥ 0
+function stepBonusScore(d) {
+  scheduleExtra.bonusScore = Math.max(0, Number(scheduleExtra.bonusScore || 0) + d * 5)
 }
 
 // ✅ 重复时长切换事件 - 修改为操作 localRepeatDuration ref
@@ -310,14 +495,10 @@ const handleMonthDayChange = (e) => { // 移除 field 参数，不需要
   }
 };
 
-// ✅ 年份日期选择事件
-const handleYearDateChange = (e) => {
-  const dateStr = e.detail.value;
-  // 从 "YYYY-MM-DD" 提取 "MM-DD"
-  const [_, month, day] = dateStr.split('-');
-  const formattedKey = `${month}-${day}`;
-  if (localSchedule.value.repeatKeys && Array.isArray(localSchedule.value.repeatKeys)) {
-    localSchedule.value.repeatKeys[0] = formattedKey;
+// ✅ 每年日期选择事件（date-picker month-day 模式，val 形如 "MM-DD"）
+const onYearDatePick = (val) => {
+  if (val && localSchedule.value.repeatKeys && Array.isArray(localSchedule.value.repeatKeys)) {
+    localSchedule.value.repeatKeys[0] = val;
   }
 };
 
@@ -392,12 +573,12 @@ const handleItemLabelChange = (e) => {
   localSchedule.value.itemLabel = itemLabelValues.value[index]
 }
 
-// ✅ 【重中之重修复】日期赋值事件 - 加固版，支持所有日期字段赋值，不会丢失最新值
-const handleRepeatDateChange = (e, field) => {
-  if (field && e?.detail?.value) {
-    localSchedule.value[field] = e.detail.value;
+// ✅ 截止日期选择事件（date-picker date 模式，val 形如 "YYYY-MM-DD"）
+const onRepeatEndDayPick = (val) => {
+  if (val) {
+    localSchedule.value.repeatEndDay = val;
   }
-  handleRepeatDateChanged(field)
+  handleRepeatDateChanged('repeatEndDay')
 }
 
 
@@ -423,16 +604,30 @@ const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
 
 // ✅ 初始化赋值 + 监听props变化自动同步
 onMounted(() => {
-  const scheduleData = props.schedule?.extra ? props.schedule : { ...props.schedule, extra: { score:0, taskType:'Habit', totalCount:1 } };
+  const scheduleData = props.schedule?.extra ? props.schedule : { ...props.schedule, extra: { score:0, taskType:'Habit', totalCount:1, scoreMode:'full', dailyLimit:1, bonusScore:0 } };
   console.log(scheduleData)
   const copyData = deepClone(scheduleData);
   localSchedule.value = copyData;
   if (!localSchedule.value.id){
-    localSchedule.value.repeatType = 'daily';
+    // 依据初始类型设默认重复规则：习惯=每天重复；待办/目标=不重复
+    const initType = copyData.extra?.taskType || 'Habit';
+    if (initType === 'Todo') {
+      localSchedule.value.repeatType = 'none';
+      localSchedule.value.repeatKeys = [];
+      localSchedule.value.itemType = 'task';
+    } else if (initType === 'Goal') {
+      localSchedule.value.repeatType = 'none';
+      localSchedule.value.repeatKeys = [];
+      localSchedule.value.itemType = 'goal';
+    } else {
+      localSchedule.value.repeatType = 'daily';
+      localSchedule.value.repeatKeys = ['whole'];
+    }
     handleRepeatDateChanged('repeatStartDay')
     // localSchedule.value.repeatStartDay = DateUtils.getDateStr(props.curDate)
   }
   Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+  includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
   localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 初始化 localRepeatDuration
   emit('schedule-ready', true);
 });
@@ -440,10 +635,11 @@ onMounted(() => {
 watch(
     () => props.schedule,
     (newSchedule) => {
-      const scheduleData = newSchedule?.extra ? newSchedule : { ...newSchedule, extra: { score:0, taskType:'Habit', totalCount:1 } };
+      const scheduleData = newSchedule?.extra ? newSchedule : { ...newSchedule, extra: { score:0, taskType:'Habit', totalCount:1, scoreMode:'full', dailyLimit:1, bonusScore:0 } };
       const copyData = deepClone(scheduleData);
       localSchedule.value = copyData;
       Object.assign(scheduleExtra, copyData.extra); // 更新 reactive 对象
+      includeMonthlyPlan.value = !!(copyData.showExtra?.hasMonthlyPlan ?? copyData.extra?.includeMonthlyPlan);
       localRepeatDuration.value = calculateRepeatDuration(copyData.repeatKeys); // 同步 localRepeatDuration
       emit('schedule-ready', true);
     },
@@ -454,7 +650,29 @@ watch(
 defineExpose({
   getFinalSchedule: () => {
     if (scheduleExtra.taskType === 'Todo') scheduleExtra.totalCount = 1; // 待办固定 1 次
-    localSchedule.value.extra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    const finalExtra = {...scheduleExtra}; // 创建副本，避免外部直接修改内部 reactive 对象
+    // 积分模式 / 周期奖励：仅多次任务有意义，单次任务统一为 full、无额外奖励
+    if (!(Number(scheduleExtra.totalCount) > 1)) {
+      finalExtra.scoreMode = 'full';
+      finalExtra.bonusScore = 0;
+    } else {
+      finalExtra.bonusScore = Math.max(0, Number(scheduleExtra.bonusScore) || 0);
+    }
+    // 每日打卡上限归一：
+    //  · 习惯+每天重复：当天目标次数即每日上限（次数=1 时即「每天仅 1 次」）
+    //  · 习惯+周/月/年：使用用户设置的每日上限（默认 1，跨天累计）
+    //  · 待办/目标：单次完成，每日最多 1 次
+    const repeat = localSchedule.value.repeatType;
+    if (scheduleExtra.taskType !== 'Habit') {
+      finalExtra.dailyLimit = 1;
+    } else if (repeat === 'daily') {
+      finalExtra.dailyLimit = Math.max(1, Number(scheduleExtra.totalCount) || 1);
+    } else {
+      finalExtra.dailyLimit = Math.max(1, Number(scheduleExtra.dailyLimit) || 1);
+    }
+    // 仅在可关联时写入勾选值，否则强制 false，避免后端误建月度计划
+    finalExtra.includeMonthlyPlan = canIncludeMonthlyPlan.value && includeMonthlyPlan.value;
+    localSchedule.value.extra = finalExtra;
     return localSchedule.value;
   }
 })
@@ -591,6 +809,7 @@ defineExpose({
 }
 .t-row--last { border-bottom: none; }
 .t-row--solo { border-bottom: none; margin-top: 8rpx; }
+.t-mp-text { display: flex; flex-direction: column; min-width: 0; }
 .t-row--col {
   flex-direction: column;
   align-items: stretch;
@@ -644,6 +863,12 @@ defineExpose({
   font-size: 26rpx;
 }
 .t-chip--active { background: #e6f0ff; color: #2196f3; font-weight: 600; }
+.t-chip--add {
+  background: transparent;
+  color: #2196f3;
+  border: 2rpx dashed #93c5fd;
+}
+.t-chip--add.is-disabled { opacity: 0.5; }
 
 .form-section {
   background-color: white;

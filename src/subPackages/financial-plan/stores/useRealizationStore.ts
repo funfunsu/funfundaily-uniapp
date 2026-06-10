@@ -15,8 +15,10 @@ import type {
   Api8RecordRealizationSellResponse,
   Api9GetFinancialPlanDetailResponse,
   Api13UpdateRealizationBatchRequest,
+  Api14ExerciseOptionRequest,
 } from '../api/financial-plan'
 import type {
+  BatchStats,
   RealizationBatch,
   RealizationOperation,
 } from '../api/financial-plan-types'
@@ -43,10 +45,19 @@ async function refreshStatsSafely(planId: string): Promise<void> {
   await statsStore.refreshStats(planId)
 }
 
-/** 重新拉取计划详情，把最新的批次聚合落回本地。 */
-async function reloadBatchListFromDetail(planId: string): Promise<RealizationBatch[]> {
+/** 重新拉取计划详情。 */
+async function reloadDetail(planId: string): Promise<Api9GetFinancialPlanDetailResponse> {
   const response = await financialPlanApiClient.getPlanDetail(planId)
-  return response.data.realizationBatches.map((batch) => cloneBatch(batch))
+  return response.data
+}
+
+/** 把详情里的 batchStats 列表索引成 batchId → BatchStats。 */
+function indexBatchStats(stats?: BatchStats[]): Record<string, BatchStats> {
+  const map: Record<string, BatchStats> = {}
+  ;(stats || []).forEach((s) => {
+    map[String(s.batchId)] = s
+  })
+  return map
 }
 
 export const useRealizationStore = defineStore('realization', {
@@ -55,6 +66,8 @@ export const useRealizationStore = defineStore('realization', {
     selectedBatch: null as RealizationBatch | null,
     /** 按 batchId 缓存的操作明细列表。 */
     operationsByBatchId: {} as Record<string, RealizationOperation[]>,
+    /** 按 batchId 索引的批次卡片汇总（正股 + 各期权 key）。 */
+    batchStatsByBatchId: {} as Record<string, BatchStats>,
     submitting: false,
   }),
 
@@ -67,6 +80,11 @@ export const useRealizationStore = defineStore('realization', {
 
     realizedQuantity: (state): number =>
       state.batchList.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0),
+
+    statsForBatch:
+      (state) =>
+      (batchId: string): BatchStats | null =>
+        state.batchStatsByBatchId[String(batchId)] || null,
   },
 
   actions: {
@@ -74,6 +92,12 @@ export const useRealizationStore = defineStore('realization', {
       this.selectedBatch = batchId
         ? this.batchList.find((item) => item.batchId === batchId) || null
         : null
+    },
+
+    /** 用详情响应同步本地批次列表与卡片汇总。 */
+    applyDetail(detail: Api9GetFinancialPlanDetailResponse): void {
+      this.batchList = detail.realizationBatches.map((batch) => cloneBatch(batch))
+      this.batchStatsByBatchId = indexBatchStats(detail.batchStats)
     },
 
     /** 从计划详情加载批次历史。 */
@@ -85,9 +109,8 @@ export const useRealizationStore = defineStore('realization', {
       }
       this.submitting = true
       try {
-        const response = await financialPlanApiClient.getPlanDetail(resolvedPlanId)
-        const detail = response.data
-        this.batchList = detail.realizationBatches.map((batch) => cloneBatch(batch))
+        const detail = await reloadDetail(resolvedPlanId)
+        this.applyDetail(detail)
         return detail
       } catch (error) {
         return handleRealizationStoreError(error)
@@ -96,7 +119,7 @@ export const useRealizationStore = defineStore('realization', {
       }
     },
 
-    /** 创建批次（新模型：携带 batchType / direction / planBuyPrice / planSellPrice / expirationDate）。 */
+    /** 创建批次（新模型：只挂正股，携带 planBuyPrice / planSellPrice / quantity）。 */
     async createBatch(
       planId: string,
       request: Api6CreateRealizationBatchRequest,
@@ -105,7 +128,7 @@ export const useRealizationStore = defineStore('realization', {
       try {
         const response = await financialPlanApiClient.createRealizationBatch(planId, request)
         // 后端是真相源；直接拉一次详情把批次列表刷新到最新状态。
-        this.batchList = await reloadBatchListFromDetail(planId)
+        this.applyDetail(await reloadDetail(planId))
         await refreshStatsSafely(planId)
         return response.data
       } catch (error) {
@@ -115,7 +138,7 @@ export const useRealizationStore = defineStore('realization', {
       }
     },
 
-    /** 登记一次买入（同批次可多次）。 */
+    /** 登记一次买入（正股或期权；同批次可多次）。 */
     async recordBuy(
       planId: string,
       batchId: string,
@@ -124,7 +147,7 @@ export const useRealizationStore = defineStore('realization', {
       this.submitting = true
       try {
         const response = await financialPlanApiClient.recordRealizationBuy(planId, batchId, request)
-        this.batchList = await reloadBatchListFromDetail(planId)
+        this.applyDetail(await reloadDetail(planId))
         // 操作明细缓存失效。
         delete this.operationsByBatchId[batchId]
         await refreshStatsSafely(planId)
@@ -136,7 +159,7 @@ export const useRealizationStore = defineStore('realization', {
       }
     },
 
-    /** 登记一次卖出（同批次可多次）。 */
+    /** 登记一次卖出（正股或期权；同批次可多次）。 */
     async recordSell(
       planId: string,
       batchId: string,
@@ -145,7 +168,27 @@ export const useRealizationStore = defineStore('realization', {
       this.submitting = true
       try {
         const response = await financialPlanApiClient.recordRealizationSell(planId, batchId, request)
-        this.batchList = await reloadBatchListFromDetail(planId)
+        this.applyDetail(await reloadDetail(planId))
+        delete this.operationsByBatchId[batchId]
+        await refreshStatsSafely(planId)
+        return response.data
+      } catch (error) {
+        return handleRealizationStoreError(error)
+      } finally {
+        this.submitting = false
+      }
+    },
+
+    /** 行权 / 被行权（API-14）：成功后刷新批次列表与卡片汇总。 */
+    async exerciseOption(
+      planId: string,
+      batchId: string,
+      request: Api14ExerciseOptionRequest,
+    ): Promise<RealizationBatch | null> {
+      this.submitting = true
+      try {
+        const response = await financialPlanApiClient.exerciseOption(planId, batchId, request)
+        this.applyDetail(await reloadDetail(planId))
         delete this.operationsByBatchId[batchId]
         await refreshStatsSafely(planId)
         return response.data
@@ -165,7 +208,7 @@ export const useRealizationStore = defineStore('realization', {
       this.submitting = true
       try {
         const response = await financialPlanApiClient.updateRealizationBatch(planId, batchId, request)
-        this.batchList = await reloadBatchListFromDetail(planId)
+        this.applyDetail(await reloadDetail(planId))
         await refreshStatsSafely(planId)
         return response.data
       } catch (error) {

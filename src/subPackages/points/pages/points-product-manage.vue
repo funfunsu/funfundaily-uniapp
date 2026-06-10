@@ -4,8 +4,7 @@
     <view class="hero">
       <view class="hero__top">
         <view class="hero__heading">
-          <text class="hero__desc">和孩子约定好的奖励，完成任务攒下积分就能兑现——零花钱、一次出游、一本绘本都可以。</text>
-          <text class="hero__presets-label">快速添加 · 点一下即可加入，之后可改</text>
+          <text class="hero__desc">和孩子约定好的奖励，完成任务攒下积分就能兑现</text>
         </view>
         <view class="hero__link" @click="goExchange">
           <text class="hero__link-text">看兑换页</text>
@@ -60,7 +59,7 @@
         <button class="empty__action" @click="addProduct">添加第一个奖励</button>
       </template>
       <template v-else>
-        <text class="empty__text">请先在底部选择群组</text>
+        <text class="empty__text">请先在底部选择小队</text>
       </template>
     </view>
   </view>
@@ -125,15 +124,9 @@ const goExchange = () => {
 
 // 常见奖励模板：让家长第一次配置时不必从零想，点一下即可加入
 const PRESET_REWARDS = [
-  { emoji: '📺', name: '看 30 分钟动画片', points: 30, description: '完成约定后，可以看 30 分钟喜欢的动画片' },
-  { emoji: '🎮', name: '多玩 20 分钟游戏', points: 30, description: '额外解锁 20 分钟游戏 / 玩耍时间' },
-  { emoji: '🍦', name: '一份喜欢的小零食', points: 20, description: '兑换一份自己喜欢的小零食' },
-  { emoji: '💰', name: '10 元零花钱', points: 50, description: '兑换 10 元零花钱，自己决定怎么花' },
-  { emoji: '🍜', name: '点一次今晚吃什么', points: 40, description: '这一顿全家吃什么，由你来决定' },
-  { emoji: '📚', name: '挑一本喜欢的书', points: 80, description: '去书店挑一本自己喜欢的绘本或图书' },
-  { emoji: '🌙', name: '周末晚睡 30 分钟', points: 30, description: '周末可以比平时晚睡 30 分钟' },
-  { emoji: '🎡', name: '一次周末出游', points: 200, description: '攒够积分，全家一起去公园 / 游乐场玩一天' },
-];
+  { emoji: '📺', name: '看30分钟动画片', points: 30, description: '完成约定后，可以看 30 分钟喜欢的动画片' },
+  { emoji: '💰', name: '10元零花钱', points: 50, description: '兑换 10 元零花钱，自己决定怎么花' },
+  ];
 
 // 过滤掉名称已存在的模板，避免重复添加
 const availablePresets = computed(() =>
@@ -143,7 +136,7 @@ const availablePresets = computed(() =>
 // 一键从模板创建奖励，创建后刷新列表，家长可再点卡片微调
 const addFromPreset = async (preset) => {
   if (!currentGroup.value.id) {
-    uni.showToast({ title: '请先选择群组', icon: 'none' });
+    uni.showToast({ title: '请先选择小队', icon: 'none' });
     return;
   }
   try {

@@ -25,11 +25,36 @@
     </view>
   </view>
 
-  <!-- 中间内容区域 -->
-  <view class="content-container">
+  <!-- 中间内容区域：可上下滚动 0-24 小时，进入默认定位到 8:00 -->
+  <scroll-view
+      class="content-container"
+      scroll-y
+      :scroll-top="defaultScrollTop"
+      :scroll-with-animation="false"
+  >
     <view class="content-wrapper">
 
-      <view class="flex-row">
+      <!-- 空状态：新用户 / 无日程时的引导，鼓励快速创建第一个日程 -->
+      <view v-if="isScheduleEmpty" class="empty-guide">
+        <view class="empty-guide__hero">
+          <text class="empty-guide__emoji">🗓️</text>
+        </view>
+        <text class="empty-guide__title">这一周还空着呢～</text>
+        <text class="empty-guide__subtitle">把想做的事安排进来，时间会更有掌控感 ✨</text>
+
+        <view class="empty-guide__samples">
+          <view class="empty-guide__sample"><text>🏃 晨跑 30 分钟</text></view>
+          <view class="empty-guide__sample"><text>📚 睡前亲子阅读</text></view>
+          <view class="empty-guide__sample"><text>🍱 周末家庭聚餐</text></view>
+        </view>
+
+        <button class="empty-guide__cta" @click="toggleGrid('', '')">
+          ＋ 创建第一个日程
+        </button>
+        <text class="empty-guide__hint">点一下，30 秒搞定第一个安排</text>
+      </view>
+
+      <view v-else class="flex-row">
         <view class="time-axis" style="width: 12%; flex-shrink: 0;">
           <view class="flex-column">
             <view
@@ -43,12 +68,7 @@
         </view>
 
         <view class="dates-container" style="width: 88%;">
-          <view v-if="isScheduleEmpty" class="no-schedule-container">
-            <button class="create-schedule-btn" @click="toggleGrid(dates[0],hours[0])">
-              + 添加一个日程
-            </button>
-          </view>
-          <view  v-else class="flex-row">
+          <view class="flex-row">
             <view
                 class="day-column"
                 v-for="(date, dateIndex) in dates"
@@ -90,11 +110,11 @@
         </view>
       </view>
     </view>
-  </view>
+  </scroll-view>
 </template>
 
 <script setup>
-import {ref, watch, onMounted, reactive, computed} from 'vue';
+import {ref, watch, onMounted, reactive, computed, nextTick} from 'vue';
 import DateUtils from '../../utils/util';
 
 // Props 定义
@@ -111,6 +131,7 @@ const props = defineProps({
   hours: {
     type: Array,
     default: () => [
+      '0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00',
       '8:00', '9:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
     ]
@@ -126,6 +147,18 @@ const props = defineProps({
 // State
 const selectedEvents = ref(new Set());
 const dates = ref([]);
+// 进入默认定位到 8:00（行高 60px，时间轴从 0:00 起）。scroll-view 的 scroll-top 仅在「值变化」时
+// 才滚动，初值若直接给 480，mp-weixin 首次渲染不会滚动 → 看起来停在 0:00。故初值给 0，渲染后再设为 480 触发滚动。
+const MORNING_SCROLL_TOP = 8 * 60;
+const defaultScrollTop = ref(0);
+
+// 渲染后把视口定位到早上 8 点
+const focusToMorning = () => {
+  defaultScrollTop.value = 0;
+  nextTick(() => {
+    setTimeout(() => { defaultScrollTop.value = MORNING_SCROLL_TOP; }, 60);
+  });
+};
 const personColorMap = reactive({})
 const availableColors = ['blue', '1', '2', '3', '4', '5', '6']; // 定义可用的颜色类名
 
@@ -189,7 +222,9 @@ const getEventStyle = (schedule) => {
   const startMinute = parseInt(startTime.split(':')[1]);
 
   const hourHeight = 60;
-  const topOffset = (startHour - 8) * hourHeight + (startMinute / 60) * hourHeight;
+  // 锚点取时间轴第一格的小时（当前为 0:00），使事件定位随轴起点自适应
+  const gridStartHour = parseInt((props.hours?.[0] || '0:00').split(':')[0]) || 0;
+  const topOffset = (startHour - gridStartHour) * hourHeight + (startMinute / 60) * hourHeight;
   const eventHeight = durationHours * hourHeight;
 
   return {
@@ -306,11 +341,13 @@ watch(() => props.shareMode, (newVal) => {
 watch(() => props.eventList, (newList) => {
   console.log("📅 eventList changed, updating dates...");
   updateDatesFromEventList(newList);
+  if (!isScheduleEmpty.value) focusToMorning();
 }, { immediate: false });
 
 // Lifecycle Hooks
 onMounted(() => {
   updateDatesFromEventList(props.eventList);
+  focusToMorning();
 });
 
 
@@ -322,6 +359,7 @@ defineExpose({
   getTotalEventCount,
   selectAll,
   toggleSelectAll,
+  focusToMorning,
   // clearSelection,
   // getSelectedCount,
   // getTotalEventCount
@@ -342,16 +380,11 @@ defineExpose({
   width: 100%;
 }
 
-/* 中间内容区域 */
+/* 中间内容区域：scroll-view，需要明确高度才能内部滚动 */
 .content-container {
-  flex: 1; /* 占据父容器剩余空间 */
-  /* 关键：允许自身滚动 */
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  height: 100%; /* 父容器为 100vh 的 flex 列，高度确定 */
   position: relative;
-  /* 确保它有明确的块级显示 */
-  display: flex;
-  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
 }
 
 .content-wrapper {
@@ -571,51 +604,104 @@ defineExpose({
 }
 
 
-/* --- 无日程状态容器 --- */
-.no-schedule-container {
+/* --- 空状态引导：新用户 / 无日程时展示 --- */
+.empty-guide {
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding: 40rpx 0; /* 上下留出一些空间 */
-  /* 如果你想让按钮占据整个列表区域，可以添加 height: 100vh; 或者具体的高度 */
-  /* height: 100vh; */
+  justify-content: flex-start;
+  padding: 64rpx 48rpx 80rpx;
+  text-align: center;
 }
 
-/* --- 创建日程按钮样式 (蓝色虚线边框) --- */
-.create-schedule-btn {
-  width: 60%; /* 按钮宽度占容器的 60% */
-  height: 80rpx; /* 按钮高度 */
-  line-height: 80rpx; /* 使文字垂直居中 */
-  font-size: 28rpx; /* 文字大小 */
-  font-weight: bold; /* 文字加粗 */
-  color: #007aff; /* 文字颜色为蓝色 */
-  background-color: transparent; /* 背景透明 */
-  border: none; /* 关键：重置 uniapp 默认边框 */
-  border: 2rpx dashed #007aff; /* 自定义蓝色虚线边框 */
-  border-radius: 40rpx; /* 按钮圆角 */
-  /* 防止按钮在某些平台被点击时有默认的视觉反馈 */
+.empty-guide__hero {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e8f1ff 0%, #d4e6ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12rpx 32rpx rgba(33, 150, 243, 0.18);
+  margin-bottom: 36rpx;
+}
+
+.empty-guide__emoji {
+  font-size: 96rpx;
+  line-height: 1;
+}
+
+.empty-guide__title {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 14rpx;
+}
+
+.empty-guide__subtitle {
+  font-size: 26rpx;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-bottom: 40rpx;
+}
+
+.empty-guide__samples {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  width: 100%;
+  max-width: 460rpx;
+  margin-bottom: 48rpx;
+}
+
+.empty-guide__sample {
+  background: #f7f9fc;
+  border: 2rpx solid #eef2f7;
+  border-radius: 16rpx;
+  padding: 20rpx 28rpx;
+  font-size: 27rpx;
+  color: #475569;
+  text-align: left;
+}
+
+.empty-guide__cta {
+  width: 100%;
+  max-width: 460rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f8cff 0%, #2196f3 100%);
+  border: none;
+  border-radius: 46rpx;
+  box-shadow: 0 10rpx 24rpx rgba(33, 150, 243, 0.32);
   -webkit-appearance: none;
   appearance: none;
   outline: none;
-  box-sizing: border-box; /* 确保 padding/border 不增加总宽高 */
+  box-sizing: border-box;
 }
 
-/* 按钮点击态效果 (可选) */
-.create-schedule-btn:active {
-  opacity: 0.7; /* 点击时透明度降低 */
-  /* 或者可以改变边框样式 */
-  /* border-style: solid; */
-  /* background-color: rgba(0, 122, 255, 0.1); */
+.empty-guide__cta::after { border: none; }
+
+.empty-guide__cta:active {
+  transform: scale(0.98);
+  opacity: 0.92;
+}
+
+.empty-guide__hint {
+  font-size: 23rpx;
+  color: #b0b8c4;
+  margin-top: 20rpx;
 }
 
 /* --- 小屏适配 --- */
 @media (max-width: 375px) {
-  .create-schedule-btn {
-    width: 70%; /* 在小屏上可以稍微宽一点 */
-    height: 70rpx;
-    line-height: 70rpx;
-    font-size: 26rpx;
-  }
+  .empty-guide { padding: 48rpx 36rpx 64rpx; }
+  .empty-guide__hero { width: 150rpx; height: 150rpx; }
+  .empty-guide__emoji { font-size: 80rpx; }
+  .empty-guide__title { font-size: 34rpx; }
 }
 </style>
