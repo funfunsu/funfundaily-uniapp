@@ -17,44 +17,10 @@
       <view class="menu-section group-section" v-for="(group, index) in groupList" :key="group.id">
         <view class="menu-item" @click="handleGroupMembersClick(group)">
           <view class="menu-left">
-            <text v-if="groupList.length > 1">群组{{ index + 1 }}-</text>
+            <text v-if="groupList.length > 1">小队{{ index + 1 }}-</text>
             <text class="menu-title">{{ group.groupName }}</text>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
-      </view>
-    </view>
-
-    <!-- 创建群组表单弹窗（保持不变） -->
-    <view v-if="showGroupForm" class="group-form-modal" @click="cancelCreateGroup">
-      <view class="group-form-container" @click.stop>
-        <view class="group-form-header">
-          <text class="group-form-title">创建新群组</text>
-        </view>
-        <view class="group-form-body">
-          <view class="form-item">
-            <text class="form-label">群组名称 *</text>
-            <input
-                ref="groupNameInputRef"
-                class="form-input"
-                v-model="newGroupName"
-                placeholder="请输入群组名称"
-                placeholder-class="placeholder-text"
-                @focus="inputFocus = true"
-                @blur="inputFocus = false"
-            />
-          </view>
-        </view>
-        <view class="group-form-footer">
-          <button class="cancel-btn" @click="cancelCreateGroup">取消</button>
-          <button
-              class="submit-btn"
-              :class="{ disabled: !newGroupName.trim() }"
-              @click="submitCreateGroup"
-              :disabled="!newGroupName.trim()"
-          >
-            创建
-          </button>
         </view>
       </view>
     </view>
@@ -81,12 +47,6 @@
     </view>
 
     <view class="contact-service-section">
-      <button class="create-btn" @click="showCreateGroupForm">
-        <text class="contact-icon">+</text>
-        <text>创建群组</text>
-      </button>
-    </view>
-    <view class="contact-service-section">
       <!-- 移除 open-type="contact"，新增点击事件 -->
       <button class="contact-service-btn" @click="showQrcodeModal = true">
         <text class="contact-icon">&#x1F4AC;</text>
@@ -98,7 +58,7 @@
 
 <script setup>
 // 导入必要的 Vue 3 Composition API 函数
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 // 导入 uni-app 提供的页面跳转等 API
 import { onLoad, onShow } from '@dcloudio/uni-app'
 
@@ -106,14 +66,8 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 const userInfo = ref({})
 const groupList = ref([])
 const selectedGroupIdx = ref(0)
-const showGroupForm = ref(false)
-const newGroupName = ref('')
-const inputFocus = ref(false)
 // 新增：控制客服二维码弹窗显示
 const showQrcodeModal = ref(false)
-
-// --- 模板引用 ---
-const groupNameInputRef = ref(null)
 
 // --- 导入工具和组件 ---
 import api from '../../utils/apiTs'
@@ -205,41 +159,6 @@ const handleGroupMembersClick = (group) => {
   uni.navigateTo({
     url: `/pages/profile/group-manage?id=${group.id}`
   })
-}
-
-const showCreateGroupForm = () => {
-  showGroupForm.value = true
-  newGroupName.value = ''
-  nextTick(() => {
-    if (groupNameInputRef.value && typeof (groupNameInputRef.value ).focus === 'function') {
-      (groupNameInputRef.value ).focus()
-    }
-  })
-}
-
-const cancelCreateGroup = () => {
-  showGroupForm.value = false
-  newGroupName.value = ''
-  inputFocus.value = false
-}
-
-const submitCreateGroup = async () => {
-  showGroupForm.value = false
-  const name = newGroupName.value.trim()
-  if (!name) {
-    await uni.showToast({title: '请输入群组名称', icon: 'none'})
-    return
-  }
-
-  await uni.showLoading({title: '创建中...'})
-  const res = await api.group.add({ groupName: name })
-  // 假设返回包含 id 和 groupName
-  const newGroup = { id: res.id, groupName: name }
-  groupList.value.push(newGroup)
-  selectedGroupIdx.value = groupList.value.length - 1
-
-  await uni.showToast({title: '群组创建成功', icon: 'success'})
-  cancelCreateGroup()
 }
 
 // 新增：关闭二维码弹窗方法
@@ -374,145 +293,12 @@ onShow(() => {
   color: #007aff;
 }
 
-/* 创建群组弹窗 */
-.group-form-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.group-form-container {
-  width: 85%;
-  max-width: 520rpx;
-  background: #ffffff;
-  border-radius: 24rpx;
-  overflow: hidden;
-  animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.group-form-header {
-  text-align: center;
-  padding: 36rpx 0;
-  background: #f8f9fa;
-}
-
-.group-form-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #333;
-}
-
-.group-form-body {
-  padding: 0 40rpx 30rpx;
-}
-
-.form-item {
-  margin-top: 20rpx;
-}
-
-.form-label {
-  display: block;
-  font-size: 28rpx;
-  color: #333;
-  margin-bottom: 16rpx;
-  font-weight: 500;
-}
-
-.form-input {
-  width: 100%;
-  height: 80rpx;
-  border: 2rpx solid #e0e0e0;
-  border-radius: 16rpx;
-  padding: 0 24rpx;
-  font-size: 28rpx;
-  box-sizing: border-box;
-  transition: border-color 0.2s;
-}
-
-.form-input:focus {
-  border-color: #007aff;
-  outline: none;
-}
-
-.placeholder-text {
-  color: #aaa;
-}
-
-.group-form-footer {
-  display: flex;
-  height: 96rpx;
-  border-top: 1rpx solid #f0f0f0;
-}
-
-.cancel-btn,
-.submit-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32rpx;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.cancel-btn {
-  color: #666;
-  border-right: 1rpx solid #f0f0f0;
-}
-
-.submit-btn {
-  color: #007aff;
-  font-weight: 600;
-}
-
-.submit-btn.disabled {
-  color: #ccc;
-  opacity: 1;
-}
-
 .contact-service-section {
   display: flex;
   justify-content: center;
   margin-top: 40rpx;
   padding: 0 20rpx;
   box-sizing: border-box;
-}
-
-.create-btn{
-  background-color: #007aff;
-  color: white;
-  height: 40px;
-  width: 100%;
-  padding: 24rpx 0;
-  border: 2rpx solid #007aff;
-  border-radius: 12rpx;
-  font-size: 32rpx;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  box-shadow: 0 4rpx 8rpx rgba(0, 122, 255, 0.1);
-  transition: all 0.2s ease;
 }
 
 .contact-service-btn {

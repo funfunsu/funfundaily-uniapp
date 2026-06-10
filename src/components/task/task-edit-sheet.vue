@@ -35,6 +35,8 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   // 有值=编辑该任务（按 id 拉全量）；空=新增
   editId: { type: [String, Number], default: null },
+  // 新增时的初始任务类型（习惯/待办前移：'Habit' | 'Todo'）
+  initialTaskType: { type: String, default: 'Habit' },
   goalList: { type: Array, default: () => [] },
   curDate: { type: Date, default: () => new Date() },
   groupId: { type: [String, Number], default: '' },
@@ -53,13 +55,14 @@ const isEdit = computed(() => !!props.editId)
 // 新增任务的初始模板（与原 edit.vue 默认一致，其余默认由 task-edit 内部补全）
 function freshTemplate() {
   const d = props.curDate || new Date()
+  const taskType = props.initialTaskType === 'Todo' ? 'Todo' : 'Habit'
   return {
     itemType: 'task',
     startTime: DateUtils.getDayStartTimeStr(d),
     endTime: DateUtils.getDayEndTimeStr(d),
     repeatStartDay: DateUtils.getDateStr(d),
     repeatEndDay: DateUtils.getNextDayStr(d),
-    extra: { score: 1, taskType: 'Habit', totalCount: 1 }
+    extra: { score: 1, taskType, totalCount: 1 }
   }
 }
 

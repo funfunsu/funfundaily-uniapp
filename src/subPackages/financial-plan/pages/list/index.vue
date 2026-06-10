@@ -178,29 +178,86 @@
                         :class="resolveStageToneClass(batch.stageStatus)"
                       >{{ resolveStageLabel(batch.stageStatus) }}</text>
                     </view>
-                    <text v-if="batch.batchType === 'DERIVATIVE'" class="batch-row__type">
-                      {{ resolveBatchTypeLabel(batch.batchType) }} · {{ resolveDirectionLabel(batch.direction) }}
-                      <text v-if="batch.expirationDate"> · 到期 {{ batch.expirationDate }}</text>
-                    </text>
                     <text class="batch-row__summary">
-                      数量 {{ batch.quantity }} · 预期 {{ formatNumber(batch.planBuyPrice) }} → {{ formatNumber(batch.planSellPrice) }}
-                    </text>
-                    <text class="batch-row__profit">
-                      目标 <text class="positive">{{ formatNumber(computeBatchTargetProfit(batch)) }}</text>
-                      · 已实现
-                      <text :class="profitToneClass(batch.actualProfit)">{{ formatProfit(batch.actualProfit) }}</text>
+                      计划 数量 {{ batch.quantity }} · {{ formatNumber(batch.planBuyPrice) }} → {{ formatNumber(batch.planSellPrice) }}
                     </text>
 
-                    <view v-if="batchOperations(batch.batchId).length > 0" class="op-grid">
+                    <view class="bstat-grid">
+                      <view class="bstat">
+                        <text class="bstat__label">目标收益</text>
+                        <text class="bstat__value">{{ formatNumber(statTargetProfit(batch)) }}</text>
+                      </view>
+                      <view class="bstat">
+                        <text class="bstat__label">累计已实现</text>
+                        <text class="bstat__value" :class="profitToneClass(statTotalRealized(batch))">{{ formatProfit(statTotalRealized(batch)) }}</text>
+                      </view>
+                      <view class="bstat">
+                        <text class="bstat__label">正股已实现</text>
+                        <text class="bstat__value" :class="profitToneClass(statStockRealized(batch))">{{ formatProfit(statStockRealized(batch)) }}</text>
+                      </view>
+                      <view class="bstat">
+                        <text class="bstat__label">期权已实现</text>
+                        <text class="bstat__value" :class="profitToneClass(statOptionRealized(batch))">{{ formatProfit(statOptionRealized(batch)) }}</text>
+                      </view>
+                      <view class="bstat">
+                        <text class="bstat__label">正股数量</text>
+                        <text class="bstat__value">{{ statStockQty(batch) }}</text>
+                      </view>
+                      <view class="bstat">
+                        <text class="bstat__label">正股成本价</text>
+                        <text class="bstat__value">{{ formatNumber(statStockCostPrice(batch)) }}</text>
+                      </view>
+                    </view>
+
+                    <view v-if="statOptionKeys(batch).length > 0" class="optkey-list">
+                      <view
+                        v-for="k in statOptionKeys(batch)"
+                        :key="optionKeyId(k)"
+                        class="optkey-row"
+                      >
+                        <view class="optkey-row__info">
+                          <text class="optkey-row__title">
+                            <text
+                              class="opt-chip"
+                              :class="k.optionType === 'CALL' ? 'opt-chip--call' : 'opt-chip--put'"
+                            >{{ k.optionType }}</text>
+                            {{ formatNumber(k.strikePrice) }} · 到期 {{ k.expirationDate }}
+                          </text>
+                          <text class="optkey-row__meta">
+                            数量 {{ k.netQuantity }} · 成本 {{ formatNumber(k.costAmount) }} · 已实现
+                            <text :class="profitToneClass(k.realizedProfit)">{{ formatProfit(k.realizedProfit) }}</text>
+                          </text>
+                        </view>
+                        <view v-if="isPlanEditable(plan)" class="optkey-row__actions">
+                          <template v-if="Number(k.netQuantity) > 0">
+                            <button class="btn btn--mini btn--danger" @click.stop="openOptionSellSheet(plan.planId, batch.batchId, k)">卖出</button>
+                            <button class="btn btn--mini btn--ghost" @click.stop="handleExercise(plan.planId, batch.batchId, k, 'EXERCISE')">行权</button>
+                          </template>
+                          <template v-else-if="Number(k.netQuantity) < 0">
+                            <button class="btn btn--mini btn--success" @click.stop="openOptionBuySheet(plan.planId, batch.batchId, k)">买入</button>
+                            <button class="btn btn--mini btn--ghost" @click.stop="handleExercise(plan.planId, batch.batchId, k, 'ASSIGN')">被行权</button>
+                          </template>
+                        </view>
+                      </view>
+                    </view>
+
+                    <view class="ops-toggle" @click.stop="toggleOps(batch.batchId)">
+                      <text class="ops-toggle__text">
+                        {{ isOpsExpanded(batch.batchId) ? '收起操作记录' : '操作记录 (' + batchOperations(batch.batchId).length + ')' }}
+                      </text>
+                    </view>
+                    <view v-if="isOpsExpanded(batch.batchId) && batchOperations(batch.batchId).length > 0" class="op-grid">
                       <view
                         v-for="op in batchOperations(batch.batchId)"
                         :key="op.operationId"
                         class="op-cell"
                         :class="op.operationType === 'BUY' ? 'op-cell--buy' : 'op-cell--sell'"
                       >
-                        <text class="op-cell__type">{{ op.operationType === 'BUY' ? '买' : '卖' }}</text>
+                        <text class="op-cell__type">{{ opLabel(op) }}</text>
                         <text class="op-cell__line">
                           {{ op.tradeDate }} · {{ formatNumber(op.price) }} × {{ op.quantity }}<text
+                            v-if="op.instrument === 'OPTION' && op.strikePrice"
+                          > · 行权价 {{ formatNumber(op.strikePrice) }}</text><text
                             v-if="op.fee && Number(op.fee) > 0"
                           > · 费 {{ formatNumber(op.fee) }}</text>
                         </text>
@@ -219,7 +276,6 @@
                     >买入</button>
                     <button
                       class="btn btn--mini btn--danger"
-                      :disabled="batch.stageStatus === 'PENDING_BUY' || batch.stageStatus === 'COMPLETED'"
                       @click.stop="openSellSheet(plan.planId, batch.batchId)"
                     >卖出</button>
                   </view>
@@ -335,51 +391,23 @@
       <view class="sheet-panel" @click.stop>
         <view class="sheet-grabber"></view>
         <view class="sheet-header">
-          <text class="sheet-title">新增批次</text>
+          <text class="sheet-title">新增正股批次</text>
           <text class="sheet-close" @click="closeAddBatchForm">×</text>
         </view>
         <view class="sheet-body">
+          <text class="sheet-hint">批次对应一只正股；期权请在批次的「买入/卖出」里作为操作记录。</text>
           <view class="field">
-            <text class="field__label">批次类型</text>
-            <picker :range="batchTypeOptions" range-key="label" @change="onNewBatchTypeChange">
-              <view class="field__picker">
-                <text>{{ resolveBatchTypeLabel(newBatchForm.batchType) }}</text>
-                <text class="field__picker-arrow">▾</text>
-              </view>
-            </picker>
-          </view>
-          <view v-if="newBatchForm.batchType === 'DERIVATIVE'" class="field">
-            <text class="field__label">方向</text>
-            <picker :range="directionOptions" range-key="label" @change="onNewBatchDirectionChange">
-              <view class="field__picker">
-                <text>{{ resolveDirectionLabel(newBatchForm.direction) }}</text>
-                <text class="field__picker-arrow">▾</text>
-              </view>
-            </picker>
-          </view>
-          <view class="field-row">
-            <view class="field">
-              <text class="field__label">数量</text>
-              <input class="field__input" v-model="newBatchForm.quantity" type="number" placeholder="数量" />
-            </view>
-            <view v-if="newBatchForm.batchType === 'DERIVATIVE'" class="field">
-              <text class="field__label">到期日</text>
-              <DatePicker
-                v-model="newBatchForm.expirationDate"
-                mode="date"
-                placeholder="请选择"
-                title="选择到期日"
-              />
-            </view>
+            <text class="field__label">数量</text>
+            <input class="field__input" v-model="newBatchForm.quantity" type="number" placeholder="数量" />
           </view>
           <view class="field-row">
             <view class="field">
               <text class="field__label">预期买入价</text>
-              <input class="field__input" v-model="newBatchForm.planBuyPrice" type="number" placeholder="0.00" />
+              <input class="field__input" v-model="newBatchForm.planBuyPrice" type="digit" placeholder="0.00" />
             </view>
             <view class="field">
               <text class="field__label">预期卖出价</text>
-              <input class="field__input" v-model="newBatchForm.planSellPrice" type="number" placeholder="0.00" />
+              <input class="field__input" v-model="newBatchForm.planSellPrice" type="digit" placeholder="0.00" />
             </view>
           </view>
         </view>
@@ -402,38 +430,18 @@
           <text class="sheet-close" @click="closeEditBatchForm">×</text>
         </view>
         <view class="sheet-body">
-          <view v-if="editBatchTargetIsDerivative" class="field">
-            <text class="field__label">方向</text>
-            <picker :range="directionOptions" range-key="label" @change="onEditBatchDirectionChange">
-              <view class="field__picker">
-                <text>{{ resolveDirectionLabel(editBatchForm.direction) }}</text>
-                <text class="field__picker-arrow">▾</text>
-              </view>
-            </picker>
-          </view>
-          <view class="field-row">
-            <view class="field">
-              <text class="field__label">数量</text>
-              <input class="field__input" v-model="editBatchForm.quantity" type="number" placeholder="数量" />
-            </view>
-            <view v-if="editBatchTargetIsDerivative" class="field">
-              <text class="field__label">到期日</text>
-              <DatePicker
-                v-model="editBatchForm.expirationDate"
-                mode="date"
-                placeholder="请选择"
-                title="选择到期日"
-              />
-            </view>
+          <view class="field">
+            <text class="field__label">数量</text>
+            <input class="field__input" v-model="editBatchForm.quantity" type="number" placeholder="数量" />
           </view>
           <view class="field-row">
             <view class="field">
               <text class="field__label">预期买入价</text>
-              <input class="field__input" v-model="editBatchForm.planBuyPrice" type="number" placeholder="0.00" />
+              <input class="field__input" v-model="editBatchForm.planBuyPrice" type="digit" placeholder="0.00" />
             </view>
             <view class="field">
               <text class="field__label">预期卖出价</text>
-              <input class="field__input" v-model="editBatchForm.planSellPrice" type="number" placeholder="0.00" />
+              <input class="field__input" v-model="editBatchForm.planSellPrice" type="digit" placeholder="0.00" />
             </view>
           </view>
           <view class="field">
@@ -460,23 +468,54 @@
           <text class="sheet-close" @click="closeOpForm">×</text>
         </view>
         <view class="sheet-body">
+          <view v-if="!opOptionLocked" class="seg">
+            <view class="seg__item" :class="{ 'seg__item--on': opForm.instrument === 'STOCK' }" @click="setOpInstrument('STOCK')">正股</view>
+            <view class="seg__item" :class="{ 'seg__item--on': opForm.instrument === 'OPTION' }" @click="setOpInstrument('OPTION')">期权</view>
+          </view>
+          <view v-if="opForm.instrument === 'OPTION'">
+            <view v-if="opOptionLocked" class="field">
+              <text class="field__label">期权</text>
+              <text class="field__static">{{ opForm.optionType }} · 目标价 {{ opForm.strikePrice }} · 到期 {{ opForm.expirationDate }}</text>
+            </view>
+            <template v-else>
+              <view class="field">
+                <text class="field__label">期权类型</text>
+                <picker :range="optionTypeOptions" range-key="label" @change="onOpOptionTypeChange">
+                  <view class="field__picker">
+                    <text>{{ resolveOptionTypeLabel(opForm.optionType) }}</text>
+                    <text class="field__picker-arrow">▾</text>
+                  </view>
+                </picker>
+              </view>
+              <view class="field-row">
+                <view class="field">
+                  <text class="field__label">目标价格</text>
+                  <input class="field__input" v-model="opForm.strikePrice" type="digit" placeholder="0.00" />
+                </view>
+                <view class="field">
+                  <text class="field__label">到期时间</text>
+                  <DatePicker v-model="opForm.expirationDate" mode="date" placeholder="请选择" title="选择到期时间" />
+                </view>
+              </view>
+            </template>
+          </view>
           <view class="field">
             <text class="field__label">交易日期</text>
             <DatePicker v-model="opForm.tradeDate" mode="date" placeholder="请选择" title="选择交易日期" />
           </view>
           <view class="field-row">
             <view class="field">
-              <text class="field__label">买入价</text>
-              <input class="field__input" v-model="opForm.price" type="number" placeholder="0.00" />
+              <text class="field__label">买入价{{ opForm.instrument === 'OPTION' ? '（可为0）' : '' }}</text>
+              <input class="field__input" v-model="opForm.price" type="digit" placeholder="0.00" />
             </view>
             <view class="field">
-              <text class="field__label">数量</text>
+              <text class="field__label">数量{{ opForm.instrument === 'OPTION' ? '（可为负）' : '' }}</text>
               <input class="field__input" v-model="opForm.quantity" type="number" placeholder="0" />
             </view>
           </view>
           <view class="field">
             <text class="field__label">手续费</text>
-            <input class="field__input" v-model="opForm.fee" type="number" placeholder="0" />
+            <input class="field__input" v-model="opForm.fee" type="digit" placeholder="0" />
           </view>
         </view>
         <view class="sheet-actions">
@@ -498,23 +537,54 @@
           <text class="sheet-close" @click="closeOpForm">×</text>
         </view>
         <view class="sheet-body">
+          <view v-if="!opOptionLocked" class="seg">
+            <view class="seg__item" :class="{ 'seg__item--on': opForm.instrument === 'STOCK' }" @click="setOpInstrument('STOCK')">正股</view>
+            <view class="seg__item" :class="{ 'seg__item--on': opForm.instrument === 'OPTION' }" @click="setOpInstrument('OPTION')">期权</view>
+          </view>
+          <view v-if="opForm.instrument === 'OPTION'">
+            <view v-if="opOptionLocked" class="field">
+              <text class="field__label">期权</text>
+              <text class="field__static">{{ opForm.optionType }} · 目标价 {{ opForm.strikePrice }} · 到期 {{ opForm.expirationDate }}</text>
+            </view>
+            <template v-else>
+              <view class="field">
+                <text class="field__label">期权类型</text>
+                <picker :range="optionTypeOptions" range-key="label" @change="onOpOptionTypeChange">
+                  <view class="field__picker">
+                    <text>{{ resolveOptionTypeLabel(opForm.optionType) }}</text>
+                    <text class="field__picker-arrow">▾</text>
+                  </view>
+                </picker>
+              </view>
+              <view class="field-row">
+                <view class="field">
+                  <text class="field__label">目标价格</text>
+                  <input class="field__input" v-model="opForm.strikePrice" type="digit" placeholder="0.00" />
+                </view>
+                <view class="field">
+                  <text class="field__label">到期时间</text>
+                  <DatePicker v-model="opForm.expirationDate" mode="date" placeholder="请选择" title="选择到期时间" />
+                </view>
+              </view>
+            </template>
+          </view>
           <view class="field">
             <text class="field__label">交易日期</text>
             <DatePicker v-model="opForm.tradeDate" mode="date" placeholder="请选择" title="选择交易日期" />
           </view>
           <view class="field-row">
             <view class="field">
-              <text class="field__label">卖出价</text>
-              <input class="field__input" v-model="opForm.price" type="number" placeholder="0.00" />
+              <text class="field__label">卖出价{{ opForm.instrument === 'OPTION' ? '（可为0）' : '' }}</text>
+              <input class="field__input" v-model="opForm.price" type="digit" placeholder="0.00" />
             </view>
             <view class="field">
-              <text class="field__label">数量</text>
+              <text class="field__label">数量{{ opForm.instrument === 'OPTION' ? '（可为负）' : '' }}</text>
               <input class="field__input" v-model="opForm.quantity" type="number" placeholder="0" />
             </view>
           </view>
           <view class="field">
             <text class="field__label">手续费</text>
-            <input class="field__input" v-model="opForm.fee" type="number" placeholder="0" />
+            <input class="field__input" v-model="opForm.fee" type="digit" placeholder="0" />
           </view>
         </view>
         <view class="sheet-actions">
@@ -549,16 +619,18 @@ import { ensureCurrentGroup, ensureCurrentMember } from '../../../../utils/curre
 import { STORAGE_KEYS, getStoredData } from '../../../../utils/storageManager'
 import {
   assetMarket,
-  batchType as batchTypeEnum,
-  batchDirection,
+  optionType as optionTypeEnum,
   timeRangeType as timeRangeTypeEnum,
   planType as planTypeEnum,
 } from '../../api/financial-plan-types'
 import type {
   AssetMarket,
-  BatchType,
-  BatchDirection,
+  BatchStats,
+  ExerciseAction,
   FinancialPlanListItem,
+  InstrumentType,
+  OptionKeyStats,
+  OptionType,
   RealizationBatch,
   RealizationOperation,
   TimeRangeType,
@@ -610,34 +682,37 @@ const newAssetForm = reactive({
 
 const showAddBatchFormFor = ref<string | null>(null)
 const newBatchForm = reactive({
-  batchType: 'EQUITY' as BatchType,
-  direction: undefined as BatchDirection | undefined,
   quantity: '',
   planBuyPrice: '',
   planSellPrice: '',
-  expirationDate: '',
 })
 
 const showBuyFormFor = ref<string | null>(null)
 const showSellFormFor = ref<string | null>(null)
 const showEditBatchFormFor = ref<string | null>(null)
-/** 编辑批次时记住该批次是否衍生品，决定要不要展示方向 / 到期日字段。 */
-const editBatchTargetIsDerivative = ref(false)
 
+/** 买入/卖出表单：可记录正股或期权（OPTION 时带 optionType/strikePrice/expirationDate）。 */
 const opForm = reactive({
+  instrument: 'STOCK' as InstrumentType,
+  optionType: 'CALL' as OptionType,
+  strikePrice: '',
+  expirationDate: '',
   tradeDate: todayDateString(),
   price: '',
   quantity: '',
   fee: '',
 })
+/** 从某个已存在的期权 key 打开买/卖时锁定 key 字段。 */
+const opOptionLocked = ref(false)
+
+/** 已展开「操作记录」的批次 id 集合。 */
+const expandedOpsBatchIds = ref<string[]>([])
 
 const editBatchForm = reactive({
   batchName: '',
-  direction: undefined as BatchDirection | undefined,
   quantity: '',
   planBuyPrice: '',
   planSellPrice: '',
-  expirationDate: '',
   version: 0,
 })
 
@@ -663,16 +738,9 @@ const marketOptions = [
   { label: 'A 股', value: assetMarket.cn },
 ] as const
 
-const batchTypeOptions = [
-  { label: '正股', value: batchTypeEnum.equity },
-  { label: '衍生品', value: batchTypeEnum.derivative },
-] as const
-
-const directionOptions = [
-  { label: '买入 CALL', value: batchDirection.call },
-  { label: '买入 PUT', value: batchDirection.put },
-  { label: '卖空 CALL', value: batchDirection.shortCall },
-  { label: '卖空 PUT', value: batchDirection.shortPut },
+const optionTypeOptions = [
+  { label: '看涨 CALL', value: optionTypeEnum.call },
+  { label: '看跌 PUT', value: optionTypeEnum.put },
 ] as const
 
 const timeRangeOptions = [
@@ -763,7 +831,7 @@ function batchOperations(batchId: string): RealizationOperation[] {
   return realizationStore.operationsByBatchId[batchId] || []
 }
 
-/** 单批次目标收益。 */
+/** 单批次目标收益（无后端 stats 时的兜底计算）。 */
 function computeBatchTargetProfit(batch: RealizationBatch): number {
   const buy = Number(batch.planBuyPrice)
   const sell = Number(batch.planSellPrice)
@@ -772,6 +840,90 @@ function computeBatchTargetProfit(batch: RealizationBatch): number {
     return 0
   }
   return Number(((sell - buy) * qty).toFixed(2))
+}
+
+/** 金额四舍五入到 2 位小数；非数字返回 0。 */
+function round2(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.round(value * 100) / 100
+}
+
+// ===== 批次卡片汇总（来自后端 batchStats，缺失时本地兜底） =====
+
+function batchStats(batch: RealizationBatch): BatchStats | null {
+  const detail = planDetails.value[String(batch.planId)]
+  const list = detail?.batchStats || []
+  return list.find((s) => String(s.batchId) === String(batch.batchId)) || null
+}
+
+function statTargetProfit(batch: RealizationBatch): number {
+  const s = batchStats(batch)
+  return s ? Number(s.targetProfit) : computeBatchTargetProfit(batch)
+}
+
+function statTotalRealized(batch: RealizationBatch): number {
+  const s = batchStats(batch)
+  return s ? Number(s.totalRealizedProfit) : Number(batch.actualProfit || 0)
+}
+
+function statStockRealized(batch: RealizationBatch): number {
+  const s = batchStats(batch)
+  return s ? Number(s.stockRealizedProfit) : Number(batch.actualProfit || 0)
+}
+
+function statOptionRealized(batch: RealizationBatch): number {
+  const s = batchStats(batch)
+  return s ? Number(s.optionRealizedProfit) : 0
+}
+
+function statStockQty(batch: RealizationBatch): number {
+  const s = batchStats(batch)
+  return s ? Number(s.stockQuantity) : 0
+}
+
+function statStockCostPrice(batch: RealizationBatch): number | null {
+  const s = batchStats(batch)
+  if (!s || s.stockCostPrice === undefined || s.stockCostPrice === null) return null
+  return Number(s.stockCostPrice)
+}
+
+function statOptionKeys(batch: RealizationBatch): OptionKeyStats[] {
+  const s = batchStats(batch)
+  return s?.optionKeys || []
+}
+
+function optionKeyId(k: OptionKeyStats): string {
+  return `${k.optionType}|${k.strikePrice}|${k.expirationDate}`
+}
+
+/** 操作记录展开/收起。 */
+function toggleOps(batchId: string): void {
+  const id = String(batchId)
+  const idx = expandedOpsBatchIds.value.indexOf(id)
+  if (idx >= 0) {
+    expandedOpsBatchIds.value.splice(idx, 1)
+  } else {
+    expandedOpsBatchIds.value.push(id)
+  }
+}
+
+function isOpsExpanded(batchId: string): boolean {
+  return expandedOpsBatchIds.value.includes(String(batchId))
+}
+
+/** 操作记录的类型文案。 */
+function opLabel(op: RealizationOperation): string {
+  const side = op.operationType === 'BUY' ? '买' : '卖'
+  if (op.instrument === 'OPTION') {
+    return `期权${op.optionType === 'CALL' ? 'C' : 'P'}${side}`
+  }
+  return `正股${side}`
+}
+
+function resolveOptionTypeLabel(type?: OptionType): string {
+  if (type === 'CALL') return '看涨 CALL'
+  if (type === 'PUT') return '看跌 PUT'
+  return '请选择'
 }
 
 /**
@@ -804,10 +956,9 @@ function resolveAssetPlannedProfitRaw(planId: string, assetId: string): number {
   return batchesByAsset(planId, assetId).reduce((sum, b) => sum + computeBatchTargetProfit(b), 0)
 }
 
-/** 单标的「已实现盈利」原币种金额（未乘汇率）= COMPLETED 批次的 actualProfit 之和。 */
+/** 单标的「已实现盈利」原币种金额（未乘汇率）= 各批次累计已实现(正股+期权) 之和。 */
 function resolveAssetActualProfitRaw(planId: string, assetId: string): number {
   return batchesByAsset(planId, assetId)
-    .filter((b) => b.stageStatus === 'COMPLETED')
     .reduce((sum, b) => sum + Number(b.actualProfit || 0), 0)
 }
 
@@ -969,7 +1120,7 @@ async function handleSubmitPlan(): Promise<void> {
     await ensureCurrentGroup()
     const group = getStoredData<{ id?: string | number }>(STORAGE_KEYS.CURRENT_GROUP)
     if (!group?.id) {
-      await uni.showToast({ title: '请先选择群组', icon: 'none' })
+      await uni.showToast({ title: '请先选择小队', icon: 'none' })
       return
     }
     await ensureCurrentMember(group.id)
@@ -1115,38 +1266,19 @@ async function handleSubmitAddAsset(planId: string): Promise<void> {
 function openAddBatchSheet(planId: string, assetId: string): void {
   sheetPlanId.value = planId
   showAddBatchFormFor.value = assetId
-  newBatchForm.batchType = 'EQUITY'
-  newBatchForm.direction = undefined
   newBatchForm.quantity = ''
   newBatchForm.planBuyPrice = ''
   newBatchForm.planSellPrice = ''
-  newBatchForm.expirationDate = ''
 }
 
 function closeAddBatchForm(): void {
   showAddBatchFormFor.value = null
 }
 
-function onNewBatchTypeChange(event: { detail: { value: number } }): void {
-  const idx = Number(event.detail.value)
-  newBatchForm.batchType = batchTypeOptions[idx]?.value || 'EQUITY'
-  if (newBatchForm.batchType === 'EQUITY') {
-    newBatchForm.direction = undefined
-    newBatchForm.expirationDate = ''
-  } else if (!newBatchForm.direction) {
-    newBatchForm.direction = batchDirection.call
-  }
-}
-
-function onNewBatchDirectionChange(event: { detail: { value: number } }): void {
-  const idx = Number(event.detail.value)
-  newBatchForm.direction = directionOptions[idx]?.value
-}
-
 async function handleSubmitAddBatch(planId: string, assetId: string): Promise<void> {
   const quantityNum = Number(newBatchForm.quantity)
-  const buyNum = Number(newBatchForm.planBuyPrice)
-  const sellNum = Number(newBatchForm.planSellPrice)
+  const buyNum = round2(Number(newBatchForm.planBuyPrice))
+  const sellNum = round2(Number(newBatchForm.planSellPrice))
   if (!(quantityNum > 0)) {
     await uni.showToast({ title: '请填写数量（>0）', icon: 'none' })
     return
@@ -1155,24 +1287,11 @@ async function handleSubmitAddBatch(planId: string, assetId: string): Promise<vo
     await uni.showToast({ title: '请填写预期买入/卖出价（>0）', icon: 'none' })
     return
   }
-  if (newBatchForm.batchType === 'DERIVATIVE') {
-    if (!newBatchForm.direction) {
-      await uni.showToast({ title: '请选择衍生品方向', icon: 'none' })
-      return
-    }
-    if (!newBatchForm.expirationDate) {
-      await uni.showToast({ title: '请填写到期日', icon: 'none' })
-      return
-    }
-  }
   const result = await realizationStore.createBatch(planId, {
     assetId,
-    batchType: newBatchForm.batchType,
-    direction: newBatchForm.batchType === 'DERIVATIVE' ? newBatchForm.direction : undefined,
     quantity: quantityNum,
     planBuyPrice: buyNum,
     planSellPrice: sellNum,
-    expirationDate: newBatchForm.batchType === 'DERIVATIVE' ? newBatchForm.expirationDate : undefined,
   })
   if (result) {
     closeAddBatchForm()
@@ -1187,16 +1306,45 @@ function openBuySheet(planId: string, batchId: string): void {
   sheetPlanId.value = planId
   showSellFormFor.value = null
   showEditBatchFormFor.value = null
-  showBuyFormFor.value = batchId
   resetOpForm()
+  showBuyFormFor.value = batchId
 }
 
 function openSellSheet(planId: string, batchId: string): void {
   sheetPlanId.value = planId
   showBuyFormFor.value = null
   showEditBatchFormFor.value = null
-  showSellFormFor.value = batchId
   resetOpForm()
+  showSellFormFor.value = batchId
+}
+
+/** 从某个期权 key 打开买入（用于平掉空头）。 */
+function openOptionBuySheet(planId: string, batchId: string, k: OptionKeyStats): void {
+  openBuySheet(planId, batchId)
+  prefillOptionKey(k)
+}
+
+/** 从某个期权 key 打开卖出（用于平掉多头）。 */
+function openOptionSellSheet(planId: string, batchId: string, k: OptionKeyStats): void {
+  openSellSheet(planId, batchId)
+  prefillOptionKey(k)
+}
+
+function prefillOptionKey(k: OptionKeyStats): void {
+  opForm.instrument = 'OPTION'
+  opForm.optionType = k.optionType
+  opForm.strikePrice = String(k.strikePrice ?? '')
+  opForm.expirationDate = k.expirationDate || ''
+  opOptionLocked.value = true
+}
+
+function setOpInstrument(instrument: InstrumentType): void {
+  opForm.instrument = instrument
+}
+
+function onOpOptionTypeChange(event: { detail: { value: number } }): void {
+  const idx = Number(event.detail.value)
+  opForm.optionType = optionTypeOptions[idx]?.value || 'CALL'
 }
 
 function closeOpForm(): void {
@@ -1205,34 +1353,79 @@ function closeOpForm(): void {
 }
 
 function resetOpForm(): void {
+  opForm.instrument = 'STOCK'
+  opForm.optionType = 'CALL'
+  opForm.strikePrice = ''
+  opForm.expirationDate = ''
   opForm.tradeDate = todayDateString()
   opForm.price = ''
   opForm.quantity = ''
   opForm.fee = ''
+  opOptionLocked.value = false
+}
+
+/** 校验买/卖操作公共字段，返回构造好的请求片段；非法时 toast 并返回 null。 */
+async function buildOpRequest(): Promise<{
+  instrument: InstrumentType
+  tradeDate: string
+  quantity: number
+  fee: number
+  optionType?: OptionType
+  strikePrice?: number
+  expirationDate?: string
+} | null> {
+  if (!opForm.tradeDate) {
+    await uni.showToast({ title: '请填写交易日期', icon: 'none' })
+    return null
+  }
+  const qtyNum = Number(opForm.quantity)
+  const feeNum = opForm.fee === '' ? 0 : round2(Number(opForm.fee))
+  if (opForm.instrument === 'OPTION') {
+    if (!Number.isFinite(qtyNum) || qtyNum === 0) {
+      await uni.showToast({ title: '期权数量需为非 0 数字', icon: 'none' })
+      return null
+    }
+    const strikeNum = round2(Number(opForm.strikePrice))
+    if (!(strikeNum > 0)) {
+      await uni.showToast({ title: '请填写目标价格（>0）', icon: 'none' })
+      return null
+    }
+    if (!opForm.expirationDate) {
+      await uni.showToast({ title: '请选择到期时间', icon: 'none' })
+      return null
+    }
+    return {
+      instrument: 'OPTION',
+      tradeDate: opForm.tradeDate,
+      quantity: qtyNum,
+      fee: feeNum,
+      optionType: opForm.optionType,
+      strikePrice: strikeNum,
+      expirationDate: opForm.expirationDate,
+    }
+  }
+  if (!(qtyNum > 0)) {
+    await uni.showToast({ title: '请填写数量（>0）', icon: 'none' })
+    return null
+  }
+  return { instrument: 'STOCK', tradeDate: opForm.tradeDate, quantity: qtyNum, fee: feeNum }
 }
 
 async function handleSubmitBuy(planId: string, batchId: string): Promise<void> {
-  const priceNum = Number(opForm.price)
-  const qtyNum = Number(opForm.quantity)
-  if (!opForm.tradeDate) {
-    await uni.showToast({ title: '请填写交易日期', icon: 'none' })
+  const base = await buildOpRequest()
+  if (!base) return
+  const priceNum = opForm.price === '' ? 0 : round2(Number(opForm.price))
+  if (base.instrument === 'STOCK' && !(priceNum > 0)) {
+    await uni.showToast({ title: '请填写买入价（>0）', icon: 'none' })
     return
   }
-  if (!(priceNum > 0) || !(qtyNum > 0)) {
-    await uni.showToast({ title: '请填写正确的价格与数量', icon: 'none' })
-    return
-  }
-  const feeNum = opForm.fee === '' ? 0 : Number(opForm.fee)
   const result = await realizationStore.recordBuy(planId, batchId, {
-    tradeDate: opForm.tradeDate,
+    ...base,
     actualBuyPrice: priceNum,
-    quantity: qtyNum,
-    fee: feeNum,
   })
   if (result) {
     closeOpForm()
     await uni.showToast({ title: '买入已记录', icon: 'success' })
-    // 同时刷新 planDetail，让批次 stageStatus 立即更新，卖出按钮无需手动刷新页面。
     await Promise.all([
       realizationStore.loadBatchOperations(planId, batchId),
       planStore.loadPlanDetail(planId),
@@ -1247,13 +1440,10 @@ function openEditBatchSheet(planId: string, batch: RealizationBatch): void {
   showBuyFormFor.value = null
   showSellFormFor.value = null
   showEditBatchFormFor.value = String(batch.batchId)
-  editBatchTargetIsDerivative.value = batch.batchType === 'DERIVATIVE'
   editBatchForm.batchName = batch.batchName || ''
-  editBatchForm.direction = batch.direction
   editBatchForm.quantity = String(batch.quantity ?? '')
   editBatchForm.planBuyPrice = String(batch.planBuyPrice ?? '')
   editBatchForm.planSellPrice = String(batch.planSellPrice ?? '')
-  editBatchForm.expirationDate = batch.expirationDate || ''
   editBatchForm.version = batch.version ?? 0
 }
 
@@ -1261,34 +1451,27 @@ function closeEditBatchForm(): void {
   showEditBatchFormFor.value = null
 }
 
-function onEditBatchDirectionChange(event: { detail: { value: number } }): void {
-  const idx = Number(event.detail.value)
-  editBatchForm.direction = directionOptions[idx]?.value
-}
-
 async function handleSubmitEditBatch(planId: string, batchId: string): Promise<void> {
   const quantityNum = Number(editBatchForm.quantity)
-  const buyNum = Number(editBatchForm.planBuyPrice)
-  const sellNum = Number(editBatchForm.planSellPrice)
+  const buyNum = round2(Number(editBatchForm.planBuyPrice))
+  const sellNum = round2(Number(editBatchForm.planSellPrice))
   if (!(quantityNum > 0)) {
     await uni.showToast({ title: '请填写数量（>0）', icon: 'none' })
     return
   }
-  if (!Number.isFinite(buyNum) || buyNum === 0) {
-    await uni.showToast({ title: '请填写预期买入价', icon: 'none' })
+  if (!(buyNum > 0)) {
+    await uni.showToast({ title: '请填写预期买入价（>0）', icon: 'none' })
     return
   }
-  if (!Number.isFinite(sellNum) || sellNum === 0) {
-    await uni.showToast({ title: '请填写预期卖出价', icon: 'none' })
+  if (!(sellNum > 0)) {
+    await uni.showToast({ title: '请填写预期卖出价（>0）', icon: 'none' })
     return
   }
   const result = await realizationStore.updateBatch(planId, batchId, {
     batchName: editBatchForm.batchName || undefined,
-    direction: editBatchForm.direction,
     quantity: quantityNum,
     planBuyPrice: buyNum,
     planSellPrice: sellNum,
-    expirationDate: editBatchForm.expirationDate || undefined,
     version: editBatchForm.version,
   })
   if (result) {
@@ -1299,22 +1482,16 @@ async function handleSubmitEditBatch(planId: string, batchId: string): Promise<v
 }
 
 async function handleSubmitSell(planId: string, batchId: string): Promise<void> {
-  const priceNum = Number(opForm.price)
-  const qtyNum = Number(opForm.quantity)
-  if (!opForm.tradeDate) {
-    await uni.showToast({ title: '请填写交易日期', icon: 'none' })
+  const base = await buildOpRequest()
+  if (!base) return
+  const priceNum = opForm.price === '' ? 0 : round2(Number(opForm.price))
+  if (base.instrument === 'STOCK' && !(priceNum > 0)) {
+    await uni.showToast({ title: '请填写卖出价（>0）', icon: 'none' })
     return
   }
-  if (!(priceNum > 0) || !(qtyNum > 0)) {
-    await uni.showToast({ title: '请填写正确的价格与数量', icon: 'none' })
-    return
-  }
-  const feeNum = opForm.fee === '' ? 0 : Number(opForm.fee)
   const result = await realizationStore.recordSell(planId, batchId, {
-    tradeDate: opForm.tradeDate,
+    ...base,
     actualSellPrice: priceNum,
-    quantity: qtyNum,
-    fee: feeNum,
   })
   if (result) {
     closeOpForm()
@@ -1324,6 +1501,56 @@ async function handleSubmitSell(planId: string, batchId: string): Promise<void> 
       planStore.loadPlanDetail(planId),
     ])
   }
+}
+
+// ===== 行权 / 被行权 =====
+
+function confirmModal(title: string, content: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    uni.showModal({
+      title,
+      content,
+      success: (r) => resolve(!!r.confirm),
+      fail: () => resolve(false),
+    })
+  })
+}
+
+async function handleExercise(
+  planId: string,
+  batchId: string,
+  k: OptionKeyStats,
+  action: ExerciseAction,
+): Promise<void> {
+  const label = action === 'EXERCISE' ? '行权' : '被行权'
+  const stockSide = resolveExerciseStockSide(k.optionType, action)
+  const ok = await confirmModal(
+    `${label}确认`,
+    `对 ${k.optionType} 目标价 ${formatNumber(k.strikePrice)} / 到期 ${k.expirationDate} 执行${label}：` +
+      `期权按价 0 平仓，并自动生成一条正股「${stockSide}」记录（价 = 目标价，数量 ${Math.abs(Number(k.netQuantity))}）。`,
+  )
+  if (!ok) return
+  const result = await realizationStore.exerciseOption(planId, batchId, {
+    optionType: k.optionType,
+    strikePrice: Number(k.strikePrice),
+    expirationDate: k.expirationDate,
+    action,
+  })
+  if (result) {
+    await uni.showToast({ title: `${label}已记录`, icon: 'success' })
+    await Promise.all([
+      realizationStore.loadBatchOperations(planId, batchId),
+      planStore.loadPlanDetail(planId),
+    ])
+  }
+}
+
+/** 行权/被行权对应的正股方向文案。 */
+function resolveExerciseStockSide(optionType: OptionType, action: ExerciseAction): string {
+  if (action === 'EXERCISE') {
+    return optionType === 'CALL' ? '买入' : '卖出'
+  }
+  return optionType === 'CALL' ? '卖出' : '买入'
 }
 
 // ===== labels & formatters =====
@@ -1342,22 +1569,9 @@ function resolveMarketChipClass(market?: string): string {
   return ''
 }
 
-function resolveBatchTypeLabel(type?: BatchType): string {
-  return type === 'DERIVATIVE' ? '衍生品' : '正股'
-}
-
-function resolveDirectionLabel(direction?: BatchDirection): string {
-  if (direction === batchDirection.call) return '买入 CALL'
-  if (direction === batchDirection.put) return '买入 PUT'
-  if (direction === batchDirection.shortCall) return '卖空 CALL'
-  if (direction === batchDirection.shortPut) return '卖空 PUT'
-  return '请选择方向'
-}
-
 function resolveBatchTitle(batch: RealizationBatch): string {
   if (batch.batchName) return batch.batchName
-  // 类型 + 方向信息已经在专门的 batch-row__type 行展示，名称只给一个通用兜底。
-  return batch.batchType === 'DERIVATIVE' ? '衍生品批次' : '正股批次'
+  return '正股批次'
 }
 
 function resolveTimeRangeLabel(value?: string): string {
@@ -1949,14 +2163,14 @@ onShow(() => {
 
 .op-cell__type {
   flex-shrink: 0;
-  width: 28rpx;
-  height: 28rpx;
+  padding: 2rpx 8rpx;
   line-height: 28rpx;
   text-align: center;
-  border-radius: 50%;
+  border-radius: 14rpx;
   background: rgba(255, 255, 255, 0.7);
   font-size: 18rpx;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .op-cell__line {
@@ -1965,6 +2179,132 @@ onShow(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ===== 批次卡片汇总（#771） ===== */
+.bstat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+.bstat {
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+  padding: 8rpx 10rpx;
+  border-radius: 10rpx;
+  background: rgba(99, 102, 241, 0.06);
+}
+.bstat__label {
+  font-size: 19rpx;
+  color: #64748b;
+}
+.bstat__value {
+  font-size: 23rpx;
+  font-weight: 600;
+  color: #1e293b;
+  font-feature-settings: 'tnum';
+}
+
+.optkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+.optkey-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10rpx;
+  padding: 10rpx 12rpx;
+  border-radius: 10rpx;
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+.optkey-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+}
+.optkey-row__title {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #1e293b;
+}
+.optkey-row__meta {
+  font-size: 20rpx;
+  color: #64748b;
+  font-feature-settings: 'tnum';
+}
+.optkey-row__actions {
+  display: flex;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+.opt-chip {
+  display: inline-block;
+  padding: 1rpx 8rpx;
+  border-radius: 8rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  margin-right: 4rpx;
+}
+.opt-chip--call {
+  background: rgba(220, 252, 231, 0.9);
+  color: #166534;
+}
+.opt-chip--put {
+  background: rgba(254, 226, 226, 0.9);
+  color: #991b1b;
+}
+
+.ops-toggle {
+  margin-top: 10rpx;
+}
+.ops-toggle__text {
+  font-size: 20rpx;
+  color: #4f46e5;
+}
+
+/* 买/卖表单：正股 / 期权切换 */
+.seg {
+  display: flex;
+  gap: 6rpx;
+  padding: 4rpx;
+  border-radius: 12rpx;
+  background: rgba(15, 23, 42, 0.05);
+  margin-bottom: 12rpx;
+}
+.seg__item {
+  flex: 1;
+  text-align: center;
+  padding: 12rpx 0;
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  color: #475569;
+}
+.seg__item--on {
+  background: #ffffff;
+  color: #4f46e5;
+  font-weight: 600;
+  box-shadow: 0 1rpx 4rpx rgba(15, 23, 42, 0.12);
+}
+
+.sheet-hint {
+  display: block;
+  font-size: 21rpx;
+  color: #94a3b8;
+  margin-bottom: 12rpx;
+  line-height: 1.5;
+}
+.field__static {
+  font-size: 24rpx;
+  color: #1e293b;
+  padding: 12rpx 0;
 }
 
 /* ===== Tone helpers ===== */

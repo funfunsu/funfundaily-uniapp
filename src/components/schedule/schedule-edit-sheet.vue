@@ -129,7 +129,7 @@ async function onConfirm() {
   const groupId = resolveGroupId()
   const targetUserId = resolveTargetUserId()
   if (!groupId || !targetUserId) {
-    uni.showToast({ title: '请先选择群组与成员', icon: 'none' })
+    uni.showToast({ title: '请先选择小队与成员', icon: 'none' })
     return
   }
   saving.value = true

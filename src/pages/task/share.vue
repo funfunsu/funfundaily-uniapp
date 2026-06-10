@@ -121,7 +121,7 @@ async function openReceive() {
   if (!currentGroup.value) {
     const group = await ensureCurrentGroup()
     if (!group) {
-      uni.showToast({ title: '你还没有群组，请先在 App 创建群组', icon: 'none' })
+      uni.showToast({ title: '你还没有小队，请先在 App 创建小队', icon: 'none' })
       return
     }
     currentGroup.value = group

@@ -19,7 +19,7 @@
       <!-- 左侧：群组信息 + 成员选择器 -->
       <view class="left-section" >
         <!-- 群组信息 -->
-        <view class="group-info">
+        <view class="group-info" v-if="showGroup">
           <view class="member-switcher">
             <picker
                 @change="handleGroupChange"
@@ -88,6 +88,7 @@ const props = defineProps({
   autoLoadMembers: { type: Boolean, default: true },
   buttons:{type: Array, default: () => []},
   topSideConfig:{type: Object, default: null },
+  showGroup: { type: Boolean, default: true },
   showGroupMember: { type: Boolean, default: true },
   isTabBarPage: { type: Boolean, default: true },
   allSelectAllMember: { type: Boolean, default: false }

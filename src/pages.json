@@ -39,7 +39,7 @@
     {
       "path": "pages/profile/group-manage",
       "style": {
-        "navigationBarTitleText": "群组管理",
+        "navigationBarTitleText": "成长小队",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }
@@ -92,6 +92,13 @@
       "path": "pages/task/checkin-calendar",
       "style": {
         "navigationBarTitleText": "打卡日历",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/point/history",
+      "style": {
+        "navigationBarTitleText": "积分流水",
         "enablePullDownRefresh": false
       }
     }

@@ -6,6 +6,8 @@
           ref="scheduleEditRef"
           :schedule="editingSchedule"
           :goal-list="userGoals"
+          :group-id="currentGroup?.id"
+          :target-user-id="currentMember?.userId"
           :cur-date="new Date()"
       ></task-edit>
     </view>
