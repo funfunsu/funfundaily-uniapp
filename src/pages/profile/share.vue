@@ -3,7 +3,7 @@
     <!-- 卡片式内容区域 -->
     <view class="card" v-if="!hasJoinedGroup">
       <!-- 欢迎信息 -->
-      <view  class="welcome-text">{{ shareFrom.creatorNickname }} 邀请你加入 {{ shareGroup.groupName }}</view>
+      <view  class="welcome-text">{{ shareFrom.creatorNickname }} 邀请你成为「{{ shareGroup.groupName }}」小队的队友</view>
       <view v-if="isBindShare" class="bind-hint">点击「接受」即可将本微信绑定到该账号，登录后自动以该账号身份进入</view>
       <!-- 昵称设置表单 -->
       <view class="form-section">
@@ -13,7 +13,7 @@
     <!-- 卡片式内容区域 -->
     <view class="card" v-if="hasJoinedGroup">
       <!-- 欢迎信息 -->
-      <view  class="welcome-text">你已加入过 {{ shareGroup.groupName }}</view>
+      <view  class="welcome-text">你已是「{{ shareGroup.groupName }}」小队的队友</view>
       <!-- 昵称设置表单 -->
       <view class="form-section">
         <button class="submit-button" @click="goHome">好的，现在去主页看看</button>

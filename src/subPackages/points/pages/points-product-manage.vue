@@ -59,7 +59,7 @@
         <button class="empty__action" @click="addProduct">添加第一个奖励</button>
       </template>
       <template v-else>
-        <text class="empty__text">请先在底部选择群组</text>
+        <text class="empty__text">请先在底部选择小队</text>
       </template>
     </view>
   </view>
@@ -136,7 +136,7 @@ const availablePresets = computed(() =>
 // 一键从模板创建奖励，创建后刷新列表，家长可再点卡片微调
 const addFromPreset = async (preset) => {
   if (!currentGroup.value.id) {
-    uni.showToast({ title: '请先选择群组', icon: 'none' });
+    uni.showToast({ title: '请先选择小队', icon: 'none' });
     return;
   }
   try {

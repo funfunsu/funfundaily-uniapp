@@ -21,7 +21,7 @@
           </view>
           <text class="msp-item__arrow">{{ actionVerb }} ›</text>
         </view>
-        <view v-if="!loading && members.length === 0" class="msp-empty"><text>该群组暂无成员</text></view>
+        <view v-if="!loading && members.length === 0" class="msp-empty"><text>该小队暂无成员</text></view>
       </scroll-view>
 
       <!-- 新建成员 -->

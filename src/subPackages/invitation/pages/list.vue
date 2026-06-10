@@ -5,8 +5,8 @@
       <view class="empty-illustration">
         <text class="empty-illustration__icon">👥</text>
       </view>
-      <text class="empty-title">先选择一个群组</text>
-      <text class="empty-hint">在底部群组选择器中切换，查看该群组的邀请函</text>
+      <text class="empty-title">先选择一个小队</text>
+      <text class="empty-hint">在底部小队选择器中切换，查看该小队的邀请函</text>
     </view>
 
     <view v-else>
@@ -688,7 +688,7 @@ const handleBottomButtonClick = (code: string) => {
 
 const openCreate = () => {
   if (!currentGroup.value.id) {
-    uni.showToast({ title: '请先选择群组', icon: 'none' })
+    uni.showToast({ title: '请先选择小队', icon: 'none' })
     return
   }
   form.value = {
@@ -756,7 +756,7 @@ const closeReceived = () => {
 
 const handleSave = async () => {
   if (saving.value) return
-  if (!currentGroup.value.id) return uni.showToast({ title: '请先选择群组', icon: 'none' })
+  if (!currentGroup.value.id) return uni.showToast({ title: '请先选择小队', icon: 'none' })
   if (!form.value.title.trim()) return uni.showToast({ title: '请填写活动标题', icon: 'none' })
   if (!form.value.startTime) return uni.showToast({ title: '请选择开始时间', icon: 'none' })
   if (!form.value.endTime) return uni.showToast({ title: '请选择结束时间', icon: 'none' })

@@ -243,7 +243,7 @@ const creatingGoal = ref(false);
 const onCreateGoal = () => {
   if (creatingGoal.value) return;
   if (!props.groupId || !props.targetUserId) {
-    uni.showToast({ title: '请先选择群组成员', icon: 'none' });
+    uni.showToast({ title: '请先选择小队成员', icon: 'none' });
     return;
   }
   uni.showModal({

@@ -74,7 +74,7 @@ async function resolveContext(query) {
   }
   const ctx = await ensureCurrentContext()
   if (!ctx) {
-    uni.showToast({ title: '请先选择群组成员', icon: 'none' })
+    uni.showToast({ title: '请先选择小队成员', icon: 'none' })
     return false
   }
   groupId.value = ctx.group.id

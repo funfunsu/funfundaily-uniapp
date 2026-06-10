@@ -1120,7 +1120,7 @@ async function handleSubmitPlan(): Promise<void> {
     await ensureCurrentGroup()
     const group = getStoredData<{ id?: string | number }>(STORAGE_KEYS.CURRENT_GROUP)
     if (!group?.id) {
-      await uni.showToast({ title: '请先选择群组', icon: 'none' })
+      await uni.showToast({ title: '请先选择小队', icon: 'none' })
       return
     }
     await ensureCurrentMember(group.id)

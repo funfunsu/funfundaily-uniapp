@@ -384,7 +384,7 @@ async function ensureContext() {
   if (currentGroup.value?.id && currentMember.value) return true
   const group = await ensureCurrentGroup()
   if (!group?.id) {
-    uni.showToast({ title: '请先创建或加入群组', icon: 'none' })
+    uni.showToast({ title: '请先创建或加入小队', icon: 'none' })
     return false
   }
   currentGroup.value = group

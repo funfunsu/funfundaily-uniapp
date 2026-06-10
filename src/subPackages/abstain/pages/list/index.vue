@@ -128,7 +128,7 @@ function todayFeedbackOf(ev) {
 // ---- 新建 / 修改 ----
 function openCreate() {
   if (!ctxReady()) {
-    uni.showToast({ title: '请先选择群组与成员', icon: 'none' })
+    uni.showToast({ title: '请先选择小队与成员', icon: 'none' })
     return
   }
   editingEvent.value = null

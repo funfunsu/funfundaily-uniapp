@@ -39,7 +39,7 @@
     {
       "path": "pages/profile/group-manage",
       "style": {
-        "navigationBarTitleText": "群组管理",
+        "navigationBarTitleText": "成长小队",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
       }

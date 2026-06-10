@@ -4,13 +4,13 @@
       <view class="section group-section">
         <view class="member-item">
           <view class="member-avatar">
-            <text>群</text>
+            <text>队</text>
           </view>
           <view class="member-info">
             <text class="member-name ">{{ currentGroup.groupName }}</text>
           </view>
           <view class="member-actions">
-            <text class="action-btn invite-btn" @click="editGroup(currentGroup)">修改群组名</text>
+            <text class="action-btn invite-btn" @click="editGroup(currentGroup)">修改小队名</text>
           </view>
         </view>
       </view>
@@ -23,7 +23,7 @@
             <view class="member-info">
               <text class="member-name">{{ member.userInfo.nickname || '未知用户' }}
                 <text v-if="member.userId === loginUser.id" class="owner-tag" >我</text>
-                <text v-if="member.role === 'Creator'" class="owner-tag" >群主</text>
+                <text v-if="member.role === 'Creator'" class="owner-tag" >队长</text>
               </text>
               <text class="member-role">{{ member.role || '成员' }}</text>
             </view>
@@ -34,7 +34,7 @@
                     v-if="member.bindType === 'None' && member.userId !== loginUser.id"
                     class="action-btn invite-btn bind-share-btn"
                     open-type="share"
-                    @click="prepareBindShare(member)">邀请绑定</button>
+                    @click="prepareBindShare(member)">邀请队友</button>
                 <text
                     v-if="member.bindType === 'None' && member.userId !== loginUser.id"
                     class="action-btn edit-nick-btn"
@@ -52,8 +52,8 @@
 
       <!-- 新增：两个并排按钮 -->
       <view class="action-buttons">
-        <button class="btn add-btn" @click="addMember">添加成员</button>
-        <button class="btn invite-link-btn" open-type="share" @click="prepareInviteShare">邀请加入</button>
+        <button class="btn add-btn" @click="addMember">添加队友</button>
+        <button class="btn invite-link-btn" open-type="share" @click="prepareInviteShare">邀请队友</button>
       </view>
     </view>
   </view>
@@ -121,7 +121,7 @@ onShareAppMessage((res) => {
 
   const isBind = shareMode.value === 'bind' && bindTarget.value;
   const groupName = currentGroup.value.groupName;
-  const shareTitle = `邀请您加入${groupName}`;
+  const shareTitle = `和你一起在「${groupName}」成长小队记录点滴`;
 
   let shareContent;
   let sceneCode;
@@ -189,10 +189,10 @@ const getMyRole = ()=>{
 }
 
 const  editGroup = async (group) =>{
-  // 编辑群组逻辑
+  // 编辑小队逻辑
   // 第一步：输入昵称
   uni.showModal({
-    title: '修改群组',
+    title: '修改小队名',
     placeholderText: group.groupName,
     editable: true,
     success: async(res1) => {
@@ -282,10 +282,10 @@ const editMemberNickname = (member) => {
   });
 };
 
-// ========== 添加成员（简易输入）==========
+// ========== 添加队友（简易输入）==========
 const addMember = async () => {
   uni.showModal({
-    title: '添加成员',
+    title: '添加队友',
     placeholderText: '请输入昵称',
     editable: true,
     success: async (res1) => {
@@ -309,7 +309,7 @@ const inviteMember = (memberId) => {
 const removeMember = (memberId) => {
   uni.showModal({
     title: '确认移除',
-    content: '确定要移除该成员吗？',
+    content: '确定要移除该队友吗？',
     success: async (res) => {
       if (res.confirm) {
         // 实际调用移除接口 (模拟)

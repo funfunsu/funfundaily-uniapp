@@ -17,7 +17,7 @@
       <view class="menu-section group-section" v-for="(group, index) in groupList" :key="group.id">
         <view class="menu-item" @click="handleGroupMembersClick(group)">
           <view class="menu-left">
-            <text v-if="groupList.length > 1">群组{{ index + 1 }}-</text>
+            <text v-if="groupList.length > 1">小队{{ index + 1 }}-</text>
             <text class="menu-title">{{ group.groupName }}</text>
           </view>
           <text class="menu-arrow">›</text>
