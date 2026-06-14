@@ -1,0 +1,27 @@
+<view class="card">
+  <view class="badge">✓ 打卡成功</view>
+  <view class="title">{{title}}</view>
+  <view class="date">{{date}}</view>
+
+  <view class="stats">
+    <view class="stat">
+      <text class="num">{{currentStreak}}</text>
+      <text class="label">连续天数</text>
+    </view>
+    <view class="divider"></view>
+    <view class="stat">
+      <text class="num">{{monthCheckinDays}}</text>
+      <text class="label">本月打卡</text>
+    </view>
+  </view>
+
+  <view class="remaining" wx:if="{{remainingPending.length > 0}}">
+    <text class="remaining-title">今天还剩 {{remainingPending.length}} 项</text>
+    <view class="remaining-row" wx:for="{{remainingPending}}" wx:key="taskId">
+      · {{item.title}}
+    </view>
+  </view>
+  <view class="all-done" wx:else>今天的打卡都完成啦 🎉</view>
+
+  <view class="footer" bindtap="openCheckinPage">打开小程序 ›</view>
+</view>

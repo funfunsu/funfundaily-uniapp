@@ -1,0 +1,28 @@
+<view class="card">
+  <view class="header">
+    <text class="title">{{date}} 打卡清单</text>
+    <text class="meta">待 {{pendingCount}} / 已 {{completedCount}}</text>
+  </view>
+
+  <block wx:if="{{pending.length > 0}}">
+    <view class="section-title">待打卡</view>
+    <view class="row pending" wx:for="{{pending}}" wx:key="taskId">
+      <text class="dot pending-dot"></text>
+      <text class="task-title">{{item.title}}</text>
+    </view>
+  </block>
+
+  <block wx:if="{{completed.length > 0}}">
+    <view class="section-title">已打卡</view>
+    <view class="row done" wx:for="{{completed}}" wx:key="taskId">
+      <text class="dot done-dot">✓</text>
+      <text class="task-title done-title">{{item.title}}</text>
+    </view>
+  </block>
+
+  <view class="empty" wx:if="{{pending.length === 0 && completed.length === 0}}">
+    今天没有打卡任务
+  </view>
+
+  <view class="footer" bindtap="openCheckinPage">打开小程序查看完整记录 ›</view>
+</view>
