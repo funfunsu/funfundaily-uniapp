@@ -1,0 +1,67 @@
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  font-size: 28rpx;
+  color: #222;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 16rpx;
+}
+.title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.meta {
+  font-size: 24rpx;
+  color: #888;
+}
+.section-title {
+  margin: 16rpx 0 8rpx;
+  font-size: 24rpx;
+  color: #666;
+}
+.row {
+  display: flex;
+  align-items: center;
+  padding: 10rpx 0;
+}
+.dot {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 14rpx;
+  margin-right: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: #fff;
+}
+.pending-dot {
+  background: #ffd24d;
+}
+.done-dot {
+  background: #4caf50;
+}
+.task-title {
+  flex: 1;
+}
+.done-title {
+  color: #888;
+  text-decoration: line-through;
+}
+.empty {
+  padding: 24rpx 0;
+  text-align: center;
+  color: #999;
+}
+.footer {
+  margin-top: 20rpx;
+  text-align: right;
+  color: #4a8cff;
+  font-size: 24rpx;
+}

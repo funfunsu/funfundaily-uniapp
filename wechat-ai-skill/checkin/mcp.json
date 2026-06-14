@@ -1,0 +1,179 @@
+{
+  "apis": [
+    {
+      "name": "checkin_active_list",
+      "description": "查询某成员某天的打卡清单（待打卡 pending + 已打卡 completed）。默认是当前用户、今天；用户提到『昨天/前天/某月某日』时传入 date；用户明确说『帮 XX 看看』时传入 targetUserId。返回 card 由 active-list 组件渲染；fact 已是面向用户的事实陈述，可直接复述。",
+      "_meta": {
+        "ui": {
+          "componentPath": "components/active-list"
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetUserId": {
+            "type": "string",
+            "description": "可选。目标成员 ID；缺省=当前登录用户"
+          },
+          "date": {
+            "type": "string",
+            "description": "可选。ISO 日期 YYYY-MM-DD；缺省=今天"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fact": { "type": "string" },
+          "action": { "type": "string" },
+          "card": {
+            "type": "object",
+            "properties": {
+              "type": { "const": "checkin_active_list" },
+              "date": { "type": "string" },
+              "pendingCount": { "type": "integer" },
+              "completedCount": { "type": "integer" },
+              "pending": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/TaskItem" }
+              },
+              "completed": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/TaskItem" }
+              }
+            }
+          }
+        },
+        "$defs": {
+          "TaskItem": {
+            "type": "object",
+            "properties": {
+              "taskId": { "type": "integer" },
+              "title": { "type": "string" },
+              "itemType": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "checkin_complete",
+      "description": "为某项打卡任务执行打卡。taskId 必须从 checkin_active_list 的返回值里拿，不要凭空猜。返回连续天数 currentStreak、本月打卡天数 monthCheckinDays、以及还未打卡的任务 remainingPending，由 complete-result 组件渲染。",
+      "_meta": {
+        "ui": {
+          "componentPath": "components/complete-result"
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["taskId"],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "必填。打卡任务 ID（从 checkin_active_list 返回的 pending[].taskId 获取）"
+          },
+          "targetUserId": {
+            "type": "string",
+            "description": "可选。目标成员 ID；缺省=当前登录用户"
+          },
+          "date": {
+            "type": "string",
+            "description": "可选。ISO 日期 YYYY-MM-DD；缺省=今天"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fact": { "type": "string" },
+          "action": { "type": "string" },
+          "card": {
+            "type": "object",
+            "properties": {
+              "type": { "const": "checkin_complete_result" },
+              "recordId": { "type": "integer" },
+              "taskId": { "type": "integer" },
+              "title": { "type": "string" },
+              "date": { "type": "string" },
+              "currentStreak": { "type": "integer" },
+              "monthCheckinDays": { "type": "integer" },
+              "remainingPending": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "taskId": { "type": "integer" },
+                    "title": { "type": "string" },
+                    "itemType": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "checkin_streak",
+      "description": "查询某项打卡任务的连续打卡天数 + 本月已打卡天数 + 最近 30 天的打卡日期列表。taskId 须从 checkin_active_list 拿。由 streak 组件渲染热力/日历。",
+      "_meta": {
+        "ui": {
+          "componentPath": "components/streak"
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["taskId"],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "必填。打卡任务 ID"
+          },
+          "targetUserId": {
+            "type": "string",
+            "description": "可选。目标成员 ID；缺省=当前登录用户"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fact": { "type": "string" },
+          "action": { "type": "string" },
+          "card": {
+            "type": "object",
+            "properties": {
+              "type": { "const": "checkin_streak" },
+              "taskId": { "type": "integer" },
+              "title": { "type": "string" },
+              "currentStreak": { "type": "integer" },
+              "monthCheckinDays": { "type": "integer" },
+              "recentDates": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "components": [
+    {
+      "path": "components/active-list",
+      "relatedPage": "/pages/checkin/index",
+      "expirable": true,
+      "expiredText": "打卡清单已过期，请重新询问"
+    },
+    {
+      "path": "components/complete-result",
+      "relatedPage": "/pages/checkin/index"
+    },
+    {
+      "path": "components/streak",
+      "relatedPage": "/pages/checkin/index",
+      "expirable": true,
+      "expiredText": "统计已过期，请重新询问"
+    }
+  ]
+}
