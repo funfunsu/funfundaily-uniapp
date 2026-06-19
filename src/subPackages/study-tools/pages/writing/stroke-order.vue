@@ -55,6 +55,11 @@
         ↺ {{ countdownSeconds > 0 ? `重新书写"${selectedChar}" (${countdownSeconds}s)` : `重新书写 "${selectedChar}"` }}
       </button>
 
+      <!-- 生成识字打卡图，分享到家长群引流 -->
+      <button v-if="historyChars.length > 0" @click="doShare" class="share-btn">
+        📤 生成识字打卡图 · 发家长群
+      </button>
+
       <text v-if="error" class="error-tip">{{ error }}</text>
     </view>
     <view class="pinyin-text">{{pinyinResultRef}}</view>
@@ -71,6 +76,19 @@
           @edit-complete="OnEditComplete"
       />
     </view>
+
+    <!-- 识字打卡分享海报（复用公共组件 + strokeLearn 绘制器） -->
+    <share-poster
+        :visible="posterVisible"
+        renderer="strokeLearn"
+        :payload="posterPayload"
+        :qr-source="posterQr"
+        :creator-name="posterCreator"
+        :show-link="true"
+        title="识字打卡分享"
+        hint="把图片发到家长群，长按识别二维码即可一起免费学笔顺"
+        @close="posterVisible = false"
+        @shared="posterVisible = false"/>
   </view>
 </template>
 
@@ -80,6 +98,14 @@ import HanziStroke from '../../components/HanziStroke.vue'; // 确保路径正�
 import { onLoad,onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app';
 import { pinyin } from 'pinyin-pro';
 import { APP_BRAND } from '../../../../utils/appBrand';
+import sharePoster from '../../../../components/share/share-poster.vue';
+import apiTs from '../../../../utils/apiTs';
+import { base64ToImageSource } from '../../../../utils/imageHelper';
+import { setShareToken } from '../../../../utils/token';
+import { autoLogin } from '../../../../utils/auth';
+
+// 识字工具自身页面路径（扫码 / 二维码落地页）
+const STUDY_SHARE_PAGE = 'subPackages/study-tools/pages/writing/stroke-order';
 
 const inputValue = ref('');
 const historyChars = ref([]); // 存储历史输入的单个汉字
@@ -90,6 +116,13 @@ const isWechatMiniProgram = ref(false);
 const autoRewriteTimer = ref(null); // 用于存储倒计时定时器
 const countdownSeconds = ref(0); // 新增：用于存储倒计时秒数
 const pinyinResultRef = ref(''); // 存储转换后的拼音
+
+// 识字打卡分享海报状态
+const posterVisible = ref(false);
+const posterPayload = ref([]);
+const posterQr = ref('');
+const posterCreator = ref('我');
+const shareToken = ref('');
 
 
 
@@ -108,16 +141,61 @@ onMounted(() => {
   // 监听朋友圈分享（可选）
   onShareTimeline(() => {
     return {
-      title: `${selectedChar.value || '汉字'}笔顺学习 - funfun日程`,
+      title: `和孩子一起每天认字 · 免费看「${selectedChar.value || '汉字'}」笔顺动画 | ${APP_BRAND}`,
       imageUrl: '/static/share-stroke.png'
     };
   });
 });
 
 
+// 解析扫码 / 转发进入时携带的分享 token（scene 为 getUnlimitedQRCode 的 scene）
+function resolveShareToken(query) {
+  let raw = (query && (query.token || query.scene)) || '';
+  // #ifdef MP-WEIXIN
+  if (!raw && typeof wx !== 'undefined') {
+    try {
+      const enter = (wx.getEnterOptionsSync && wx.getEnterOptionsSync())
+          || (wx.getLaunchOptionsSync && wx.getLaunchOptionsSync()) || {};
+      const q = enter.query || {};
+      raw = q.token || q.scene || '';
+    } catch (e) { console.warn('[stroke] getEnterOptionsSync 失败:', e); }
+  }
+  // #endif
+  if (raw) { try { raw = decodeURIComponent(raw); } catch (e) { /* token 为纯 hex */ } }
+  return raw;
+}
+
+// 扫码进入：用 token 还原分享者的识字清单
+async function restoreFromShareToken(token) {
+  setShareToken(token);
+  try { await autoLogin(token); } catch (e) { console.warn('自动登录失败:', e); }
+  try {
+    const res = await apiTs.share.getContent(token);
+    let data = (res && res.data) ? res.data : res;
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { /* ignore */ } }
+    const chars = data && Array.isArray(data.chars)
+        ? data.chars.filter(c => /[一-龥]/.test(c))
+        : [];
+    if (chars.length > 0) {
+      historyChars.value = chars.slice(0, 20);
+      const main = data.main && chars.includes(data.main) ? data.main : chars[0];
+      selectChar(main);
+    }
+  } catch (e) {
+    console.error('还原分享识字清单失败:', e);
+  }
+}
+
 // 页面加载时的处理逻辑
-onLoad((options) => {
+onLoad(async (options) => {
   console.log("Page loaded with options:", options);
+
+  // 优先处理扫码 / 二维码进入：scene/token 还原识字清单
+  const shareTokenFromEnter = resolveShareToken(options);
+  if (shareTokenFromEnter) {
+    await restoreFromShareToken(shareTokenFromEnter);
+    return;
+  }
 
   // --- 关键修改开始 ---
   // 1. 处理传入的历史记录
@@ -169,7 +247,8 @@ onLoad((options) => {
  * 生成分享配置（核心）
  */
 function getShareConfig() {
-  const shareTitle =  `汉字笔顺学习 | ${APP_BRAND}`;
+  const charHint = selectedChar.value ? `「${selectedChar.value}」` : '';
+  const shareTitle = `和孩子一起认字${charHint} · 免费看笔顺动画 | ${APP_BRAND}`;
   // 分享路径：携带当前汉字参数
   const encodedHistory = encodeURIComponent(JSON.stringify(historyChars.value));
 
@@ -199,6 +278,41 @@ function getShareConfig() {
       });
     }
   };
+}
+
+// 「生成识字打卡图」：建分享 token → 取小程序码 → 弹出海报长图，引导发家长群
+async function doShare() {
+  const chars = historyChars.value;
+  if (!chars || chars.length === 0) {
+    uni.showToast({ title: '请先添加要打卡的汉字', icon: 'none' });
+    return;
+  }
+  uni.showLoading({ title: '生成分享图...', mask: true });
+  try {
+    const main = selectedChar.value || chars[0];
+    const content = JSON.stringify({ chars, main });
+    posterQr.value = '';
+    try {
+      const res = await apiTs.share.create({ content, sceneCode: 'study_share' });
+      shareToken.value = res?.token || '';
+      if (shareToken.value) {
+        const qr = await apiTs.share.qrcode({ token: shareToken.value, page: STUDY_SHARE_PAGE });
+        if (qr?.qrBase64) {
+          posterQr.value = await base64ToImageSource(qr.qrBase64, qr.contentType || 'image/png');
+        }
+      }
+    } catch (qrErr) {
+      // 二维码失败（dev 占位 / 未配置 appid）不阻断出图，海报画灰块占位
+      console.warn('生成二维码失败，继续出图:', qrErr);
+    }
+    posterPayload.value = [{ chars: [...chars], main, pinyin: pinyin(main) }];
+    posterVisible.value = true;
+  } catch (e) {
+    console.error('生成分享图失败:', e);
+    uni.showToast({ title: e?.message || '生成失败，请重试', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+  }
 }
 
 function handleInputChange() {
@@ -464,6 +578,25 @@ onUnmounted(() => {
 .history-char-btn:active {
   background: #bbdefb;
   transform: scale(0.95); /* 点击时缩小 */
+}
+
+.share-btn {
+  width: 100%;
+  height: 92rpx;
+  margin-top: 8rpx;
+  background: linear-gradient(135deg, #4f8cff 0%, #1e88e5 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 60rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 24rpx rgba(30, 136, 229, 0.3);
+  transition: all 0.2s ease;
+}
+
+.share-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 4rpx 16rpx rgba(30, 136, 229, 0.25);
 }
 
 .error-tip {

@@ -371,4 +371,120 @@ const scheduleTimetable = {
   }
 }
 
-export const renderers = { taskList, scheduleTimetable }
+// ============================================================
+// 识字打卡（笔顺学习）—— 用于「发现页/识字工具」分享到家长群引流
+// payload[0] = { chars: string[], main: string, pinyin: string }
+// ============================================================
+const STROKE_WIDTH = 600
+const STROKE_PAD = 40
+const STROKE_HEADER_H = 220
+const STROKE_CARD_H = 420
+const STROKE_FOOTER_H = 360
+
+const strokeLearn = {
+  title: '识字打卡分享',
+  hint: '把图片发到家长群，长按识别二维码即可一起免费学笔顺',
+  buildLayout() {
+    return {
+      width: STROKE_WIDTH,
+      height: STROKE_HEADER_H + 16 + STROKE_CARD_H + 16 + STROKE_FOOTER_H
+    }
+  },
+  paint(ctx, api, layout, qrImg, { payload, creatorName }) {
+    const data = (payload && payload[0]) || {}
+    const chars = Array.isArray(data.chars) ? data.chars : []
+    const main = data.main || chars[0] || '字'
+    const pinyinText = data.pinyin || ''
+    const width = layout.width
+
+    api.setFill('#f5f7fa')
+    ctx.fillRect(0, 0, width, layout.height)
+
+    // 顶部渐变（与识字工具主题蓝一致）
+    if (ctx.createLinearGradient) {
+      const grad = ctx.createLinearGradient(0, 0, width, STROKE_HEADER_H)
+      grad.addColorStop(0, '#4f8cff')
+      grad.addColorStop(1, '#1e88e5')
+      api.setFill(grad)
+    } else {
+      api.setFill('#1e88e5')
+    }
+    ctx.fillRect(0, 0, width, STROKE_HEADER_H)
+
+    api.setFill('rgba(255,255,255,0.92)')
+    api.setTextAlign('left')
+    api.setTextBaseline('top')
+    api.setFont('600 22px sans-serif', 22)
+    ctx.fillText(`${APP_BRAND} · 识字打卡`, STROKE_PAD, 46)
+
+    api.setFill('#ffffff')
+    api.setFont('800 34px "PingFang SC", sans-serif', 34)
+    ctx.fillText('和孩子一起，每天认几个字', STROKE_PAD, 88)
+
+    api.setFill('rgba(255,255,255,0.85)')
+    api.setFont('400 22px sans-serif', 22)
+    const count = chars.length || 1
+    ctx.fillText(truncate(api, `来自 ${creatorName} 的识字打卡 · 共 ${count} 个字`, width - STROKE_PAD * 2), STROKE_PAD, 138)
+
+    // 主字卡片
+    const cardY = STROKE_HEADER_H + 16
+    const cardX = STROKE_PAD
+    const cardW = width - STROKE_PAD * 2
+    drawRoundRectPath(ctx, cardX, cardY, cardW, STROKE_CARD_H, 24)
+    api.setFill('#ffffff')
+    ctx.fill()
+
+    if (pinyinText) {
+      api.setFill('#1e88e5')
+      api.setTextAlign('center')
+      api.setTextBaseline('top')
+      api.setFont('500 36px sans-serif', 36)
+      ctx.fillText(truncate(api, pinyinText, cardW - 80), width / 2, cardY + 36)
+    }
+
+    // 大字
+    api.setFill('#1f2937')
+    api.setTextAlign('center')
+    api.setTextBaseline('middle')
+    api.setFont('700 220px "PingFang SC", sans-serif', 220)
+    ctx.fillText(main, width / 2, cardY + STROKE_CARD_H / 2 + 14)
+
+    // 今日认字清单
+    if (chars.length) {
+      const label = '今日认字：' + chars.slice(0, 10).join(' ')
+      api.setFill('#94a3b8')
+      api.setTextAlign('center')
+      api.setTextBaseline('bottom')
+      api.setFont('400 24px sans-serif', 24)
+      ctx.fillText(truncate(api, label, cardW - 60), width / 2, cardY + STROKE_CARD_H - 28)
+    }
+
+    // 底部二维码卡片
+    const footerY = cardY + STROKE_CARD_H + 16
+    const fCardH = STROKE_FOOTER_H - 40
+    drawRoundRectPath(ctx, STROKE_PAD, footerY, cardW, fCardH, 20)
+    api.setFill('#ffffff')
+    ctx.fill()
+
+    const qrSize = 180
+    const qrX = STROKE_PAD + (cardW - qrSize) / 2
+    const qrY = footerY + 30
+    if (qrImg) {
+      try { ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize) } catch (e) { /* ignore */ }
+    } else {
+      api.setFill('#f1f5f9')
+      ctx.fillRect(qrX, qrY, qrSize, qrSize)
+    }
+
+    api.setFill('#1f2937')
+    api.setTextAlign('center')
+    api.setTextBaseline('top')
+    api.setFont('600 24px sans-serif', 24)
+    ctx.fillText('长按识别二维码 · 免费看笔顺动画', width / 2, qrY + qrSize + 24)
+    api.setFill('#94a3b8')
+    api.setFont('400 18px sans-serif', 18)
+    ctx.fillText(`和孩子一起在 ${APP_BRAND} 每天打卡识字`, width / 2, qrY + qrSize + 58)
+  }
+}
+
+export const renderers = { taskList, scheduleTimetable, strokeLearn }
