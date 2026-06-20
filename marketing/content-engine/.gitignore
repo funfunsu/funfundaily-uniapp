@@ -1,0 +1,5 @@
+# 生成的图片 / 上传的截图 / 二维码，不入库
+out/
+shots/
+assets/*.png
+assets/*.jpg

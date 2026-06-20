@@ -59,6 +59,41 @@ python3 content.py prompt topics --n 15   # 粘给 Claude，它回一批 add 命
 python3 content.py backlog                 # 查看库存
 ```
 
+## 配图生成（images.py，需 `pip install pillow`）
+
+把"封面/清单/规律"等文字卡**用脚本直接生成**，截图**套手机边框**让产品图更好看。
+图片尺寸 1080×1440（小红书 3:4），中文字体自动找系统的（macOS 用 STHeiti）。
+
+四种卡：
+
+| 类型 | 用途 | 命令示例 |
+|---|---|---|
+| `cover` | 封面：超大标题+副标题+角标 | `python3 images.py cover --title "笔顺易错30字" --sub "一年级·可截图自查" --corner "附正确写法"` |
+| `list` | 清单/表格（自动缩放防溢出） | 见下方 batch 里的 groups |
+| `rule` | 规律/步骤（编号要点） | `python3 images.py rule --title "7条笔顺规律" --point "从上到下" --point "从左到右"` |
+| `frame` | 截图套手机边框 | `python3 images.py frame --shot shots/x.png --caption "输字看笔顺动画"` |
+
+主题色：`--theme blue|amber|green|purple|plain`（对应积分/财务/学习/工具配色）。
+
+**批量生成一篇笔记的所有图**（推荐）：把每张图写进一个 JSON，一条命令出图。
+```bash
+python3 images.py batch --spec specs/T001.json   # 看 specs/T001.json 这个模板
+```
+生成在 `out/<笔记ID>/`。改 JSON 重跑即可。
+
+**截图美化（frame）**：
+1. 微信开发者工具/真机里截小程序页面，存到 `shots/`
+2. `python3 images.py frame --shot shots/stroke.png --caption "输字看笔顺动画"`
+3. 想叠小程序码：把码图存 `assets/miniapp-qr.png`，加 `--qr assets/miniapp-qr.png`
+
+> ⚠️ **小红书图里别放微信小程序码**（站外导流，易限流）——frame 不加 `--qr` 即可，导流靠简介+评论。
+> 小程序码适合用在：**发家长群的图、公众号配图、视频号**。
+
+> 小程序码哪来：微信小程序后台「设置→基本设置→小程序码」下载，或用 App 内分享生成的码截图，存成 `assets/miniapp-qr.png`。
+
+配图工作流串起来：`prompt write` 让 Claude 写文案时，它会列出每张图画什么 →
+你把这些填进 `specs/<ID>.json` → `images.py batch` 一键出图。
+
 ## 调策略（都在 config.json）
 - 某主题数据好 → 调高它的 `weight`（plan 会多排它）
 - 改渠道节奏 → 改 `channels.*.days`
