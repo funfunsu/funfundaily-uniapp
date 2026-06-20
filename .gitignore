@@ -19,3 +19,6 @@ dist
 *.njsproj
 *.sln
 *.sw?
+
+# 私有营销内容，不进代码仓（已迁至 funfundaily/marketing）
+/marketing/
